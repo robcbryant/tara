@@ -19,7 +19,12 @@ db/
 test_db/
 media/*
 */tara/
-/static/*
+!/static/
+/static/**
+!/static/js/
+!/static/css/
+!/static/site-images/
+!/static/Temp Files/
 settings.py
 __pycache__
 *.pyc
