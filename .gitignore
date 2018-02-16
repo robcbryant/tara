@@ -1,4 +1,3 @@
-*/settings/local.py
 *.py[co]
 *.sw[po]
 *.egg*
@@ -18,13 +17,11 @@ tmp/*
 db/
 test_db/
 media/*
-*/tara/
+settings.py
+__pycache__
+*.pyc
 !/static/
 /static/**
 !/static/js/
 !/static/css/
 !/static/site-images/
-!/static/Temp Files/
-settings.py
-__pycache__
-*.pyc
