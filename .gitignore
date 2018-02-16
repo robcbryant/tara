@@ -20,8 +20,3 @@ media/*
 settings.py
 __pycache__
 *.pyc
-!/static/**
-/static/**
-!/static/js/**
-!/static/css/**
-!/static/site-images/**
