@@ -1,0 +1,208 @@
+
+{% extends "admin/base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine{% endblock %}
+
+
+{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+
+{% block breadcrumbs %}
+    {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}
+{% endblock %}
+
+{% block content %} 
+    <div id="project-header" class="container-fluid">
+
+    </div><!-- project header -->
+    
+
+    <div id="project-content" class="container-fluid">
+    
+        <!-- This panel is the side column for listing available form types -->
+        <div id="left-pane" class="col-md-2">
+            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                              
+        </div>
+        
+        
+        <div id="center-pane" class="col-md-10">
+ 
+            <form enctype="multipart/form-data" id="new_forms_form" method="post">
+                {% csrf_token %}
+                <input type="text" class="hidden" name='sesID' value="{{ -1|getUniqueSessionToken }}">
+                <div id="worker-uri" name="{% static 'js/enki-csv-importer-worker.js' %}" style="display:none"></div>
+
+                        <div id="clone" class="row attribute-float-importer-row" style="display:none">
+                            <div class="attribute-float"><input class="clone-name" name="record__{{key}}__name" value="{{key}}"></div>
+                            <div class="attribute-float-sm"><div><span class="glyphicon glyphicon-qrcode"></span><input class="clone-isprimary" type="checkbox" name="record__{{key}}__ismainID" value=""></div></div>
+                        </div>
+
+                    
+                    <h1 class='bg-primary'>Upload a CSV File to add new formns to : {{formtype}}</h1> 
+                    <div class="container-fluid"> 
+                        <div class="row">
+                            <div class="col-md-4">
+                                <input type="file" id="csv" style="color:#5555cc;background-color: #86bee3; float:left;" name="csvfile" value="">
+                            </div>
+                            <div class="col-md-8">
+                                <div class="progress">
+                                  <div id="file-read-progress-bar" class="progress-bar progress-bar-striped" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="min-width:2em; width:0%; white-space: nowrap;">0%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="importer-stats" class="panel panel-info" style="display:none;">
+                          <div class="panel-heading">Import Stats</div>
+                          <div class="panel-body" id="info-message">
+                            {% if error_message != "" %} {{error_message}} {%endif%} 
+                          </div>
+                    </div>
+                    <div ></div>
+                    
+                   
+                    <!-- HEADER ROW FOR COLUMN OPTIONS -->
+                    <div id="read-csv-results" class="container-fluid" style="display:none">  
+                        <input type="submit" class="btn btn-success" id="submit-button" style="float:right" value="Import!">
+                        <div id="importer-header" class="row attribute-float-importer-row">
+                            
+                            <div class="attribute-float">Record Name</div>
+                            <div class="attribute-float-sm">Main ID?</div>
+
+                        </div>
+                    </div>
+                    <div id='form-type-importer' class="container-fluid" style="display:none">   
+
+                    </div>
+            </form>
+        </div>
+    </div>
+    
+
+{% endblock %}
+
+    {% block footer %}
+    
+    <!--   
+    //================================================================================================================
+    //
+    //  This script acts as a standarized set of functions and variables that all templates in the maqlu engine need
+    //  --to access and utilize. e.g. Because these scripts access the back-end API outside of a template, I needed
+    //  --a way to access the API endpoint URIs so I store a list of the URIs and pass them as a template variables
+    //  --that the rest of the included javascripts can utilize. I had contemplated just adding all the javascript to
+    //  --each <template>.html file within <script> tags, but that will increase the file template size, and there will
+    //  --be redundant code that can't be cached, nor edited easily in the future.
+    //
+    //  These global variables and Endpoints should be on every main admin template page 
+    //
+    //  It additionally, adds a CSRF token reader for the scripts to use POST AJAX with.
+    //================================================================================================================
+    -->
+    {% if user_access >= access_level %}   
+    <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+    <script>          
+    //GLOBAL FUNCTIONS//
+    function getAPIEndpoints(){
+        return JSON.parse('{{api_urls|safe}}');
+    }
+    //GLOBALS VARIABLES//
+    var RTYPE_LIST;
+    var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
+    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
+    var CURRENT_PROJECT_PK = '{{project.pk}}';
+    var INITIALIZATION_CODE = 0;
+    var API_URLS = getAPIEndpoints();
+    </script>
+    {% endif %}   
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->  
+    
+        <script src="{% static 'jquery-csv/jquery.csv.min.js' %}"></script> 
+        <script src="{% static 'papaparse/papaparse.min.js' %}"></script> 
+        <script src="{% static 'js/enki-csv-importer.js' %}"></script>
+         
+        <script>
+            var attemptCounter = 0;
+            $('#new_forms_form').on('submit', function(event){
+                event.preventDefault();
+                console.log("form submitted!")  // sanity check
+                var data = $('#new_forms_form').serializeArray();
+                $uuid = gen_uuid(); 
+                data.push({name: 'formtype_pk', value:CURRENT_FORMTYPE_PK});
+                data.push({name: 'uuid', value: $uuid});
+                data.push({name: 'row_total', value: $current_file_row_count});
+                data.push({name: 'csv_json', value: PARSED_JSON});
+
+                console.log(data);
+                $.ajax({
+                        url : API_URLS['import_formtype_forms'], // the endpoint
+                        type : "POST", // http method
+                        data :  data, // data sent with the post request
+
+                        // handle a successful response
+                        success : function(json) {
+                            console.log(json);
+                            console.log("success"); // another sanity check
+                        },
+                        // handle a non-successful response
+                        fail : function(xhr,errmsg,err) {
+                            $('#info-message').html("<div class='alert-box alert radius' data-alert>Oops! We have encountered an error: "+errmsg+
+                                " <a href='#' class='close'>&times;</a></div>"); // add the error to the dom
+                            //console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+                        }
+                });
+                
+                function update_progress_info() { 
+                    console.log($uuid);
+                    $.ajax({
+                        url : API_URLS['run_check_progress'], // the endpoint
+                        type : "POST", // http method
+                        data :  {'uuid': $uuid}, // data sent with the post request
+
+                        // handle a successful response
+                        success : function(json) {
+                        console.log(json);
+                            if (json) {
+                                //console.log("we got data!");
+                                var $progressBar = $('#file-read-progress-bar');
+                                var progress = Math.round(parseInt(json.row_index) / parseInt(json.row_total) * 100);
+                                avgTimeSum += parseFloat(json.row_timer);
+                                avgTimeCount++;
+                                var approxTimeLeft = Math.round((json.row_total - json.row_index)*(avgTimeSum/avgTimeCount));
+                                //Only update the progress bar if the row doesn't = 0
+                                if (json.is_complete == 'True'){
+                                    $progressBar.addClass('progress-bar-success');
+                                    $progressBar.removeClass('progress-bar-striped');
+                                    $progressBar.css('width', 100+'%');
+                                    $progressBar.html(100+'% -- Database Import Finished');
+                                    $progressBar.attr('aria-valuenow', 100);                   
+                                    //window.location.reload();
+                                } else if( json.row_index != '0'){
+                                    //console.log("row index larger than 0");
+                                    $progressBar.addClass('progress-bar-striped');
+                                    $progressBar.removeClass('progress-bar-success');
+                                    $progressBar.css('width', progress+'%');
+                                    $progressBar.html(progress+'% -- Approximate Time Left: ' + approxTimeLeft + " seconds");
+                                    $progressBar.attr('aria-valuenow', progress);
+                                } else {
+                                    $progressBar.css('width', 0+'%');
+                                    $progressBar.html(0+'% -- Approximate Time Left: Calculating...');
+                                    $progressBar.attr('aria-valuenow', 0);
+                                }
+                            }
+                           if (json.hasOwnProperty('ERROR')) {attemptCounter += 1;if (attemptCounter < 60)window.setTimeout(update_progress_info, 1000);}
+                           else if(json.is_complete == 'False')window.setTimeout(update_progress_info, 1000);
+                           
+                        }
+                    });
+                }
+                window.setTimeout(update_progress_info, 1000);
+           
+            });          
+        
+        </script>
+        
+    {% endblock %}

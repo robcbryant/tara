@@ -1,0 +1,266 @@
+
+{% extends "admin/base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine&nbsp;&nbsp;-&nbsp;&nbsp;{{project}}&nbsp;&nbsp;:&nbsp;&nbsp;{{formtype}}&nbsp;&nbsp;:&nbsp;&nbsp;{{form}}{% endblock %}
+
+
+{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+
+{% block breadcrumbs %}
+    {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}
+{% endblock %}
+
+{% block content %} 
+    
+    <div id="project-header" class="container-fluid">
+    </div><!-- project header -->
+    
+    
+    <div id="project-content" class="container-fluid">
+    
+        <!-- This panel is the side column for listing available form types -->
+        <div id="left-pane" class="col-md-2">
+            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                              
+        </div>
+         
+        <div id="center-pane" class="col-md-10">
+ 
+
+ 
+             <form id="edit_form" method="post">
+                {% if user_access >= access_level %}{% csrf_token %}{% endif %}
+                <input type="submit" id="submit-form" class="hidden">
+                
+                <div id="form-header" class="">
+              
+                    <div id="recycling-bin" class=""> 
+                            
+                            <div class="recycled-item-template" hidden>
+                                <div class="LABEL">Test Label</div>
+                                <div class="type">Model Type</div>
+                                <div class="parent">Parent Model</div>
+                                <div class="date">Date Deleted</div>
+                                <div class="btn restore-item"><span class="glyphicon glyphicon-wrench"></span></div>
+                                {% if user_access >= 5 %}<div class="btn perma-delete-item"><span class="glyphicon glyphicon-trash"></span></div>{%endif%}
+                            </div>
+                    </div>
+                    
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    
+{% endblock %}
+
+
+{% block footer %}
+
+    <!--   
+    //================================================================================================================
+    //
+    //  This script acts as a standarized set of functions and variables that all templates in the maqlu engine need
+    //  --to access and utilize. e.g. Because these scripts access the back-end API outside of a template, I needed
+    //  --a way to access the API endpoint URIs so I store a list of the URIs and pass them as a template variables
+    //  --that the rest of the included javascripts can utilize. I had contemplated just adding all the javascript to
+    //  --each <template>.html file within <script> tags, but that will increase the file template size, and there will
+    //  --be redundant code that can't be cached, nor edited easily in the future.
+    //
+    //  These global variables and Endpoints should be on every main admin template page 
+    //
+    //  It additionally, adds a CSRF token reader for the scripts to use POST AJAX with.
+    //================================================================================================================
+    -->
+    {% if user_access >= access_level %}   
+    <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+    <script>          
+    //GLOBAL FUNCTIONS//
+    function getAPIEndpoints(){
+        return JSON.parse('{{api_urls|safe}}');
+    }
+    //GLOBALS VARIABLES//
+    var RTYPE_LIST;
+    var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
+    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
+    var CURRENT_PROJECT_PK = '{{project.pk}}';
+    var INITIALIZATION_CODE = 0;
+    var API_URLS = getAPIEndpoints();
+    
+    //Query Engine Specific
+    var GLOBAL_CURRENT_QUERY; console.log('{{user.permissions.saved_queries|escapejs}}');
+    var GLOBAL_USER_QUERIES{% if user.permissions.saved_queries == None %}; {% else %} = JSON.parse('{{user.permissions.saved_queries|escapejs}}'); {%endif%}
+        
+    </script>
+    {% endif %}   
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    
+    {% if user_access >= access_level %}
+    <script>
+
+    function loadRTYPESForForm(){
+ 
+        
+            var formData = {"project_pk": CURRENT_PROJECT_PK};
+            console.log(formData);
+            $.ajax({ 
+                 url   : API_URLS['load_recycling_bin'],
+                 type  : "POST",
+                 data  : formData, // data to be submitted
+                 success : function(returnedQuery)
+                 {
+                    console.log(returnedQuery);
+                    for(i = 0; i < returnedQuery.recycled_items.length; i ++){
+                        currentItem = returnedQuery.recycled_items[i];
+                        switch (currentItem.item_type){
+
+                        case "FTYPE":
+                            $newItem = $('#recycling-bin').find('.recycled-item-template').clone(true);
+                            $newItem.show();
+                            $newItem.find('.type').html("Form Type");
+                            $newItem.find('.LABEL').html(currentItem.item_label);
+                            $newItem.find('.date').html(currentItem.date_deleted);
+                            $newItem.attr('pk', currentItem.item_pk);
+                            $newItem.removeClass('recycled-item-template');
+                            $newItem.addClass('recycled-item');
+                            //Handle Button Listeners
+                            $newItem.find('.restore-item').click( function(){
+                                var pk = $(this).parent().attr('pk');
+                                var widget = $(this).parent();
+                                $.ajax({ 
+                                     url   : API_URLS.restore_form_type, type  : "POST", data  : {"ID": pk}, 
+                                     success : function(message){
+                                        console.log(message);
+                                        location.reload();
+                                     }                 
+                                });
+                            });
+                            $newItem.find('.perma-delete-item').click ( function(){
+                                $.ajax({ 
+                                     url   : API_URLS.delete_form_type, type  : "POST", data  : {"ID": $(this).parent().attr('pk')}, 
+                                     success : function(message){
+                                        console.log(message);
+                                        location.reload();
+                                     }                 
+                                });
+                            });
+                            $('#recycling-bin').append($newItem);
+                            break;
+                        case "FORM":
+                            $newItem = $('#recycling-bin').find('.recycled-item-template').clone(true);
+                            $newItem.show();
+                            $newItem.find('.type').html("Form");
+                            $newItem.find('.LABEL').html(currentItem.item_label);
+                            $newItem.find('.date').html(currentItem.date_deleted);
+                            $newItem.find('.parent').html(currentItem.parent_form_type);
+                            $newItem.attr('pk', currentItem.item_pk);
+                            $newItem.removeClass('recycled-item-template');
+                            $newItem.addClass('recycled-item');
+                            console.log($newItem[0]);
+                            //Handle Button Listeners
+                            $newItem.find('.restore-item').click( function(){
+                                var pk = $(this).parent().attr('pk');
+                                var widget = $(this).parent();
+                                $.ajax({ 
+                                     url   : API_URLS.restore_form, type  : "POST", data  : {"ID": pk}, 
+                                     success : function(message){
+                                        console.log(message);
+                                        location.reload();
+                                     }                 
+                                });
+                            });
+                            $newItem.find('.perma-delete-item').click ( function(){
+                                $.ajax({ 
+                                     url   : API_URLS.delete_form, type  : "POST", data  : {"ID": $(this).parent().attr('pk')}, 
+                                     success : function(message){
+                                        console.log(message);
+                                        location.reload();
+                                     }                 
+                                });
+                            });
+                            $('#recycling-bin').append($newItem);
+                            break;
+                        case "FRAT":
+                            $newItem = $('#recycling-bin').find('.recycled-item-template').clone(true);
+                            $newItem.show();
+                            $newItem.find('.type').html("Form Record Attribute");
+                            $newItem.find('.date').html(currentItem.date_deleted);
+                            $newItem.find('.LABEL').html(currentItem.item_label);
+                            $newItem.find('.parent').html(currentItem.parent_form_type);
+                            $newItem.attr('pk', currentItem.item_pk);
+                            $newItem.removeClass('recycled-item-template');
+                            $newItem.addClass('recycled-item');
+                            console.log($newItem[0]);
+                            //Handle Button Listeners
+                            $newItem.find('.restore-item').click( function(){
+                                var pk = $(this).parent().attr('pk');
+                                var widget = $(this).parent();
+                                $.ajax({ 
+                                     url   : API_URLS.restore_frat, type  : "POST", data  : {"ID": pk}, 
+                                     success : function(message){
+                                        console.log(message);
+                                        location.reload();
+                                     }                 
+                                });
+                            });
+                            $newItem.find('.perma-delete-item').click ( function(){
+                                $.ajax({ 
+                                     url   : API_URLS.delete_frat, type  : "POST", data  : {"ID": $(this).parent().attr('pk')}, 
+                                     success : function(message){
+                                        console.log(message);
+                                        location.reload();
+                                     }                 
+                                });
+                            });
+                            $('#recycling-bin').append($newItem);
+                            break;
+                        case "FRRT":
+                            $newItem = $('#recycling-bin').find('.recycled-item-template').clone(true);
+                            $newItem.show();
+                            $newItem.find('.type').html("Form Record Reference");
+                            $newItem.find('.LABEL').html(currentItem.item_label);
+                            $newItem.find('.date').html(currentItem.date_deleted);
+                            $newItem.find('.parent').html(currentItem.parent_form_type);
+                            $newItem.attr('pk', currentItem.item_pk);
+                            $newItem.removeClass('recycled-item-template');
+                            $newItem.addClass('recycled-item');
+                            console.log($newItem[0]);
+                            //Handle Button Listeners
+                            $newItem.find('.restore-item').click( function(){
+                                var pk = $(this).parent().attr('pk');
+                                var widget = $(this).parent();
+                                $.ajax({ 
+                                     url   : API_URLS.restore_frrt, type  : "POST", data  : {"ID": pk}, 
+                                     success : function(message){
+                                        console.log(message);
+                                        location.reload();
+                                     }                 
+                                });
+                            });
+                            $newItem.find('.perma-delete-item').click ( function(){
+                                $.ajax({ 
+                                     url   : API_URLS.delete_frrt, type  : "POST", data  : {"ID": $(this).parent().attr('pk')}, 
+                                     success : function(message){
+                                        console.log(message);
+                                        location.reload();
+                                     }                 
+                                });
+                            });
+                            $('#recycling-bin').append($newItem);
+                            break;
+                            }
+                    }
+                 }
+            });          
+        
+    }
+    $(document).ready(loadRTYPESForForm);
+    
+    
+    </script>
+    {% endif %}
+    {% endblock %}

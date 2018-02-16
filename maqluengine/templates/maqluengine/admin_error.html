@@ -1,0 +1,48 @@
+
+{% extends "admin/base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine{% endblock %}
+
+
+{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+
+{% block breadcrumbs %}                      
+    {% include "base/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}
+{% endblock %}
+
+{% block content %} 
+
+    <div id="project-header" class="container-fluid">
+
+    </div><!-- project header -->
+      
+    <div id="project-content" class="container-fluid">
+    
+        <!-- This panel is the side column for listing available form types -->
+        <div id="left-pane" class="col-md-2">
+            {% include "base/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                           
+        </div>
+        
+         
+        
+        <div id="center-pane" class="col-md-10">
+     
+                <div class="error_message">{{ERROR_MESSAGE}}<br><span class="glyphicon glyphicon-warning-sign"></span></div>
+                
+
+            
+            
+        </div>
+    </div>
+
+
+{% endblock %}
+
+
+    {% block footer %}
+    <script src="{% static 'chart/Chart.min.js'  %}"></script>     
+    <script src="{% static 'js/enki-search-formtype-controls.js' %}"></script> 
+    <script src="{% static 'js/enki-thumbnail-popup.js'  %}"></script>    
+    {% endblock %}

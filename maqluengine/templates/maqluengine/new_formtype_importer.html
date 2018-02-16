@@ -1,0 +1,178 @@
+
+{% extends "admin/base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine{% endblock %}
+
+
+{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+
+{% block breadcrumbs %}
+    {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}
+{% endblock %}
+
+{% block content %} 
+    <div id="project-header" class="container-fluid">
+
+    </div><!-- project header -->
+    
+
+    <div id="project-content" class="container-fluid">
+    
+        <!-- This panel is the side column for listing available form types -->
+        <div id="left-pane" class="col-md-2">
+            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                              
+        </div>
+        
+        
+        <div id="center-pane" class="col-md-10">
+ 
+            <form enctype="multipart/form-data" id="new_form_type" method="post">
+                {% csrf_token %}
+                <input type="text" class="hidden" name='sesID' value="{{ -1|getUniqueSessionToken }}">
+                <div id="worker-uri" name="{% static 'js/enki-csv-importer-worker.js' %}" style="display:none"></div>
+
+                        <div id="clone" class="row attribute-float-importer-row" style="display:none">
+                            <div class="attribute-float"><input class="clone-name" name="record__{{key}}__name" value="{{key}}"></div>
+                            <div class="attribute-float-sm"><div><span class="glyphicon glyphicon-qrcode"></span><input class="clone-isprimary" type="checkbox" name="record__{{key}}__ismainID" value=""></div></div>
+                            <div class="attribute-float-sm"><div><span class="glyphicon glyphicon-sort-by-attributes-alt"></span><input class="clone-ishierarchy" type="checkbox" name="record__{{key}}__ishierarchy" value=""></div></div>
+                            <div class="attribute-float"><select class="clone-select" name="record__{{key}}__reftype">
+                                    <option value="default" selected>Current Import Form Type</option>
+                                {% for aformtype in project.formtype_set.all %}
+                                    <option value="{{aformtype.pk}}">{{aformtype}}</option>
+                                {% endfor %}</select></div>
+                            <div class="attribute-float-sm"><div><span class="glyphicon glyphicon-transfer"></span><input class="clone-isreference" type="checkbox" name="record__{{key}}__isreference" value=""></div></div>
+                            <div class="attribute-float"></div>
+                        </div>
+
+                    
+                    <h1 class='bg-primary'>Upload a CSV File:</h1> 
+                    <div class="container-fluid"> 
+                        <div class="row">
+                            <div class="col-md-4">
+                                <input type="file" id="csv" style="color:#5555cc;background-color: #86bee3; float:left;" name="csvfile" value="">
+                            </div>
+                            <div class="col-md-8">
+                                <div class="progress">
+                                  <div id="file-read-progress-bar" class="progress-bar progress-bar-striped" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="min-width:2em; width:0%; white-space: nowrap;">0%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="importer-stats" class="panel panel-info" style="display:none;">
+                          <div class="panel-heading">Import Stats</div>
+                          <div class="panel-body" id="info-message">
+                            {% if error_message != "" %} {{error_message}} {%endif%} 
+                          </div>
+                    </div>
+                    <div ></div>
+                    
+                    <div id="form-type-title" style="display:none">
+                        <h2 class='bg-primary'>New Form Type Name: <input type="text" style="color:#5555cc;margin-bottom: 1px;padding: 0px;" name="form_type_name" value=""></input><input type="submit" class="btn btn-success" id="submit-button" style="display:none; float:right" value="Import!"></h2>
+                        <input id="parsed-json" type="hidden" name='csv_json' value="{{csv_json}}">
+                    
+                    <!-- FORM TYPE GROUP OPTIONS CONTAINER-->
+                         <div class="container-fluid">
+                         <div class="input-group col-sm-4" style="float:left;">
+                            <div class="input-group-addon">Add to Group?</div>
+                            
+                            <div>
+                                <select name="ft_group" class="selectpicker" data-size="5" data-width="90%" data-live-search="true" >
+                                    <option value="NONE">---------</option>
+                                    <option value="NEW">NEW GROUP</option>
+                                            {% for aformtypegroup in project.formtypegroup_set.all %}
+                                                <option value="{{aformtypegroup.pk}}" {% if formtype.form_type_group.pk == aformtypegroup.pk %} selected="selected" {% endif %}>{{aformtypegroup}}</option>
+                                            {% endfor %}
+                                </select>
+                            </div>
+                            <div><input type="text" name="ft_group_new" value="Enter Name if New" style="width:90%"></div>
+                        </div>  
+                    <!-- MEDIA TYPE OPTIONS CONTAINER-->                            
+
+                         <div class="input-group col-sm-4" style="float:left;">
+                            <div class="input-group-addon">Is Media Type?</div>
+                            <div>
+                                <select class="selectpicker" name="ft_media_type">
+                                    <option value="-1" selected>Not a Media Type</option>
+                                    <option value="1">Image(.jpg,.tif, etc.)</option>
+                                    <option value="2">Pdf Document</option>
+                                    <option value="3">3D Object</option>
+                                    <option value="0">Other</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        
+                    <!-- IS HIERCHICAL OPTIONS CONTAINER-->
+                        <div class="input-group col-sm-4" style="float:left;">                    
+                        <div class="input-group-addon">Is Hierchical?</div>
+                        <div class="importer-title-check-box" style=""><input type="checkbox" name="is_hierarchical"></div>
+                        </div>
+                        </div>
+                    </div>
+                    
+                    <!-- HEADER ROW FOR COLUMN OPTIONS -->
+                    <div id="read-csv-results" class="container-fluid" style="display:none">  
+                        <div id="importer-header" class="row attribute-float-importer-row">
+                            
+                            <div class="attribute-float">Record Name</div>
+                            <div class="attribute-float-sm">Main ID?</div>
+                            <div class="attribute-float-sm">Hierarchy Ref?</div>
+                            <div class="attribute-float">Reference</div>
+                            <div class="attribute-float-sm">Is Ref?</div>
+                        </div>
+                    </div>
+                    <div id='form-type-importer' class="container-fluid" style="display:none">   
+
+                    </div>
+            </form>
+        </div>
+    </div>
+    
+
+{% endblock %}
+
+{% block footer %}
+    
+    <!--   
+    //================================================================================================================
+    //
+    //  This script acts as a standarized set of functions and variables that all templates in the maqlu engine need
+    //  --to access and utilize. e.g. Because these scripts access the back-end API outside of a template, I needed
+    //  --a way to access the API endpoint URIs so I store a list of the URIs and pass them as a template variables
+    //  --that the rest of the included javascripts can utilize. I had contemplated just adding all the javascript to
+    //  --each <template>.html file within <script> tags, but that will increase the file template size, and there will
+    //  --be redundant code that can't be cached, nor edited easily in the future.
+    //
+    //  These global variables and Endpoints should be on every main admin template page 
+    //
+    //  It additionally, adds a CSRF token reader for the scripts to use POST AJAX with.
+    //================================================================================================================
+    -->
+    {% if user_access >= access_level %}   
+    <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+    <script>          
+    //GLOBAL FUNCTIONS//
+    function getAPIEndpoints(){
+        return JSON.parse('{{api_urls|safe}}');
+    }
+    //GLOBALS VARIABLES//
+    var RTYPE_LIST;
+    var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
+    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
+    var CURRENT_PROJECT_PK = '{{project.pk}}';
+    var INITIALIZATION_CODE = 0;
+    var API_URLS = getAPIEndpoints();
+    </script>
+    {% endif %}   
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    
+        <script src="{% static 'jquery-csv/jquery.csv.min.js' %}"></script> 
+        <script src="{% static 'papaparse/papaparse.min.js' %}"></script> 
+        <script src="{% static 'js/enki-csv-importer.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,336 @@
+
+{% extends "admin/base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine&nbsp;&nbsp;-&nbsp;&nbsp;{{project}}&nbsp;&nbsp;:&nbsp;&nbsp;{{formtype}}&nbsp;&nbsp;:&nbsp;&nbsp;{{form}}{% endblock %}
+
+
+{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+
+{% block breadcrumbs %}
+    {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}
+{% endblock %}
+
+{% block content %} 
+    
+    <div id="project-header" class="container-fluid">      
+    </div><!-- project header -->
+    
+    
+    <div id="project-content" class="container-fluid">
+    
+        <!-- This panel is the side column for listing available form types -->
+        <div id="left-pane" class="col-md-2">
+            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                              
+        </div>
+         
+        <div id="center-pane" class="col-md-10">
+ 
+            <form id="form-nav-search-form" method="post" autocomplete="off">
+
+                {% if user_access >= access_level %}{% csrf_token %}{% endif %}
+                <div id="nav-container">
+                    <div class="spacer"></div>
+                    <div id="form-navigation">
+                    
+                        <div class="span-container"><a id="previous-form-link"><span class="glyphicon glyphicon-backward"></span></a></div>
+                        <div class="search-field">
+                            <div id="search-box-list" style="display:none;"></div>
+                            <input type='text' id="form-nav-search" placeholder="{{form}}" oninput="queryServerForMatchingForms(this, {{project.pk}}, {{formtype.pk}});"></input>     
+                        </div>
+                        <div class="span-container"><a id="next-form-link"><span class="glyphicon glyphicon-forward"></span></a></div>
+                    </div>
+                    <div class="spacer"> 
+                    
+                    {% if user_access >= access_level %}
+                    <div class="btn-group btn-group-sm save-delete-buttons" role="group">
+                        <label for="submit-form" data-toggle="tooltip" data-placement="bottom" title="Save New Form or Form Template" class="btn btn-success" role="button"><span class="glyphicon glyphicon-floppy-disk"></span></label>
+                        
+                        <button id="toolbar-delete" {%if form != 'False' %}name="delete-form" value="{{form.pk}}"{%else%}name="delete-form-type" value="{{formtype.pk}}"{%endif%}" type="submit" data-toggle="tooltip" data-placement="bottom" title="Delete Current Form or Form Template" class="btn btn-danger" role="button" {% if deletable == 'True' %}{% else %}disabled{% endif %}><span class="glyphicon glyphicon-trash"></span></button>
+
+                    </div>  
+                   {% endif %} 
+                       
+                    </div>
+                </div>
+                <input type="submit" autocomplete="off" hidden/>    
+             </form>
+
+ 
+             <form id="edit_form" method="post">
+                {% if user_access >= access_level %}{% csrf_token %}{% endif %}
+                <input type="submit" id="submit-form" class="hidden">
+                <input type="submit" id="submit-delete-form" class="hidden" name='delete-form-type'>
+                <input type="text" class="hidden" name='sesID' value="{{ -1|getUniqueSessionToken }}">
+                
+                <div id="form-header" class="">
+              
+                    <div class="">
+                        <div class="row header-container">
+                            <div class="col-md-6">
+                             {% if formtype.media_type == 3 %}
+                                <div id="three-viewer">
+                                    <a id="three-viewer-link" title="{% static 'Temp Files/untitled.jpg'  %}" href="{% static 'Temp Files/untitled.obj'  %}">Download Link</a>
+                                </div>
+                                
+                                <script src="{% static 'three/three.min.js'  %}"></script>
+                                <script src="{% static 'three/js/loaders/OBJLoader.js'  %}"></script>
+                                <script src="{% static 'three/js/controls/OrbitControls.js'  %}"></script>
+                                <script src="{% static 'three/js/Detector.js'  %}"></script>
+                                <script src="{% static 'three/js/libs/stats.min.js'  %}"></script>
+                                <script src="{% static 'js/enki_3dviewer.js'  %}"></script> 
+                                
+                             {% else %}
+                                <div id="geospatial" style="min-height:400px;">
+                                    <!--geospatial stuff goes here-->
+                                    <div id="gis-help-text-box" class="col-md-12"></div>
+                                    <div style="display:none;"><strong>GeoJSON Data</strong></div>
+                                    <div style="display:none;"><textarea id="id_geojson_string" name ="form_geojson_string">{{form.form_geojson_string}}</textarea></div>
+                                </div>
+                             {%endif%}
+                            </div>
+                                                      
+                            <!-- FormType Name Entry for Editing-->
+                            <div id="form-properties" class="col-md-6">
+                                <div id="form-info" class="panel">
+                                    <div class="panel-heading">{{form.form_name}} {{ formtype.form_type_name }} Properties</div>
+                                    <div class="panel-body">
+                                        <div class="input-group">
+                                            {% if formtype.type == 0 %}
+                                            <div class="input-group-addon property-label">{{ formtype.form_type_name }} ID</div>
+                                            {% elif formtype.type == 1%}
+                                            <div class="input-group-addon property-label">{{ formtype.form_type_name }} URI ID</div>
+                                            {% else %}
+                                            <div class="input-group-addon property-label">{{ formtype.form_type_name }} Entry</div>
+                                            {%endif%}
+                                            <input type="text" name="form_number" value="{{form}}" class="form-control property-value">
+
+                                        </div>
+                                        <div class="input-group"> <div class="input-group-addon property-label">Date Created</div><input type="text" value="{{form.date_created}}" class="form-control property-value" disabled></div>
+                                        <div class="input-group"> <div class="input-group-addon property-label">Created By</div><input type="text" value="{{form.created_by}}" class="form-control property-value" disabled></div>
+                                        <div class="input-group"> <div class="input-group-addon property-label">Last Modified</div><input type="text" value="{{form.date_last_modified}}" class="form-control property-value" disabled></div>
+                                        <div class="input-group"> <div class="input-group-addon property-label">Modified By</div><input type="text" value="{{form.modified_by}}" class="form-control property-value"disabled></div>
+                                        {% if formtype.media_type == 1 %}
+                                             <div class="image-thumb">
+                                                <img class="enki-img-popup" src="{{project.uri_thumbnail}}{%if formtype.uri_prefix != None %}{{formtype.uri_prefix}}{%endif%}{{form}}{{formtype.file_extension}}"/>
+                                                <div><a href="{{project.uri_img}}{%if formtype.uri_prefix != None %}{{formtype.uri_prefix}}{%endif%}{{form}}{{formtype.file_extension}}">Download Image</a></div>
+                                             </div>
+                                        {% elif formtype.media_type == 2 %}
+                                             <div class="image-thumb">
+                                                <embed id="iframe-container-clone" type="application/pdf" src="{{project.uri_download}}{%if formtype.uri_prefix != None %}{{formtype.uri_prefix}}{%endif%}{{form.form_name}}.pdf" style="width:100%; min-height:400px;"></embed>
+                                                <a href="{{project.uri_download}}{%if formtype.uri_prefix != None %}{{formtype.uri_prefix}}{%endif%}{{form}}.pdf">Download Link</a>
+                                             </div>
+
+
+                                        {% endif %}
+                                        {% if formtype.is_hierarchical%}
+                                            <div class="input-group">
+                                                <div class="input-group-addon property-label">Choose an available Parent: </div>
+                                                <select  class="selectpicker" data-size="5" data-width="100%" data-live-search="true" name="hierarchical_reference">
+                                                    <option value="NONE">--None--</option>
+                                                {% for formpk, label in formtype.string_list_hierarchy %}
+                                                    {%if form.pk  != aform.pk %}
+                                                    <option value="{{formpk}}" {%if formpk == form.hierarchy_parent.pk%}selected{%endif%}>{{formtype}}&nbsp;&nbsp;-&nbsp;&nbsp;{% autoescape off %}{{label}}{%endautoescape%}</option>
+                                                    {% endif%}
+                                                {% endfor %} 
+                                                </select>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>   
+                            </div>
+                    
+                        </div>
+                    </div>
+                    
+                    <!-- All Attributes -->           
+                    <div id="form-all-fields-grid" class=""> 
+                        <div class="layout-container">
+
+                        
+                            <div class="loader" hidden></div>
+                             
+                                
+                                
+                        </div>
+                    </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!---------------------------------------------------------------------------------------------------------------------------------------------------------->    
+    <!-- ALL WIDGET TEMPLATES CONTAINER (for cloning) ---------------------------------------------------------------------------------------------------------->
+    <!---------------------------------------------------------------------------------------------------------------------------------------------------------->
+    <div id="widget-templates" style="display:none">
+                <!-- LABEL WIDGET ------------------------------------------------------------------------------------------------------------------------>
+                <div class="widget-label" type="label"><div class="widget-label-value LABEL">Label</div></div>
+                
+                <!-- DROPDOWN SELECT WIDGET ------------------------------------------------------------------------------------------------------------------------>
+                <div class="widget-dropdown-view widget-FRRT widget frrt" id="" type="dropdown-view" msg="NEW">
+                    <div class="dropdown-title LABEL">Label Here</div>
+                    <div class="ext-key" hidden><input hidden></input></div>
+                    <select name=""><option value="" selected="">None</option></select>
+                </div>                
+                
+                <!-- THUMB LIST WIDGET ------------------------------------------------------------------------------------------------------------------------>
+                <div class="widget-thumb-view widget-FRRT widget frrt" id="" type="frrt" msg="NEW">
+                    
+                    <div class="frrv-title">
+                        <div class="LABEL"></div>
+                    </div>
+                    <div class="frrv-list">          
+                        
+                        
+                    </div>
+                    <div class="frrv-search">
+                        <div class="ext-key"><span class="glyphicon glyphicon-barcode"></span><input type="text"></input></div>
+                        <div class="search-box"><span class="glyphicon glyphicon-search"></span><input type="text"></input><div class="search-box-list" hidden></div></div>
+                    </div>
+
+                </div>
+                
+                <!-- IMAGE VIEW WIDGET ------------------------------------------------------------------------------------------------------------------------>
+                <div class="widget-image-view widget-FRRT frrt" msg="NEW">
+                    <div class="frrv-title">
+                        <div class="LABEL"></div>
+                    </div>
+                    <div class="widget-image-view-nav-arrows">
+                        <button class="nav-left" type="button"><span class="glyphicon glyphicon-chevron-left"></span></button>
+                        <button class="nav-right" type="button"><span class="glyphicon glyphicon-chevron-right"></span></button>
+                    </div>
+                    <div class="frrv-list">
+                       
+                    </div>
+                    <div class="frrv-search">
+                        <div class="ext-key"><span class="glyphicon glyphicon-barcode"></span><input type="text"></input></div>
+                        <div class="search-box"><span class="glyphicon glyphicon-search"></span><input type="text"></input><div class="search-box-list" hidden></div></div>
+                        
+                    </div>                  
+                </div>        
+                
+                <!-- FRAT WIDGET ------------------------------------------------------------------------------------------------------------------------>
+                <div class="widget-frat attribute-float widget frat" id="" type="frat" msg="NEW">
+                    <ul class="list-group" title="">
+                        <li class="list-group-item input-label"><strong class="LABEL"></strong></li>
+                        <li class="list-group-item input-field">
+                            <textarea style="resize:none;"></textarea>
+                        </li>
+                    </ul>
+                </div>
+                
+                <!-- Other Widget related templates, e.g. a list item template -->
+                
+                    <!-- Thumb List Item Template -->
+                    <div class="frrv-container thumb-view-item"><input name="" value="" hidden></input><img class="enki-img-popup" src=""><div class="frrv-label" style=""><a href="#">Example Item 1</a></div><button class="btn btn-danger" type="button" onclick="removeReferenceFromFRRV(this)"><span class="glyphicon glyphicon-remove"></span></button></div>
+                    <!-- Image View Item Template -->
+                    <div class="frrv-container image-view-item"><input name="" value="" hidden></input><div class="frrv-label"><a href="">Label</a></div><img class="enki-img-popup" src=""></img><button class="btn btn-danger" type="button" onclick="removeReferenceFromFRRV(this)"><span class="glyphicon glyphicon-remove"></span></button></div>
+    </div>
+    <!--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-->    
+    <!--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-->
+    <!--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-->   
+    
+    
+{% endblock %}
+
+
+{% block footer %}
+    <!--   
+    //================================================================================================================
+    //
+    //  This script acts as a standarized set of functions and variables that all templates in the maqlu engine need
+    //  --to access and utilize. e.g. Because these scripts access the back-end API outside of a template, I needed
+    //  --a way to access the API endpoint URIs so I store a list of the URIs and pass them as a template variables
+    //  --that the rest of the included javascripts can utilize. I had contemplated just adding all the javascript to
+    //  --each <template>.html file within <script> tags, but that will increase the file template size, and there will
+    //  --be redundant code that can't be cached, nor edited easily in the future.
+    //
+    //  These global variables and Endpoints should be on every main admin template page 
+    //
+    //  It additionally, adds a CSRF token reader for the scripts to use POST AJAX with.
+    //================================================================================================================
+    -->
+    {% if user_access >= access_level %}   
+    <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+    <script>          
+    //GLOBAL FUNCTIONS//
+    function getAPIEndpoints(){
+        return JSON.parse('{{api_urls|safe}}');
+    }
+    //GLOBALS VARIABLES//
+    var RTYPE_LIST;
+    var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
+    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
+    var CURRENT_PROJECT_PK = '{{project.pk}}';
+    var INITIALIZATION_CODE = 0;
+    var API_URLS = getAPIEndpoints();
+    </script>
+    {% endif %}   
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+
+    {% if formtype.media_type != 3 %}
+        <script src="{% static 'js/enki-form-navigation-search.js'  %}"></script>
+        <script src="{% static 'js/enki_geoeditor_single_entity.js'  %}"></script>   
+        <script src="{% static 'js/enki-iframe-url-tester.js'  %}"></script> 
+    {%endif%}   
+    
+    {% if user_access >= access_level %}
+        <script>
+            var DEFAULT_GEOJSON = '{{project.geojson_string}}';
+            
+            $('#edit_form').submit(function(e){
+                e.preventDefault();
+                var formData = $("#edit_form").serializeArray();
+                formData.push({name: 'project_id', value: CURRENT_PROJECT_PK });
+                formData.push({name: 'formtype_id', value: CURRENT_FORMTYPE_PK });
+                formData.push({name: 'form_id', value: CURRENT_FORM_PK });
+                console.log(formData);
+                $.ajax({ 
+                     url   : API_URLS['save_form'],
+                     type  : "POST",
+                     data  : formData, // data to be submitted
+                     success : function(returnedQuery)
+                     {
+                        console.log(returnedQuery);
+                        try{alert(returnedQuery.MESSAGE);}
+                        catch(e){alert(returnedQuery.ERROR);}
+                     },
+                    // handle a non-successful response
+                    fail : function(xhr,errmsg,err) {
+                        console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+                    }
+                });        
+            
+            }); 
+            
+            $('#toolbar-delete').click( function(){
+                if(confirm("Are you sure you want to delete this Form?")){
+                    formData = {'ID': CURRENT_FORM_PK}
+                    $.ajax({ 
+                         url   : API_URLS['recycle_form'],
+                         type  : "POST",
+                         data  : formData, // data to be submitted
+                         success : function(returnedQuery)
+                         {
+                            console.log(returnedQuery);
+                            window.location.replace($('#next-form-link').attr('href'));
+
+                         },
+                        // handle a non-successful response
+                        fail : function(xhr,errmsg,err) {
+                            console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+                        }
+                    });        
+                }
+            }); 
+            
+        
+        </script>
+        <script src="{% static 'js/enki_template_engine.js'  %}"></script>   
+    {% endif %}
+    {% endblock %}

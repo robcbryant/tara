@@ -1,0 +1,255 @@
+
+{% extends "admin/base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine{% endblock %}
+
+
+{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+
+{% block breadcrumbs %}
+    {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}
+{% endblock %}
+
+{% block content %} 
+    <div id="project-content" class="container-fluid">
+    
+        <!-- This panel is the side column for listing available form types -->
+        <div id="left-pane" class="col-md-2">
+            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                              
+        </div>
+        
+        
+        <div id="center-pane" class="col-md-10">
+
+            <form id="new-form" method="post">
+                {% if user_access >= access_level %}{% csrf_token %}{% endif %}
+                <input type="submit" id="submit-form" class="hidden">
+                <input type="submit" id="submit-delete-form" class="hidden" name='delete-form-type'>
+                <input type="text" class="hidden" name='sesID' value="{{ -1|getUniqueSessionToken }}">
+                
+                <div id="form-header" class="">
+                    <div class="">
+                        <div class="row header-container">
+                            <div class="col-md-6">
+                                <div id="geospatial" style="min-height:400px;">
+                                    <!--geospatial stuff goes here-->
+                                    <div id="gis-help-text-box" class="col-md-12"></div>
+                                    <div style="display:none;"><strong>GeoJSON Data</strong></div>
+                                    <div style="display:none;"><textarea id="id_geojson_string" name ="form_geojson_string"></textarea></div>
+                                </div>
+                            </div>
+                                                      
+                            <!-- FormType Name Entry for Editing-->
+                            <div id="form-properties" class="col-md-6">
+                                <div id="form-info" class="panel">
+                                    <div class="panel-heading">{{ formtype.form_type_name }} Properties</div>
+                                    <div class="panel-body">
+                                        <div class="input-group">
+                                            {% if formtype.type == 0 %}
+                                            <span class="input-group-addon property-label">{{ formtype.form_type_name }} ID</span>
+                                            <input type="text" name="form_number" value="{% if formtype.is_hierarchical == False %}{%endif%}" class="form-control property-value">
+                                                
+                                            {% elif formtype.type == 1%}
+                                            <span class="input-group-addon">{{ formtype.form_type_name }} URI ID</span>
+                                            <input type="text" name="form_number" value="" class="form-control property-value">
+                                            {%endif%}
+                                            
+                                        </div>
+                                        {% if formtype.is_hierarchical%}
+                                            <div class="input-group">
+                                                <span class="input-group-addon">Choose an available Parent: </span>
+                                                <select  class="selectpicker" data-size="5" data-width="100%" data-live-search="true" name="hierarchical_reference">
+                                                    <option value="NONE">--None--</option>
+                                                {% for aform in formtype.form_set.all%}
+                                                    <option data-icon="glyphicon-file" value="{{aform.pk}}">{%if aform.hierarchy_parent != None %}{{aform.hierarchy_parent}}{%endif%} -- {{aform}}</option>
+                                                {% endfor %} 
+                                                </select>
+                                            </div>
+                                        {% endif %}
+
+                                        
+                                    </div>
+                                </div>   
+                            </div>
+                    
+                        </div>
+                    </div>
+                    
+                    <div id="template-editor-toolbar">
+                        <div class="button-container">
+                            <button type="button" id="add-label" class="btn toolbar-btn"><span class="glyphicon glyphicon-text-background"></span></button>
+                            <button type="button" id="add-tab" class="btn toolbar-btn"><span class="glyphicon glyphicon-folder-close"></span></button>
+                            <button type="button" id="save-template" class="btn toolbar-btn"><span class="glyphicon glyphicon-floppy-disk"></span></button>
+                            <button id="reset-layout" class="btn" type="button"><span class="glyphicon glyphicon-refresh"></span></button>
+                        </div>
+                    
+                    </div>
+                    
+                    
+                    <!-- All Attributes -->
+                  
+                    
+                    <div id="form-all-fields-grid" class="">
+
+                        <div class="layout-container">
+                        
+                <div class="widget-dropdown-view widget-FRRT widget frrt" id="" type="dropdown-view">
+                    <div class="dropdown-title LABEL"></div>
+                    <div><select name=""><option value="" selected>None</option></select></div>
+                </div>
+                        
+                        
+                        </div>
+                    </div>
+                    
+                                <div class="row-fluid"> 
+
+                                </div>
+                            </div>
+                            
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!---------------------------------------------------------------------------------------------------------------------------------------------------------->    
+    <!-- ALL WIDGET TEMPLATES CONTAINER (for cloning) ---------------------------------------------------------------------------------------------------------->
+    <!---------------------------------------------------------------------------------------------------------------------------------------------------------->
+    <div id="widget-templates" style="display:none">
+                <!-- LABEL WIDGET ------------------------------------------------------------------------------------------------------------------------>
+                <div class="widget-label" type="label"><div class="btn widget-control"><span class="glyphicon glyphicon-move"></span></div><div class="btn widget-delete"><span class="glyphicon glyphicon-remove-circle"></span></div><div class="widget-label-value LABEL"><input value="Label"></div><div class="btn widget-resize"><span class="glyphicon glyphicon-resize-full"></span></div></div>
+                
+                <!-- DROPDOWN SELECT WIDGET ------------------------------------------------------------------------------------------------------------------------>
+                <div class="widget-dropdown-view widget-FRRT widget frrt" id="" type="dropdown-view">
+                    <div class="btn widget-control"><span class="glyphicon glyphicon-move"></span></div>
+                    <div class="dropdown-title LABEL">Label Here</div>
+                    <select name="" disabled=""><option value="" selected="">None</option></select>
+                    <div class="btn widget-resize"><span class="glyphicon glyphicon-resize-full"></span></div>
+                    <div class="widget-frrt-tools">
+                        <div title="Convert To A Dropdown Select View Widget" class="btn widget-frrt-convert-to-dropdown-view"><span class="glyphicon glyphicon-indent-left"></span></div>
+                        <div title="Convert to An Image View Widget" class="btn widget-frrt-convert-to-image-view"><span class="glyphicon glyphicon-picture"></span></div>
+                        <div title="Convert to A Thumb View Widget" class="btn widget-frrt-convert-to-thumb-list"><span class="glyphicon glyphicon-list"></span></div>
+                    </div>
+                </div>
+                
+                <!-- THUMB LIST WIDGET ------------------------------------------------------------------------------------------------------------------------>
+                <div class="widget-thumb-view widget-FRRT widget frrt" id="" type="thumb-view">
+                    <div class="btn widget-control"><span class="glyphicon glyphicon-move"></span></div>
+                    <div class="frrv-title">
+                        <div class="LABEL"></div>
+                    </div>
+                    <div class="frrv-list">          
+                        
+                        
+                    </div>
+                    <div class="frrv-search">
+                        <div><span class="glyphicon glyphicon-barcode"></span><input type="text" disabled></input></div>
+                        <div><span class="glyphicon glyphicon-search"></span><input type="text" disabled></input></div>
+                    </div>
+                    <div class="btn widget-resize"><span class="glyphicon glyphicon-resize-full"></span></div>
+                    <div class="widget-frrt-tools">
+                        <div title="Convert To A Dropdown Select View Widget" class="btn widget-frrt-convert-to-dropdown-view"><span class="glyphicon glyphicon-indent-left"></span></div>
+                        <div title="Convert to An Image View Widget" class="btn widget-frrt-convert-to-image-view"><span class="glyphicon glyphicon-picture"></span></div>
+                        <div title="Convert to A Thumb View Widget" class="btn widget-frrt-convert-to-thumb-list"><span class="glyphicon glyphicon-list"></span></div>
+                    </div>
+             
+
+                </div>
+                
+                <!-- IMAGE VIEW WIDGET ------------------------------------------------------------------------------------------------------------------------>
+                <div class="widget-image-view widget-FRRT" type="image-view">
+                    <div class="btn widget-control"><span class="glyphicon glyphicon-move"></span></div>
+                    <div class="frrv-title">
+                        <div class="LABEL"></div>
+                    </div>
+                    <div class="widget-image-view-nav-arrows">
+                        <button class="nav-left" type="button"><span class="glyphicon glyphicon-chevron-left"></span></button>
+                        <button class="nav-right" type="button"><span class="glyphicon glyphicon-chevron-right"></span></button>
+                    </div>
+                    <div class="frrv-list">
+                        <div class="frrv-container"><input name="" value="" hidden></input><div class="frrv-label"><a href="">Label</a></div><img class="enki-img-popup" src="{% static 'site-images/no-thumb-missing.png'%}"></img><button class="btn btn-danger" type="button" onclick="removeReferenceFromFRRV(this)"><span class="glyphicon glyphicon-remove"></span></button></div>
+                    </div>
+                    <div class="frrv-search">
+                        <div><span class="glyphicon glyphicon-barcode"></span><input type="text" disabled></input></div>
+                        <div><span class="glyphicon glyphicon-search"></span><input type="text" disabled></input></div>
+                    </div>
+                    <div class="btn widget-resize"><span class="glyphicon glyphicon-resize-full"></span></div>   
+                    <div class="widget-frrt-tools">
+                        <div title="Convert To A Dropdown Select View Widget" class="btn widget-frrt-convert-to-dropdown-view"><span class="glyphicon glyphicon-indent-left"></span></div>
+                        <div title="Convert to An Image View Widget" class="btn widget-frrt-convert-to-image-view"><span class="glyphicon glyphicon-picture"></span></div>
+                        <div title="Convert to A Thumb View Widget" class="btn widget-frrt-convert-to-thumb-list"><span class="glyphicon glyphicon-list"></span></div>
+                    </div>                    
+                </div>        
+                
+                <!-- FRAT WIDGET ------------------------------------------------------------------------------------------------------------------------>
+                <div class="widget-frat attribute-float widget frat" id="" type="frat">
+                    <div class="btn widget-control"><span class="glyphicon glyphicon-move"></span></div>
+                    <ul class="list-group" title="">
+                        <li class="list-group-item input-label"><strong class="LABEL"></strong></li>
+                        <li class="list-group-item input-field">
+                            <textarea style="resize:none;" disabled></textarea>
+                        </li>
+                    </ul>
+                    <div class="btn widget-resize"><span class="glyphicon glyphicon-resize-full"></span></div>
+                </div>
+                
+                <!-- Other Widget related templates, e.g. a list item template -->
+                
+                    <!-- Thumb List Item Template -->
+                    <div class="frrv-container thumb-view-item"><input name="" value="" hidden></input><img class="" src=""><div class="frrv-label" style=""><a href="#">Example Item 1</a></div><button class="btn btn-danger" type="button"><span class="glyphicon glyphicon-remove"></span></button></div>
+                    <!-- Image View Item Template -->
+                    <div class="frrv-container image-view-item"><input name="" value="" hidden></input><div class="frrv-label"><a href="">Label</a></div><img class="enki-img-popup" src=""></img><button class="btn btn-danger" type="button" onclick="removeReferenceFromFRRV(this)"><span class="glyphicon glyphicon-remove"></span></button></div>
+    </div>
+    <!--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-->    
+    <!--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-->
+    <!--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-->   
+    
+    
+{% endblock %}
+
+    {% block footer %}
+    
+    <!--   
+    //================================================================================================================
+    //
+    //  This script acts as a standarized set of functions and variables that all templates in the maqlu engine need
+    //  --to access and utilize. e.g. Because these scripts access the back-end API outside of a template, I needed
+    //  --a way to access the API endpoint URIs so I store a list of the URIs and pass them as a template variables
+    //  --that the rest of the included javascripts can utilize. I had contemplated just adding all the javascript to
+    //  --each <template>.html file within <script> tags, but that will increase the file template size, and there will
+    //  --be redundant code that can't be cached, nor edited easily in the future.
+    //
+    //  These global variables and Endpoints should be on every main admin template page 
+    //
+    //  It additionally, adds a CSRF token reader for the scripts to use POST AJAX with.
+    //================================================================================================================
+    -->
+    {% if user_access >= access_level %}   
+    <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+    <script>          
+    //GLOBAL FUNCTIONS//
+    function getAPIEndpoints(){
+        return JSON.parse('{{api_urls|safe}}');
+    }
+    //GLOBALS VARIABLES//
+    var RTYPE_LIST;
+    var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
+    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
+    var CURRENT_PROJECT_PK = '{{project.pk}}';
+    var INITIALIZATION_CODE = 0;
+    var API_URLS = getAPIEndpoints();
+    </script>
+    {% endif %}   
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== --> 
+    
+    
+     <script src="{% static 'js/enki_geoeditor_single_entity.js'  %}"></script> 
+     <script src="{% static 'js/enki-form-navigation-search.js'  %}"></script> 
+     <script src="{% static 'js/enki_template_engine.js'  %}"></script>      
+   
+   {% endblock %}

@@ -1,0 +1,115 @@
+{% load enki_tags %}
+
+            <div id="all-form-types-title">
+                <div class="form-type-group-title">Project Forms</div>
+            </div>
+            {% for aformtype in project.formtype_set.all %}
+                {% if not aformtype.form_type_group and aformtype.flagged_for_deletion == False%}
+                    {% if aformtype.type == 0 %}
+
+                    <div class="" role="group">
+                        <a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqlu_admin:view_form_type' project_pk=project.pk form_type_pk=aformtype.pk  %}">{{aformtype}}</a>
+                        {% if user_access >= 3 %}<a role="button" data-toggle="tooltip" href="{% url 'maqlu_admin:edit_form_type' project_pk=project.pk form_type_pk=aformtype.pk  %}" data-placement="bottom" title="Save New Form or Form Template" class="btn btn-success side-panel-edit-btn"><span class="glyphicon glyphicon-pencil"></span></a>{% endif %}
+                        {% if user_access >= 4 %}<button  name="delete-form-type" value="{{aformtype.pk}}" data-toggle="tooltip" data-placement="bottom" title="Delete Current Form or Form Template" class="btn btn-danger side-panel-btn del-formtype-button" role="button"><span class="glyphicon glyphicon-trash"></span></button>{%endif%}
+                    </div>
+
+                    {% endif %}
+            {% endif %}
+            {% endfor %}  
+            
+          {% for aformtypegroup in project.formtypegroup_set.all %}
+                
+                <div id="all-form-types-title"  class="btn-group btn-group-sm" role="group">
+                   <div class="form-type-group-title">{{aformtypegroup}}</div>
+                    {% if user_access >= 4 %}<button name="delete-form-type-group" value="{{aformtypegroup.pk}}" data-toggle="tooltip" data-placement="bottom" title="Delete Current Group" class="btn btn-danger side-panel-group-btn del-formtypegroup-button" role="button"><span class="glyphicon glyphicon-trash"></span></button>{%endif%}
+                </div>
+
+                {% for aformtype in aformtypegroup.formtype_set.all %}
+                    {% if aformtype.flagged_for_deletion == False %}
+
+                    <div class="" role="group">
+                        <a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqlu_admin:view_form_type' project_pk=project.pk form_type_pk=aformtype.pk %}">{{aformtype}}</a>
+                        {% if user_access >= 3 %}<a role="button" data-toggle="tooltip" href="{% url 'maqlu_admin:edit_form_type'  project_pk=project.pk form_type_pk=aformtype.pk %}" data-placement="bottom" title="Save New Form or Form Template" class="btn btn-success side-panel-edit-btn"><span class="glyphicon glyphicon-pencil"></span></a>{% endif %}
+                        {% if user_access >= 4 %}<button name="delete-form-type" value="{{aformtype.pk}}" data-toggle="tooltip" data-placement="bottom" title="Delete Current Form or Form Template" class="btn btn-danger side-panel-btn del-formtype-button" role="button"><span class="glyphicon glyphicon-trash"></span></button>{%endif%}
+                    </div>
+                    {% endif %}
+                {% endfor %}
+          {% endfor %}
+          
+          <div id="all-form-types-title">
+            <div class="form-type-group-title">Media Types</div>
+          </div>
+            {% for aformtype in project.formtype_set.all %}
+                {% if not aformtype.form_type_group and aformtype.flagged_for_deletion == False%}
+                    {% if aformtype.type == 1 %}
+
+                    <div class="" role="group">
+                        <a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqlu_admin:view_form_type' project_pk=project.pk form_type_pk=aformtype.pk  %}">{{aformtype}}</a>
+                        {% if user_access >= 3 %}<a role="button" data-toggle="tooltip" href="{% url 'maqlu_admin:edit_form_type' project_pk=project.pk form_type_pk=aformtype.pk  %}" data-placement="bottom" title="Save New Form or Form Template" class="btn btn-success side-panel-edit-btn"><span class="glyphicon glyphicon-pencil"></span></a>{% endif %}
+                        {% if user_access >= 4 %}<button name="delete-form-type" value="{{aformtype.pk}}" data-toggle="tooltip" data-placement="bottom" title="Delete Current Form or Form Template" class="btn btn-danger side-panel-btn del-formtype-button" role="button"><span class="glyphicon glyphicon-trash"></span></button>{%endif%}
+                    </div>
+
+                    {% endif %}
+            {% endif %}
+            {% endfor %}
+       <script>    
+
+    
+var recycleFormType = function() {
+        if(confirm("Are you sure you want to delete this Form Type?")){
+                    var  data = "ID="+this.value;
+                    var xmlhttp;
+                    var butElement = this;
+                    // compatible with IE7+, Firefox, Chrome, Opera, Safari
+                    xmlhttp = new XMLHttpRequest();
+                    xmlhttp.onreadystatechange = function(){
+                        if (xmlhttp.readyState == 4 && xmlhttp.status == 200){
+                            butElement.parentNode.parentNode.removeChild(butElement.parentNode);
+                            location.reload();
+                        }
+                    }
+                    xmlhttp.open("POST", "{% url 'maqlu_admin:recycle_form_type' %}", true);
+                    xmlhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+                    xmlhttp.setRequestHeader('X-CSRFToken', "{{ csrf_token }}");
+                    //console.log(this.value);
+                    xmlhttp.send(data);
+                    
+        }
+}
+
+var deleteFormTypeGroup = function() {
+        if(confirm("Are you sure you want to delete this Form Type Group?")){
+                    var  data = "ID="+this.value;
+                    var xmlhttp;
+                    var butElement = this;
+                    // compatible with IE7+, Firefox, Chrome, Opera, Safari
+                    xmlhttp = new XMLHttpRequest();
+                    xmlhttp.onreadystatechange = function(){
+                        if (xmlhttp.readyState == 4 && xmlhttp.status == 200){
+                            butElement.parentNode.parentNode.removeChild(butElement.parentNode);
+                            location.reload();
+                        }
+                    }
+                    xmlhttp.open("POST", "{% url 'maqlu_admin:delete_form_type_group' %}", true);
+                    xmlhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+                    xmlhttp.setRequestHeader('X-CSRFToken', "{{ csrf_token }}");
+                    //console.log(this.value);
+                    xmlhttp.send(data);
+        }
+}
+                
+   addLoadEvent( function() {
+   //console.log("sanity test");
+        var buts = document.getElementsByTagName('button');
+        //console.log(buts);
+        for(var i = 0; i < buts.length; i++) {
+            var but = buts[i];
+            //console.log(but.className);
+            if(but.classList.contains("del-formtype-button")) {
+                but.onclick = recycleFormType;
+            } else if(but.classList.contains("del-formtypegroup-button")) {
+                but.onclick = deleteFormTypeGroup;
+            }
+        }
+    });
+</script>

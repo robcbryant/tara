@@ -1,0 +1,34 @@
+{% extends "admin/base.html" %}
+{% load i18n admin_static %}
+{% load staticfiles %}
+{% load enki_tags %}
+{% block branding %}
+<a href="{% url 'admin:index' %}">
+<span class="glyphicon glyphicon-certificate"></span>
+M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small>
+</a>
+{% endblock %}
+{% block bodyclass %}login{% endblock %}
+{% block nav-global %}{% endblock %}
+{% block content_title %}{% endblock %}
+{% load enki_tags %}
+{% block title %}Maqlu Engine{% endblock %}
+
+
+
+{% block content %} 
+<div class ="stripe" id="stripeA"></div>
+<div class ="stripe" id="stripeB"></div>
+<div class ="stripe" id="stripeC"></div>
+
+<div class="login-welcome">
+Y<small>OU</small> A<small>RE</small> N<small>OW</small> L<small>OGGED</small> O<small>UT</small>
+</div>
+
+
+<div id="content-main">
+<p>Thanks, {{request.session.user.first_name}}, for spending some quality time with the database today!</p>
+
+<p><a href="{% url 'admin:index' %}">{% trans 'Log in again' %}</a></p>
+</div>
+{% endblock %}

@@ -1,0 +1,246 @@
+{% load enki_tags %}
+
+<div class="breadcrumbs">
+    <div class="stripeA" id="stripeA"></div>
+    <div class="stripeB" id="stripeB"></div>
+    <div class="stripeC" id="stripeC"></div>
+
+
+    <div class="row" id="header-toolbar">
+        <div class="attribute-float-header-row project-title" id="PROJECT_ID" title="{{project.pk}}">
+            <a href="{% url 'maqlu_admin:project_home' project_pk=project.pk %}"><span class="glyphicon glyphicon-globe"></span><strong>{{ project.name }} P<small>roject</small> A<small>dministration</small></strong></a>
+        </div>
+        <div class="attribute-float-header-row header-spacer"></div>
+        <div class="attribute-float-header-row toolbar-title" id="FORMTYPE_ID" title="{% if formtype != None %} {{formtype.pk}} {%endif%}">{{ toolbar_title_code|get_toolbar_title }}</div>
+        <div class="attribute-float-header-row header-spacer"></div>
+        <div class="attribute-float-header-row btn-toolbar" id="toolbar-buttons" role="toolbar">
+                    
+                    <div class="btn-group btn-group-sm" role="group">
+                        <a class="btn btn-primary main" data-toggle="tooltip" data-placement="bottom" title="Go To Project Control Panel" role="button" href="{% url 'maqlu_admin:project_home' project_pk=project.pk %}"><span class="glyphicon glyphicon-home"></span></a>
+                        <a class="btn btn-primary main" data-toggle="tooltip" data-placement="bottom" title="Change User Settings" role="button" href="#"><span class="glyphicon glyphicon-cog"></span></a>
+                        <a class="btn btn-primary main" data-toggle="tooltip" data-placement="bottom" title="Geospatial Query Engine" role="button" href="{% url 'maqlu_admin:geospatial_engine' project_pk=project.pk %}"><span class="glyphicon glyphicon-globe"></span><span class="glyphicon glyphicon-search"></span></a>
+                        <a class="btn btn-primary main" data-toggle="tooltip" data-placement="bottom" title="Cross-Project Query Engine" role="button" href="{% url 'maqlu_admin:master_query_engine' project_pk=project.pk %}"><span class="glyphicon glyphicon-list-alt"></span><span class="glyphicon glyphicon-search"></span></a>
+                    </div>
+                    
+                    {% if user_access >= 4 %} 
+                    <div class="btn-group btn-group-sm" role="group">
+                        <a class="btn btn-primary recycling" data-toggle="tooltip" data-placement="bottom" title="Go To Recycling Bin" role="button" href="{% url 'maqlu_admin:recycling_bin' project_pk=project.pk %}"><span class="glyphicon glyphicon-trash"></span></a>  
+                    </div>
+                    {% endif %}
+                    
+                    {% if user_access >= 3 %}
+                    <div class="btn-group btn-group-sm" role="group">
+                        <a class="btn btn-primary project" data-toggle="tooltip" data-placement="bottom" title="Create New Form Template" role="button" href="{% url 'maqlu_admin:new_form_type' project_pk=project.pk %}"><span class="glyphicon glyphicon-book"></span></a>
+                        <a class="btn btn-primary project" data-toggle="tooltip" data-placement="bottom" title="Import Form Template from CSV" role="button" href="{% url 'maqlu_admin:formtype_importer' project_pk=project.pk %}"><span class="glyphicon glyphicon-download-alt"></span><span class="glyphicon glyphicon-book"></span></a>
+                        {% if user_access >= 5 %}
+                        <a class="btn btn-primary project export-project-csv" data-toggle="tooltip" data-placement="bottom" title="Export {{project}} to a CSV file" role="button" ><span class="glyphicon glyphicon-globe"></span><span>CSV</span></a>
+                        <a class="btn btn-primary project export-project-json" data-toggle="tooltip" data-placement="bottom" title="Export {{project}} to a JSON file" role="button"><span class="glyphicon glyphicon-globe"></span><span>JSON</span></a>                        
+                        {%endif%}
+                    </div>
+                    {% endif %}
+                    
+                    {%if formtype%}
+
+                            <div class="btn-group btn-group-sm" role="group">
+                                <a class="btn btn-primary formtype" data-toggle="tooltip" data-placement="bottom" title="Import new record type to {{formtype}} from CSV" role="button" href="{% url 'maqlu_admin:rtype_importer' project_pk=project.pk form_type_pk=formtype.pk %}"><span class="glyphicon glyphicon-download-alt"></span></a>
+                                <a class="btn btn-primary formtype" data-toggle="tooltip" data-placement="bottom" title="Import new forms to {{formtype}} from CSV" role="button" href="{% url 'maqlu_admin:formtype_form_importer' project_pk=project.pk form_type_pk=formtype.pk %}"><span class="glyphicon glyphicon-download-alt"></span><span class="glyphicon glyphicon-file"></span></a>                                 
+                                <a class="btn btn-primary formtype" data-toggle="tooltip" data-placement="bottom" title="Query Engine for {{formtype}}" role="button" href="{% url 'maqlu_admin:query_form_type' project_pk=project.pk form_type_pk=formtype.pk %}"><span class="glyphicon glyphicon-sunglasses"></span></a> 
+                                <a class="btn btn-primary formtype export-formtype-csv" data-toggle="tooltip" data-placement="bottom" title="Export {{formtype}} to a CSV file" role="button" ><span class="glyphicon glyphicon-export"></span><span>CSV</span></a> 
+                                <a class="btn btn-primary formtype export-formtype-json" data-toggle="tooltip" data-placement="bottom" title="Export {{formtype}} to a JSON file" role="button"><span class="glyphicon glyphicon-export"></span><span>JSON</span></a> 
+                                                          
+                              {% if user_access >= 4 %}  
+                                <a class="btn btn-primary formtype" data-toggle="tooltip" data-placement="bottom" title="Design Form Type Layout" role="button" href="{% url 'maqlu_admin:edit_form_type_template' project_pk=project.pk form_type_pk=formtype.pk%}"><span class="glyphicon glyphicon-th"></span></a>
+                              {% else %}
+                                <a class="btn btn-primary formtype" data-toggle="tooltip" data-placement="bottom" title="Design Form Type Layout" role="button" href="# disabled"><span class="glyphicon glyphicon-th"></span></a>
+                              {%endif%} 
+                            
+                                <div class="btn" id="form-quick-search-tool"><div id="" class="admin-search-list" style="display:none;"></div><input type="text" oninput="queryServerForMatchingForms(this, {{project.pk}}, {{formtype.pk}});"></input><span class="glyphicon glyphicon-search"></span></div>
+                           </div>
+                            
+                            {% if user_access >= 2 %}
+                            <div class="btn-group btn-group-sm" role="group">
+                                {% if formtype %}
+                                    <a class="btn btn-primary form" data-toggle="tooltip" data-placement="bottom" title="Create New {{formtype}} Form" role="button" href="{% url 'maqlu_admin:new_form' project_pk=project.pk form_type_pk=formtype.pk %}"><span class="glyphicon glyphicon-file"></span></a>
+         
+                                {% else %}
+                                    <a class="btn btn-primary form" data-toggle="tooltip" data-placement="bottom" title="Create New Form" role="button" href="#" disabled><span class="glyphicon glyphicon-file"></span></a>       
+                                {%endif%}
+                            </div>
+                            {%endif%}
+
+                    {%endif %}                                                                                                              
+        </div>
+    </div>
+</div>
+
+<script>
+
+    
+    function showBusyLoadbar(){
+        var busyParent = document.createElement("DIV");
+        var busyLoadbar = document.createElement("DIV");
+        var busyLoadbarBG = document.createElement("DIV");
+        var busyImage = document.createElement("IMG");
+        var busyLoadbarOverlay = document.createElement("DIV");
+        
+        busyParent.appendChild(busyImage);
+        busyParent.appendChild(busyLoadbarBG);
+        busyLoadbarBG.appendChild(busyLoadbar);
+        busyLoadbarBG.appendChild(busyLoadbarOverlay);
+        busyParent.id = "busy-load-bar";
+        busyLoadbar.classList.add('loadbar');
+        busyLoadbar.id = "busy-load-bar-width";
+        busyLoadbarBG.classList.add('loadbar-bg');
+        busyLoadbarOverlay.classList.add('loadbar-overlay');
+        busyLoadbarOverlay.id = "busy-load-bar-message";
+        busyImage.classList.add('load-image');
+        busyImage.setAttribute("src", "/static/site-images/busy-indicator.gif");
+
+        document.getElementById('header-toolbar').appendChild(busyParent);
+    }
+        
+    function removeBusyLoadbar(){
+       document.getElementById('busy-load-bar').parentNode.removeChild(document.getElementById('busy-load-bar'));
+    }
+    
+
+
+
+function addLoadEvent(func) {
+  var oldonload = window.onload;
+  if (typeof window.onload != 'function') {
+    window.onload = func;
+  } else {
+    window.onload = function() {
+      if (oldonload) {
+        oldonload();
+      }
+      func();
+    }
+  }
+}
+
+// Generate 32 char random uuid 
+function gen_uuid() {
+    var uuid = ""
+    for (var i=0; i < 32; i++) {
+        uuid += Math.floor(Math.random() * 16).toString(16); 
+    }
+    return uuid
+}
+
+function exportData(export_format, export_type) {
+
+    //console.log(export_format);
+    //console.log(export_type);
+    //show load bar
+    showBusyLoadbar();
+    var exportProjectURL = "{% url 'maqlu_admin:export_project' %}";
+    var exportFormtypeURL = "{% url 'maqlu_admin:export_formtype' %}";
+    var uuid = gen_uuid();
+    var urlToUse = "";
+    var data = "";
+    var formtypetester = "{{formtype.pk}}"
+    if (export_type == "project") {
+        urlToUse = exportProjectURL;
+        data = "id="+{{project.pk}}+"&export_format="+export_format+"&uuid="+uuid;
+    }else if(formtypetester != "") {
+        urlToUse = exportFormtypeURL;
+        data = "id="+formtypetester+"&export_format="+export_format+"&uuid="+uuid;
+    }
+
+    var xmlhttp;
+
+    console.log(uuid);
+    // compatible with IE7+, Firefox, Chrome, Opera, Safari
+    xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("POST", urlToUse, true);
+    xmlhttp.responseType = "blob";
+    xmlhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+    xmlhttp.setRequestHeader('X-CSRFToken', "{{ csrf_token }}");
+    xmlhttp.onload = function(e) {
+        if (this.status == 200) {
+            // Create a new Blob object using the 
+            //response data of the onload object
+            var blob;
+            var filename;
+            if (export_type == "project"){ blob = new Blob([this.response], {type: 'application/octet-stream'}); filename = '{{project}}_export.zip';}
+            else if (export_format == "CSV"){ blob = new Blob([this.response], {type: 'text/csv'});filename = '{{project}}__{{formtype}}_export.csv';}
+            else if (export_format == "JSON"){ blob = new Blob([this.response], {type: 'application/json'});filename = '{{project}}__{{formtype}}_export.json';}
+            //Create a link element, hide it, direct 
+            //it towards the blob, and then 'click' it programatically
+            let a = document.createElement("a");
+            a.style = "display: none";
+            document.body.appendChild(a);
+            //Create a DOMString representing the blob 
+            //and point the link element towards it
+            let url = window.URL.createObjectURL(blob);
+            a.href = url;
+            a.download = filename;
+            //programatically click the link to trigger the download
+            a.click();
+            //release the reference to the file by revoking the Object URL
+            window.URL.revokeObjectURL(url);
+        }else{
+            //deal with your error state here
+        }    
+    };
+    
+    xmlhttp.send(data);
+
+    function update_progress_info() {
+        var  updatedata = "uuid="+uuid;
+        //console.log(updatedata);
+        var updatexml;
+
+        // compatible with IE7+, Firefox, Chrome, Opera, Safari
+        updatexml = new XMLHttpRequest();
+        updatexml.onreadystatechange = function(){
+            if (updatexml.readyState == 4 && updatexml.status == 200){
+                var progress = JSON.parse(updatexml.responseText);
+                console.log(progress)
+                if (progress.is_complete == "False"){
+                    window.setTimeout(update_progress_info, 1000);
+                    document.getElementById('busy-load-bar-message').innerHTML = progress.percent_done + "%     :  Currently Processing Form: " + progress.current_form + "  of FormType:  " + progress.current_formtype;
+                    document.getElementById('busy-load-bar-width').style.width = progress.percent_done + "%";
+                } else {
+                    document.getElementById('busy-load-bar-message').innerHTML = "100%     : Completed Export  of FormType";
+                    document.getElementById('busy-load-bar-width').style.width = "100%"; 
+                    window.setTimeout(removeBusyLoadbar, 1000);                    
+                }
+            }
+        }
+        updatexml.open("POST", "{% url 'maqlu_admin:check_progress' %}", true);
+        updatexml.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+        updatexml.setRequestHeader('X-CSRFToken', "{{ csrf_token }}");
+        updatexml.send(updatedata);
+        
+        
+
+    }
+    window.setTimeout(update_progress_info, 1000);
+}
+
+
+
+
+   addLoadEvent( function() {
+   //console.log("sanity test 222222");
+        var buts = document.getElementsByTagName('a');
+        //console.log(buts);
+        for(var i = 0; i < buts.length; i++) {
+            var but = buts[i];
+            //console.log(but.className);
+            if(but.classList.contains("export-project-csv")) {
+                but.onclick = function(){exportData("CSV","project")};
+            } else if(but.classList.contains("export-project-json")) {
+                but.onclick = function(){exportData("JSON","project")};
+            } else if(but.classList.contains("export-formtype-csv")) {
+                but.onclick = function(){exportData("CSV","formtype")};
+            } else if(but.classList.contains("export-formtype-json")) {
+                but.onclick = function(){exportData("JSON","formtype")};
+            }
+        }
+    });
+    
+</script>

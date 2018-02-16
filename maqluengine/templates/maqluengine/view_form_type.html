@@ -1,0 +1,533 @@
+
+{% extends "admin/base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine{% endblock %}
+
+
+{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+
+{% block breadcrumbs %}                      
+    {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form access_level=access_level user_access=user_access%}
+{% endblock %}
+
+{% block content %} 
+
+    <div id="project-header" class="container-fluid">
+    </div><!-- project header -->
+      
+    <div id="project-content" class="container-fluid">
+    
+        <!-- This panel is the side column for listing available form types -->
+        <div id="left-pane" class="col-md-2">
+            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                           
+        </div>
+        
+         
+        
+        <div id="center-pane" class="col-md-10">
+
+             
+            <div id="search-form">
+                <form class="simple-search" method="post">
+                {% if user_access >= access_level %}{% csrf_token %}{% endif %}
+                <input id="sesID" type="text" class="hidden" name='sesID' value="{{ -1|getUniqueSessionToken }}">
+                 
+                <div class="search-title">{{formtype}} Search </div>
+                <div class="main-query-frame">
+                    <div class="all-queries">
+                        <div class="single-query" style="display:none">
+                            <button class="del-new-query btn" type="button"><span class="glyphicon glyphicon-remove-circle"></span></button>
+                            <div class="big-and-or-select">
+                            <span class="glyphicon glyphicon-arrow-down"></span>
+                                <select class="__Q-AO">
+                                    <option value="and">AND</option><option value="or">OR</option>
+                                </select>
+                            <span class="glyphicon glyphicon-arrow-up"></span>
+                            </div>
+                            <div class="query-container">
+                                <span class="glyphicon glyphicon-th-list"></span>
+                                <div class="formtype-select">
+                                    <select class="__RTYPE" >
+                                        <option value="FORMID-0">{{formtype}} ID</option>
+                                        {% for atttype in formtype.formrecordattributetype_set.all %}
+                                            <option value="FRAT-{{atttype.pk}}">{{atttype}}</option>
+                                        {% endfor %}
+                                        {% for reftype in formtype.ref_to_parent_formtype.all %}
+                                            <option value="FRRT-{{reftype.pk}}">{{reftype}}</option>
+                                        {% endfor %}
+                                     </select>
+                                </div>
+                                <span class="glyphicon glyphicon-arrow-right"></span >
+                                <input class="__T-AO-A" type="text" value="NULL" hidden></input>
+                                <div class="options-select">
+                                    <select class="__QCODE-A">
+                                        <option value="0">Contains(Case Sensitive)</option>
+                                        <option value="1">Contains</option>
+                                        <option value="2">Matches Exact</option>
+                                        <option value="3">Excludes</option>
+                                        <option value="4">Is Null</option>
+                                     </select>
+                                </div>
+                                <span class="glyphicon glyphicon-arrow-right"></span>
+                                <input class="__TVAL-A" type="text"></input>                     
+                            </div>
+                            <div class="and-or-container">
+                                <div class="newTerm" style="display:none">   
+                                    <button class="btn btn-info and-or-btn"  type="button"><span class="glyphicon glyphicon-remove-circle"></span></button>
+                                    <div class="and-or-query">
+                                        <select class="__T-AO and-or-select">
+                                            <option value="and">AND</option><option value="or">OR</option>
+                                        </select>
+                                        <span class="glyphicon glyphicon-arrow-right"></span>
+                                        <div class="and-or-options-select">
+                                            <select class="__QCODE">
+                                                <option value="0">Contains(Case Sensitive)</option>
+                                                <option value="1">Contains</option>
+                                                <option value="2">Matches Exact</option>
+                                                <option value="3">Excludes</option>
+                                                <option value="4">Is Null</option>
+                                             </select>
+                                        </div>
+                                        <span class="glyphicon glyphicon-arrow-right"></span>
+                                        <input class="__TVAL" type="text"></input>      
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-info and-or-add-btn" type="button">Add Term</button>
+                        </div>
+
+
+
+                    
+                        <div class="single-query __Q">
+                            <div class="query-container">
+                                <span class="glyphicon glyphicon-th-list"></span>
+                                <select class="__Q-AO" hidden><option value="NULL" selected></option></select>
+                                <div class="formtype-select">
+                                    <select class="__RTYPE">
+                                            <option value="FORMID-0">{{formtype}} ID</option>
+                                        {% for atttype in formtype.formrecordattributetype_set.all %}
+                                            <option value="FRAT-{{atttype.pk}}">{{atttype}}</option>
+                                        {% endfor %}
+                                        {% for reftype in formtype.ref_to_parent_formtype.all %}
+                                            <option value="FRRT-{{reftype.pk}}">{{reftype}}</option>
+                                        {% endfor %}
+                                     </select>
+                                </div>
+                                <span class="glyphicon glyphicon-arrow-right"></span>
+                                <input class="__T-AO-A" type="text" value="NULL" hidden></input>
+                                <div class="options-select">
+                                    <select class="__QCODE-A">
+                                        <option value="0">Contains(Case Sensitive)</option>
+                                        <option value="1">Contains</option>
+                                        <option value="2">Matches Exact</option>
+                                        <option value="3">Excludes</option>
+                                        <option value="4">Is Null</option>
+                                     </select>
+                                </div>
+                                <span class="glyphicon glyphicon-arrow-right"></span>
+                                <input class="__TVAL-A" type="text" ></input>                     
+                            </div>
+                            <div class="and-or-container">
+                                <div class="newTerm" style="display:none">  
+                                    <button class="btn btn-info and-or-btn" type="button"><span class="glyphicon glyphicon-remove-circle"></span></button>
+                                    <div class="and-or-query">
+                                        <select class="__T-AO and-or-select">
+                                            <option value="and">AND</option><option value="or">OR</option>
+                                        </select>
+                                        <span class="glyphicon glyphicon-arrow-right"></span>
+                                        <div class="and-or-options-select">
+                                            <select class="__QCODE">
+                                                <option value="0">Contains(Case Sensitive)</option>
+                                                <option value="1">Contains</option>
+                                                <option value="2">Matches Exact</option>
+                                                <option value="3">Excludes</option>
+                                                <option value="4">Is Null</option>
+                                             </select>
+                                        </div>
+                                        <span class="glyphicon glyphicon-arrow-right"></span>
+                                        <input class="__TVAL" type="text"></input>      
+                                    </div>
+                                </div>
+                            </div>
+                            <button class="btn btn-info and-or-add-btn" type="button">Add Term</button>
+                        </div>
+                    
+                    </div> <!-- End of all-queries  container -->
+                    
+
+                    
+                </div>
+                <button id="add-query" class="btn add-query-btn" type="button">Add Query</button>
+                <input type="submit" name="SEARCH" value="SEARCH"></input>
+                </form>
+            </div>
+            
+            <div id="query-stats">
+                <div class='stats-header'>Query Progress and Statistics</div> 
+                <div class="progress">
+                    <div id="query-progress-bar" class="active progress-bar progress-bar-striped" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="min-width:2em; width:0%; white-space: nowrap;text-align:left;padding-left:10px;">0%</div>
+                </div>
+                <div id="info-message">
+                    
+                </div>
+                <div id="query-graphs">
+             
+                </div>
+
+            </div>
+            
+            
+            <div id="query-pagination">
+                <input id="pagination-query-json" value="" hidden disabled></input>
+                <input id="pagination-results-count" value="" hidden disabled></input>
+                <div class="pagination-container" style="display:none;">
+
+                </div>
+            </div>
+        
+
+        
+            <form id="find-replace-form" method="post">
+            {% csrf_token %}
+            
+                <div id="view-table">
+                    <div class="query-stats"><span class="query-title">Query Results</span>{% if user_access >= access_level %}<div class="find-replace"><span>Find</span><input type="text" id="find"><span>Replace</span><input type="text" id="replace"><button type="button" class="btn button-find-replace"><span class="glyphicon glyphicon-search"></span></div><label for="submit-find-replace-form" role="button" class="btn save-edits-button"><span class="glyphicon glyphicon-floppy-disk"></span></label><div class="find-replace-stats"></div>{% endif %}</div>
+                    <div class="scroll-container">
+                    
+                   
+                    <table id="view-table-body" class="table table-striped table-select" border="1px">
+                    <tbody>
+                    <!-- List of forms is generated here-->
+                    </tbody>
+                    </table>
+                    
+
+                    
+                    </div>
+                </div> 
+                <input id="submit-find-replace-form" type="submit" hidden></input>
+            </form>            
+                
+            
+
+            
+            
+        </div>
+    </div>
+
+
+{% endblock %}
+
+
+{% block footer %}
+
+    <!--   
+    //================================================================================================================
+    //
+    //  This script acts as a standarized set of functions and variables that all templates in the maqlu engine need
+    //  --to access and utilize. e.g. Because these scripts access the back-end API outside of a template, I needed
+    //  --a way to access the API endpoint URIs so I store a list of the URIs and pass them as a template variables
+    //  --that the rest of the included javascripts can utilize. I had contemplated just adding all the javascript to
+    //  --each <template>.html file within <script> tags, but that will increase the file template size, and there will
+    //  --be redundant code that can't be cached, nor edited easily in the future.
+    //
+    //  These global variables and Endpoints should be on every main admin template page 
+    //
+    //  It additionally, adds a CSRF token reader for the scripts to use POST AJAX with.
+    //================================================================================================================
+    -->
+    {% if user_access >= access_level %}   
+    <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+    <script>          
+    //GLOBAL FUNCTIONS//
+    function getAPIEndpoints(){
+        return JSON.parse('{{api_urls|safe}}');
+    }
+    //GLOBALS VARIABLES//
+    var RTYPE_LIST;
+    var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
+    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
+    var CURRENT_PROJECT_PK = '{{project.pk}}';
+    var INITIALIZATION_CODE = 0;
+    var API_URLS = getAPIEndpoints();
+    console.log(CURRENT_FORMTYPE_PK);
+    //Query Engine Specific
+    var GLOBAL_CURRENT_QUERY; console.log('{{user.permissions.saved_queries|escapejs}}');
+    var GLOBAL_USER_QUERIES{% if user.permissions.saved_queries == None %}; {% else %} = JSON.parse('{{user.permissions.saved_queries|escapejs}}'); {%endif%}
+        
+    </script>
+    {% endif %}   
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+
+    <script src="{% static 'chart/Chart.min.js'  %}"></script>     
+    <script src="{% static 'js/enki-search-formtype-controls.js' %}"></script> 
+    <script src="{% static 'js/enki-thumbnail-popup.js'  %}"></script>  
+        {% if user_access >= access_level %} <script src="{% static 'js/enki-view-form-type-find-replace-controls.js' %}"></script>{% endif %}
+    
+    
+    <script>
+    
+    
+    function showBusyGraphic(elementToCover){
+        $busyIndicator = $('<div id="busy-indicator"><img src="http://tara.museum.upenn.edu/static/site-images/busy-indicator.gif"></img></div>');
+        $(elementToCover).append($busyIndicator);
+    }
+    
+    function removeBusyGraphic(){
+        $('#busy-indicator').remove();
+    }
+
+   //***************************************************************************************
+   // These functions handle building a new HTML table of the query results for the user
+   //***************************************************************************************
+ 
+    function buildPageNavigationBar(numOfResults, currentPage, currentQueryJson){
+        console.log('Is it working?*****************************');
+        var resultsPerPage = 25;
+        
+        //add our queryjson to the hidden pagination input
+        $('#pagination-query-json').val(currentQueryJson);
+        $('#pagination-results-count').val(numOfResults);
+        $paginationParent = $('#query-pagination .pagination-container');
+        
+        //show our container
+        $paginationParent.show();
+        
+        //Clear our container
+        $paginationParent.empty();
+        
+        //setup the vars for the first/previous page buttons
+        var first = 1; //This will always be 1
+        console.log("I'm losing my f**** mind. What is : " + currentPage);
+        if (currentPage == "ALL"){
+            var previous = 1;
+            var last = 1;
+            var next = 1;
+        } else {
+            var previous = parseInt(currentPage) - 1;
+            //if the prveious page is less than 1, e.g. if the current page is one, then set it to 1
+            if (previous < 1) previous = 1;
+        
+            //setup the vars for the next/last page buttons
+            var last = Math.ceil(numOfResults / resultsPerPage);//This is just chopping the remainder off our quotient to get our final page
+            var next = parseInt(currentPage) + 1;
+            if(next > last) next = last;
+        }
+        //setup our results option div
+        $paginationParent.append($('<button class="btn see-all-results" type="button" title="Load All Results" page="ALL" onclick="requestNewPageFromServer(this)"><span class="glyphicon glyphicon-eye-open"></span></button>'))
+        
+        //Now add all of our pagination buttons
+        
+        $paginationParent.append($('<button class="btn page-control" type="button" page="'+first+'" onclick="requestNewPageFromServer(this)"><span class="glyphicon glyphicon-step-backward"></button></span>'));
+        $paginationParent.append($('<button class="btn page-control" type="button" page="'+previous+'" onclick="requestNewPageFromServer(this)"><span class="glyphicon glyphicon-backward"></button></span>'));
+
+        //setup 4 previous page buttons 
+        for(i = 4; i > 0;i--){
+            var pageNum;
+            if (currentPage == "ALL") pageNum = 1;
+            else pageNum = parseInt(currentPage) - i;
+            //If the page number is less than 1--make an empty div with ...'s
+            if (pageNum < 1 || currentPage =="ALL") $paginationParent.append($('<div class="page-button-empty">. . .</div>'));
+            //else make a proper page number button with a working link etc.
+            else $paginationParent.append($('<button class="btn page-button" type="button" page="'+pageNum+'" onclick="requestNewPageFromServer(this)">'+pageNum+'</button>'));
+        }
+        
+        // Create the empty current page DIV
+        $paginationParent.append($('<div class="page-button current-page">'+currentPage+'</div>'))
+        
+         //setup 4 next page buttons 
+        for(i = 1; i < 5;i++){
+            var pageNum;
+            if (currentPage == "ALL") pageNum = 1;
+            else pageNum = parseInt(currentPage) + i;
+            //If the page number is less than 1--make an empty div with ...'s
+            if (pageNum > last || currentPage =="ALL") $paginationParent.append($('<div class="page-button-empty">. . .</div>'));
+            //else make a proper page number button with a working link etc.
+            else $paginationParent.append($('<button class="btn page-button" type="button" page="'+pageNum+'" onclick="requestNewPageFromServer(this)">'+pageNum+'</button>'));
+        }       
+        
+        //Finally, append the last two next/last buttons
+        $paginationParent.append($('<button class="btn page-control" type="button" page="'+next+'" onclick="requestNewPageFromServer(this)"><span class="glyphicon glyphicon-forward"></button></span>'));        
+        $paginationParent.append($('<button class="btn page-control" type="button" page="'+last+'" onclick="requestNewPageFromServer(this)"><span class="glyphicon glyphicon-step-forward"></button></span>'));
+        
+        //setup our stats div
+        $paginationParent.append($('<div class="stats">'+last+' pages<br>'+numOfResults+' results</div>'))
+    }
+
+    function requestNewPageFromServer(currentButton){
+        var pageNumber = $(currentButton).attr('page');
+        var queryToResend = $('#pagination-query-json').val();
+        var numOfResults = $('#pagination-results-count').val();
+            
+        formData = [];
+        progress_uuid=gen_uuid()
+        formData.push({name: 'uuid', value: progress_uuid});
+        formData.push({name: 'currentQueryJSON', value: queryToResend});
+        formData.push({name: 'requestedPageNumber', value: pageNumber});
+        formData.push({name: 'resultsPerPage', value: '25'});
+        formData.push({name: 'numberOfResults', value: numOfResults});
+        formData.push({name: 'formtype_id', value: CURRENT_FORMTYPE_PK});
+        formData.push({name: 'project_id', value: CURRENT_PROJECT_PK});
+        
+        showBusyGraphic($('#view-table'));
+        
+        $.ajax({ 
+             url   : API_URLS['run_formtype_query_pagination'],
+             type  : "POST",
+             data  : formData, // data to be submitted
+             success : function(returnedQuery)
+             {
+                console.log(returnedQuery);
+                var $progressBar = $('#query-progress-bar');
+                $progressBar.addClass('progress-bar-success');
+                $progressBar.removeClass('progress-bar-striped');
+                $progressBar.css('width', 100+'%');
+                $progressBar.html(100+'% -- Database Import Finished');
+                $progressBar.attr('aria-valuenow', 100); 
+                $('#view-table-body').children().first().empty();
+                //Setup our initial pagination
+                buildPageNavigationBar(returnedQuery.resultsCount, returnedQuery.pagination_page, returnedQuery.currentQuery);
+                //Create the new table of the query results
+                rebuildQueryResultsTable(returnedQuery);
+                //remove busy indicator
+                removeBusyGraphic();
+
+             }
+
+        });
+        alreadyHaveStats = true;
+        
+        queryFinishedFasterThanAJAXCall = false
+        //Start our progress check
+        window.setTimeout(update_progress_info, freq);
+    }
+    
+    function rebuildQueryResultsTable(results){
+        //Setup the necessary DOM variables
+        $queryTable = $('#view-table-body').children().first();
+        //Build the header
+        var $headerRow = $('<tr class="header-row"></tr>');
+        $queryTable.append($headerRow);
+        $headerRow.append('<td>Preview</td>');
+        $headerRow.append('<td>' + results.formtype + '</td>');
+        for(i = 0; i < results.rtype_header.length;i++) {
+            value = results.rtype_header[i].name;
+            if(results.rtype_header[i].rtype == 'frat')$headerRow.append('<td title="'+value+'"><div><span>'+value+'</span>{% if user_access >= access_level %} <button type="button" class="btn edit-column-button"><span class="glyphicon glyphicon-pencil"></span></button> {% endif %} </div></td>');    
+            else $headerRow.append('<td title="'+value+'"><div><span>'+value+'</span></div></td>');    
+        }
+        //build the individual form rows and append them to the newly cleared table
+        for(row=0; row < results.form_list.length;row++){
+            var $newRow = $('<tr></tr>');
+            var $currentForm = results.form_list[row];
+            $queryTable.append($newRow);
+            //Now add all the relevant columns ofinformation
+            //Add the thumbnail link
+            //First see if it's a 'NO Preview" -- if it is, then add the IMG-404 class--we don't want to show it as a big pop up
+            if($currentForm.thumbnail_URI.search('no-thumb-missing.png') != -1 ){
+                $newRow.append('<td><a href="#"><img class="enki-img-popup IMG-404" src="' + $currentForm.thumbnail_URI +'"></img></a></td>');
+            //Otherwise add it as normal
+            }else{
+                $newRow.append('<td><img class="enki-img-popup" src="' + $currentForm.thumbnail_URI +'" onError="this.onerror=null;this.src=\'http://67.205.135.223/static/site-images/no-thumb-missing.png\';this.classList.add(\'IMG-404\');"></img></td>');
+            }       
+            //Add the form id link
+            $newRow.append('<td style=""><a href="http://'+ document.location.hostname +'dev/admin/project/' + results.project_pk +'/formtype/' + results.formtype_pk + '/form_editor/' + $currentForm.pk + '/">' + results.formtype +': ' + $currentForm.form_id + '</a></td>');
+            //now add each individual column from the query results
+            for(col=0; col < $currentForm.rvals.length;col++){
+               $thisRval = $currentForm.rvals[col];
+               //If we're working with a FRAT (Form Record Attribute Value) or a 'frrv-ext' value then just display the text
+               if($thisRval.rtype != "frrv"){
+                   if($thisRval.value.length < 40){$newRow.append('<td><div><span class="frav_view" {% if user_access >= access_level %} onclick="editIndividualRecord(this)" {% endif %} >'+ $thisRval.value.replace(/,/g, ",&nbsp;") +'</span>{% if user_access >= access_level %}<textarea form="find-replace-form" class="frav_edit" name="frav__'+$thisRval.pk+'" oninput="flagTextareaAsChanged(this)" style="display:none"  disabled>'+ $thisRval.value.replace(/,/g, ",&nbsp;") +'</textarea>{% endif %} </div></td>');}
+                   else{$newRow.append('<td><div><span class="frav_view" {% if user_access >= access_level %} onclick="editIndividualRecord(this)" {% endif %} >'+ $thisRval.value.replace(/,/g, ",&nbsp;") +'</span>{% if user_access >= access_level %}<textarea form="find-replace-form" class="frav_edit" name="frav__'+$thisRval.pk+'" oninput="flagTextareaAsChanged(this)" style="display:none"  disabled>'+ $thisRval.value.replace(/,/g, ",&nbsp;") +'</textarea>{% endif %}</div></td>');}
+               //Otherwise we are dealing with a FRAV   reference type, and we need to parse out the list of names and make them links
+               } else {
+                   var FRRVlist = $thisRval.value.split("^,^");
+                   var parsedHTML = ""; 
+                   for(i=0; i<FRRVlist.length;i++){parsedHTML+='<a class="relation-link" href="http://'+ document.location.hostname +'dev/admin/project/' + results.project_pk +'/formtype/' + FRRVlist[i].split("|^|")[1] + '/form_editor/' + FRRVlist[i].split("|^|")[2] + '/">' + FRRVlist[i].split("|^|")[0] + '</a>';}
+                   $newRow.append('<td><div>' + parsedHTML + '</div></td>');
+               }
+            }
+        }
+        
+        {% if user_access >= access_level %}
+        $('.edit-column-button').click( function() {
+            turnOnColumnForEdits(this);
+        });
+        {% endif %}
+        
+        //Activate the iamge popup for the thumbnails
+        //--This will require the enki-thumbnail-popup.js to be included on this page
+        updateImagePopup();
+    }    
+
+    
+
+    function simpleSearch(isNew){
+        var queryToResend = "";
+        if (isNew == true)
+            queryToResend = '{"query_list":{"query_1":{"LABEL":"Object ID","RTYPE":"FORMID-0","Q-ANDOR":"NULL","TERMS":[{"T-ANDOR":"NULL","QCODE":"0","TVAL":""}]}}}';
+        else
+            queryToResend = RecordSearchJSON();
+            
+        var pageNumber = 1
+        var numOfResults = 0
+        console.log("2" + CURRENT_FORMTYPE_PK);    
+        formData = [];
+        progress_uuid=gen_uuid()
+        formData.push({name: 'uuid', value: progress_uuid});
+        formData.push({name: 'currentQueryJSON', value: queryToResend});
+        formData.push({name: 'requestedPageNumber', value: pageNumber});
+        formData.push({name: 'resultsPerPage', value: '25'});
+        formData.push({name: 'numberOfResults', value: numOfResults});
+        formData.push({name: 'formtype_id', value: CURRENT_FORMTYPE_PK});
+        formData.push({name: 'project_id', value: CURRENT_PROJECT_PK});
+        
+        showBusyGraphic($('#view-table'));
+        
+        $.ajax({ 
+             url   : API_URLS['run_formtype_query_pagination'],
+             type  : "POST",
+             data  : formData, // data to be submitted
+             success : function(returnedQuery)
+             {
+                console.log(returnedQuery);
+                var $progressBar = $('#query-progress-bar');
+                $progressBar.addClass('progress-bar-success');
+                $progressBar.removeClass('progress-bar-striped');
+                $progressBar.css('width', 100+'%');
+                $progressBar.html(100+'% -- Database Import Finished');
+                $progressBar.attr('aria-valuenow', 100); 
+                $('#view-table-body').children().first().empty();
+                //Setup our initial pagination
+                buildPageNavigationBar(returnedQuery.resultsCount, returnedQuery.pagination_page, returnedQuery.currentQuery);
+                //Create the new table of the query results
+                rebuildQueryResultsTable(returnedQuery);
+                //remove busy indicator
+                removeBusyGraphic();
+
+             }
+        });
+        alreadyHaveStats = true;
+        queryFinishedFasterThanAJAXCall = false
+        //Start our progress check
+        window.setTimeout(update_progress_info, freq);
+    }
+    
+    $(document).ready(function() { 
+        simpleSearch(true);
+        console.log($("#search-form").find('form.simple-search'));
+    });
+    
+    $("#search-form").find('form.simple-search').submit(function(e){
+        console.log(this);
+        e.preventDefault(); // Keep the form from submitting
+        simpleSearch(false);
+    });
+    
+    </script>    
+{% endblock %}

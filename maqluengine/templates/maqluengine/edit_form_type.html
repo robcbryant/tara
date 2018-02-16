@@ -1,0 +1,416 @@
+ 
+{% extends "admin/base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine{% endblock %}
+
+
+{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+
+{% block breadcrumbs %}                      
+    {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}
+{% endblock %}
+
+{% block content %} 
+
+    <div id="project-header" class="container-fluid">
+
+    </div><!-- project header -->
+      
+    <div id="project-content" class="container-fluid">
+    
+        <!-- This panel is the side column for listing available form types -->
+        <div id="left-pane" class="col-md-2">
+            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                              
+        </div>
+        
+        
+        
+        <div id="center-pane" class="col-md-10">
+            {% if user_access >= access_level %}
+            <div id="form-type-controls" class="btn-group btn-group-sm save-delete-buttons" role="group">
+                <label for="submit-form" data-toggle="tooltip" data-placement="bottom" title="Save New Form or Form Template" class="btn btn-success" role="button"><span class="glyphicon glyphicon-floppy-disk"></span></label>
+                
+                <button id="toolbar-delete" name="delete-form-type" value="{{formtype.pk}}"data-toggle="tooltip" data-placement="bottom" title="Delete Current Form or Form Template" class="btn btn-danger" role="button"><span class="glyphicon glyphicon-trash"></span></button>
+
+            </div>  
+           {% endif %}             
+            <form id="form-type-form" method="post">
+            {% csrf_token %}
+            <input type="submit" id="submit-form" class="hidden">
+            <input type="submit" id="submit-delete-form" class="hidden" name='delete-form-type'>
+            <input type="text" class="hidden" name='formtype-type' value="{{formtype.type}}">
+            <input type="text" class="hidden" name='formtype_pk' value="{{formtype.pk}}">
+ 
+            
+            
+
+                <!-- FormType Name Entry for Editing-->
+                    <div id="form-type-title">
+                        <h2 class='bg-primary'>Edit {{formtype}}'s Name: <input type="text" style="" name="form_type_name" value="{{formtype}}"></input><input type="submit" class="btn btn-success" id="submit-button" style="display:none; float:right" value="Import!"></h2>
+                        <input id="parsed-json" type="hidden" name='csv_json' value="{{csv_json}}">
+                    
+           
+                        <!-- FORM TYPE GROUP OPTIONS CONTAINER-->
+                         <div class="container-fluid">
+                         <div class="input-group col-sm-4" style="float:left;">
+                            <div class="input-group-addon">Add to Group?</div>
+                            
+                            <div>
+                                <select name="ft_group" class="selectpicker" data-size="5" data-width="90%" data-live-search="true" >
+                                    <option value="NONE">---------</option>
+                                    <option value="NEW">NEW GROUP</option>
+                                            {% for aformtypegroup in project.formtypegroup_set.all %}
+                                                <option value="{{aformtypegroup.pk}}" {% if formtype.form_type_group.pk == aformtypegroup.pk %} selected="selected" {% endif %}>{{aformtypegroup}}</option>
+                                            {% endfor %}
+                                </select>
+                            </div>
+                            <div><input type="text" name="ft_group_new" value="Enter Name if New" style=""></div>
+                        </div>
+                        <!-- IS HIERCHICAL OPTIONS CONTAINER-->
+                        <div class="input-group col-sm-3" style="float:left;">                    
+                            <div class="input-group-addon small-option">Is Hierchical?</div>
+                            <div class="importer-title-check-box" style=""><input type="checkbox" name="is_hierarchical" {%if formtype.is_hierarchical %}checked{%endif%}></div>
+                        </div>
+                                                
+             
+                        <!-- MEDIA TYPE OPTIONS CONTAINER-->                            
+                        <div style="float:left;" class="col-sm-5">
+                             <div class="input-group form-type-media-dropdown" style="float:left;">
+                                <div class="input-group-addon small-option">Is Media Type?</div>
+                                <div>
+                                    <select class="selectpicker" name="ft_media_type">
+                                        <option value="-1"{% if formtype.type == 0 %}selected{%endif%}>Not a Media Type</option>
+                                        <option value="1" {% if formtype.media_type == 1 %}selected{%endif%}>Image(.jpg,.tif, etc.)</option>
+                                        <option value="2" {% if formtype.media_type == 2 %}selected{%endif%}>Pdf Document</option>
+                                        <option value="3" {% if formtype.media_type == 3 %}selected{%endif%}>3D Object</option>
+                                        <option value="0" {% if formtype.media_type == 0 and formtype.type == 1 %}selected{%endif%}>Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="input-group" style="float:left;">                    
+                                <div class="input-group-addon small-option">File Extension(if img):</div>
+                                <select class="selectpicker" name="file_extension">
+                                    <option value=".jpg" {% if formtype.file_extension == '.jpg' %}selected{%endif%}>.jpg</option>
+                                    <option value=".jpeg"{% if formtype.file_extension == '.jpeg'%}selected{%endif%}>.jpeg</option>
+                                    <option value=".tif" {% if formtype.file_extension == '.tif' %}selected{%endif%}>.tif</option>
+                                    <option value=".tiff"{% if formtype.file_extension == '.tiff'%}selected{%endif%}>.tiff</option>
+                                    <option value=".gif" {% if formtype.file_extension == '.gif' %}selected{%endif%}>.gif</option>
+                                    <option value=".png" {% if formtype.file_extension == '.png' %}selected{%endif%}>.png</option>
+                                    <option value=".bmp" {% if formtype.file_extension == '.bmp' %}selected{%endif%}>.bmp</option>
+                                    <option value="" {% if formtype.file_extension == '' %}selected{%endif%}>None</option>
+                                </select>
+                            </div>
+                            <div class="input-group" style="float:left;">                    
+                                <div class="input-group-addon small-option">URI Prefix</div>
+                                <div class="importer-title-check-box" style=""><input type="text" name="uri_prefix" {%if formtype.uri_prefix != None %}value="{{formtype.uri_prefix}}"{%endif%}></div>
+                            </div>
+                        </div>
+                        
+                        
+                    </div>
+                
+                </div>
+                <!-- Area for Adding, Deleting, and Editing Form Record Attribute Types-->
+                <div class="title-band">Attribute Fields</div> 
+                <div id="formattributegrid" class="col-md-12">  
+                    {# --We create a hidden row and set it to disabled. This gives the javascript something to #}
+                    {# --clone for the add new button #}
+                            <div class="attribute-float" style="display:none">
+                                <div class="input-group attribute-input">
+                                    <span class="input-group-btn">
+                                        <a role="button" class="btn btn-danger del-field-button" href="#">
+                                        <span class="glyphicon glyphicon-remove-sign" aria-hidden="true"></span>
+                                        </a>
+                                    </span>
+                                    <input class="form-type-label-entry" type="text" name="for cloning" value="Enter Label here!">
+                                    <div class="order-field">
+                                        <span class="glyphicon glyphicon-sort-by-order" title="Order of Priority"></span>
+                                        <input type="text" class="order-num-field" maxlength="3" name="cloning" value="">
+                                    </div>
+                               </div>
+                               <div class="new-ref-chk-box" hidden disabled>
+                                    <span class="glyphicon glyphicon-random" title="Convert Field to A Reference Type"></span>
+                                    <input class="reference-conversion" type="checkbox" name="frat__{{formrecordattributetype.pk}}__is-new-ref">
+                                    <select class="offline" name="frat__{{formrecordattributetype.pk}}__new-ref-id" disabled>
+                                    {% for thisformtype in project.formtype_set.all %}
+                                        
+                                        <option value="{{thisformtype.pk}}">{{thisformtype}}</option>
+                                       
+                                    {% endfor %}
+                                    </select>
+                               </div>
+                            </div>
+                        {% for formrecordattributetype in formtype.formrecordattributetype_set.all|dictsort:"order_number"  %}
+                            {% if formrecordattributetype.flagged_for_deletion == False%}
+                            <div class="attribute-float">
+                                <div class="input-group attribute-input">
+                                    <span class="input-group-btn">
+                                        <a role="button" class="btn btn-danger del-field-button" href="#">
+                                        <span class="glyphicon glyphicon-remove-sign" aria-hidden="true"></span>
+                                        </a>
+                                    </span>
+                                    <input class="form-type-label-entry" type="text" name="{{formrecordattributetype|post_model_type}}{{formrecordattributetype.pk}}" value="{{formrecordattributetype}}">
+                                    <div class="order-field">
+                                        <span class="glyphicon glyphicon-sort-by-order" title="Order of Priority"></span>
+                                        <input type="text" class="order-num-field" maxlength="3" name="frat__{{formrecordattributetype.pk}}__order" value="{% if formrecordattributetype.order_number == None %}{{forloop.counter|add:"200"}}{% else %}{{formrecordattributetype.order_number}}{%endif%}">
+                                    </div>
+                               </div>
+                               <div class="new-ref-chk-box">
+                                    <span class="glyphicon glyphicon-random" title="Convert Field to A Reference Type"></span>
+                                    <input class="reference-conversion" type="checkbox" name="frat__{{formrecordattributetype.pk}}__is-new-ref">
+                                    <select class="offline" name="frat__{{formrecordattributetype.pk}}__new-ref-id" disabled>
+                                    {% for thisformtype in project.formtype_set.all %}
+                                        
+                                        <option value="{{thisformtype.pk}}">{{thisformtype}}</option>
+                                        
+                                    {% endfor %}
+                                    </select>
+                               </div>
+                               <div class="switch-id">
+                                    <span class="glyphicon glyphicon-retweet" title="Switch with Form ID"></span>
+                                    <input class="switch-id-checkbox" type="checkbox" name="frat__{{formrecordattributetype.pk}}__switch-id">
+                                </div>
+                            </div>
+                            {%endif%}
+                        {% endfor %}
+                </div>
+                <div class="add-field-button">
+                     <button id="add_recordattribute" class="btn btn-info btn-small" type="button">+Add Attribute</button> 
+                </div>
+              
+                <!-- Area for Adding, Deleting, and Editing Form Record Reference Types-->
+                <div class="col-md-12 title-band">
+                    References to Other Forms
+                </div>
+                <div id="formreferencegrid" class="col-md-12 reference-grid"> 
+                    {# --We create a hidden row and set it to disabled. This gives the javascript something to #}
+                    {# --clone for the add new button #}
+                        <div class="row" style="display:none">
+                            <div class=""><a class="btn del-reference-button" href="#"><span class="glyphicon glyphicon-remove-sign" aria-hidden="true"></span></a></div>
+                            <div class="reference-input"><input type="text" name="forcloning" value="nothing"></div>                            
+                            <span class="glyphicon glyphicon-resize-horizontal"></span>
+                            <div class="reference-input"><select name="forcloning">
+                                    <option value="-1" selected>None Selected</option>
+                                {% for thisformtype in project.formtype_set.all %}
+                                    {% if thisformtype.flagged_for_deletion == False %}
+                                    <option value="{{thisformtype.pk}}">{{thisformtype}}</option>
+                                    {%endif %}
+                                {% endfor %}
+                            </select></div>
+                            <div class="order-field"><span class="glyphicon glyphicon-sort-by-order" title="Order of Priority"></span><input type="text" class="order-num-field" maxlength="3" name="forcloning" value=""> </div>
+                            <div class="new-ref-chk-box" hidden disabled>
+                                <span class="glyphicon glyphicon glyphicon-refresh" title="Convert Field to A Reference Type"></span>
+                                <input class="reference-conversion" type="checkbox" name="frrt____is-new-ref">
+                                <select class="offline" name="frrt____new-ref-id" hidden disabled>
+                                    <option value="-1">None Selected</option>
+                                {% for thisformtype in project.formtype_set.all %}
+                                    {% if thisformtype.flagged_for_deletion == False %}
+                                    <option value="{{thisformtype.pk}}">{{thisformtype}}</option>
+                                    {%endif %}
+                                {% endfor %}
+                                </select>
+                            </div>
+                        </div> 
+                    {# This is where we build reference record type input rows if any exists for the formtype already #}
+                        {% for formrecordreferencetype in formtype.ref_to_parent_formtype.all %}
+                            {% if formrecordreferencetype.form_type_reference.type == 0 or formrecordreferencetype.form_type_reference == None%}
+                            {% if formrecordreferencetype.flagged_for_deletion == False %}
+                            {{counter.set_false}}
+                            <div class="row">
+                                <div class=""><a class="btn del-reference-button" href="#"><span class="glyphicon glyphicon-remove-sign" aria-hidden="true"></span></a></div>
+                                <div class="reference-input"><input type="text" name="{{formrecordreferencetype|post_model_type}}{{formrecordreferencetype.pk}}" value="{{formrecordreferencetype}}"></div>                            
+                                <span class="" hidden disabled></span>
+                                <div class="reference-input" hidden disabled><select name="{{formrecordreferencetype|post_model_type}}{{formrecordreferencetype.pk}}__ref">
+                                    {% for thisformtype in project.formtype_set.all %}
+                                        {% if thisformtype.flagged_for_deletion == False %}
+                                        <!--{{formrecordreferencetype.form_type_reference}} == {{thisformtype}} -->
+                                        <option value="{{thisformtype.pk}}" {% if formrecordreferencetype.form_type_reference == thisformtype %}  {{counter.set_true}}selected{% endif %}>{{thisformtype}}</option>
+                                        {%endif %}
+                                    {% endfor %}
+                                        <!-- {{counter.count}} -->
+                                        {% if counter.count == 0 %}<option value="-1" selected>None Selected</option>{%else%}<option value="-1">None Selected</option>{%endif%}
+                                        {{counter.set_false}}
+                                </select></div>
+                                <div class="order-field"><span class="glyphicon glyphicon-sort-by-order" title="Order of Priority"></span><input type="text" class="order-num-field" maxlength="3" name="frrt__{{formrecordreferencetype.pk}}__order" value="{% if formrecordreferencetype.order_number == None %}{{forloop.counter|add:"200"}}{% else %}{{formrecordreferencetype.order_number}}{%endif%}"> </div>
+                                <div class="new-ref-chk-box">
+                                    <span class="glyphicon glyphicon glyphicon-refresh" title="Convert Field to A Reference Type"></span>
+                                    <input class="reference-conversion" type="checkbox" name="frrt__{{formrecordreferencetype.pk}}__is-new-ref">
+                                    <select class="offline" name="frrt__{{formrecordreferencetype.pk}}__new-ref-id" disabled>
+                                    {% for thisformtype in project.formtype_set.all %}
+                                        {% if thisformtype.flagged_for_deletion == False %}
+                                        <!-- {{formrecordreferencetype}} ?? {{formrecordreferencetype.form_type_reference}}  =   {{thisformtype}} -->
+                                        <option value="{{thisformtype.pk}}"  {% if formrecordreferencetype.form_type_reference == thisformtype %}  {{counter.set_true}}selected{% endif %}>{{thisformtype}}</option>
+                                        {%endif %}
+                                    {% endfor %}
+                                        {% if counter.count == 0 %}<option value="-1" selected>None Selected</option>{%else%}<option value="-1">None Selected</option>{%endif%}
+                                        {{counter.set_false}}
+                                    </select>
+                                </div>
+                                <div class="new-attr-chk-box">
+                                    <span class="glyphicon glyphicon-text-height" title="Convert Field to A Reference Type"></span>
+                                    <input class="attribute-conversion" type="checkbox" name="frrt__{{formrecordreferencetype.pk}}__is-new-att">
+                                </div>               
+                            </div> 
+                            {%endif%}
+                           {%  endif %}
+                        {% endfor %}
+                    
+                    </div>
+                <div class="add-field-button">
+                      <button id="add_recordreference" class="btn btn-info btn-small" type="button">+Add Reference</button> 
+                </div>
+                
+                <!-- Area for Adding, Deleting, and Editing Form Media Attribute Types-->
+                <div class="col-md-12 title-band">Media Entries</div> 
+                <div id="formmediareferencegrid" class="col-md-12 reference-grid"> 
+                    {# --We create a hidden row and set it to disabled. This gives the javascript something to #}
+                    {# --clone for the add new button #}
+                        <div class="row" style="display:none">
+                            <div class=""><a class="btn del-reference-button" href="#"><span class="glyphicon glyphicon-remove-sign" aria-hidden="true"></span></a></div>
+                            <div class="reference-input"><input type="text" name="forcloning" value="nothing"></div>                            
+                            <span class="glyphicon glyphicon-resize-horizontal"></span>
+                            <div class="reference-input"><select name="forcloning">
+                                    <option value="-1"  selected>Other</option>
+                                {% for thisformtype in project.formtype_set.all %}
+                                    {% if thisformtype.flagged_for_deletion == False %}
+                                    <option value="{{thisformtype.pk}}">{{thisformtype}}</option>
+                                    {%endif %}
+                                {% endfor %}
+                            </select></div>
+                            <div class="order-field"><span class="glyphicon glyphicon-sort-by-order" title="Order of Priority"></span><input type="text" class="order-num-field" maxlength="3" name="forcloning" value=""> </div>
+                            <div class="new-ref-chk-box" hidden disabled>
+                                <span class="glyphicon glyphicon glyphicon-refresh" title="Convert Field to A Reference Type"></span>
+                                <input class="reference-conversion" type="checkbox" name="frrt__{{formrecordreferencetype.pk}}__is-new-ref">
+                                <select class="offline" name="frrt__{{formrecordreferencetype.pk}}__new-ref-id" disabled>
+                                    <option value="-1" selected>Other</option>
+                                {% for thisformtype in project.formtype_set.all %}
+                                   {% if thisformtype.flagged_for_deletion == False %}
+                                    <option value="{{thisformtype.pk}}">{{thisformtype}}</option>
+                                   {% endif %}
+                                {% endfor %}
+                                </select>
+                            </div>
+                        </div> 
+                    {# This is where we build reference record type input rows if any exists for the formtype already #}
+                        {% for formrecordreferencetype in formtype.ref_to_parent_formtype.all %}
+                            {% if formrecordreferencetype.form_type_reference.type == 1 and formrecordreferencetype.flagged_for_deletion == False%}
+                            
+                            <div class="row">
+                                <div class=""><a class="btn del-reference-button" href="#"><span class="glyphicon glyphicon-remove-sign" aria-hidden="true"></span></a></div>
+                                <div class="reference-input"><input type="text" name="{{formrecordreferencetype|post_model_type}}{{formrecordreferencetype.pk}}" value="{{formrecordreferencetype}}"></div>                            
+                                <span class="" hidden disabled></span>
+                                <div class="reference-input" hidden disabled><select name="{{formrecordreferencetype|post_model_type}}{{formrecordreferencetype.pk}}__ref">   
+                                    {% for thisformtype in project.formtype_set.all %}
+                                        {% if thisformtype.flagged_for_deletion == False %}
+                                        <option value="{{thisformtype.pk}}" {% if formrecordreferencetype.form_type_reference == thisformtype %} {{counter.set_true}}selected{% endif %}>{{thisformtype}}</option>
+                                         {% endif %}
+                                    {% endfor %}
+                                        {% if counter.count == 0 %}<option value="-1" selected>None Selected</option>{%else%}<option value="-1">None Selected</option>{%endif%}
+                                        {{counter.set_false}}
+                                </select></div>
+                                <div class="order-field"><span class="glyphicon glyphicon-sort-by-order" title="Order of Priority"></span><input type="text" class="order-num-field" maxlength="3" name="frrt__{{formrecordreferencetype.pk}}__order" value="{% if formrecordreferencetype.order_number == None %}{{forloop.counter|add:"200"}}{% else %}{{formrecordreferencetype.order_number}}{%endif%}"> </div>
+                                <div class="new-ref-chk-box">
+                                    <span class="glyphicon glyphicon glyphicon-refresh" title="Convert Field to A Reference Type"></span>
+                                    <input class="reference-conversion" type="checkbox" name="frrt__{{formrecordreferencetype.pk}}__is-new-ref">
+                                    <select class="offline" name="frrt__{{formrecordreferencetype.pk}}__new-ref-id" disabled>
+                                    {% for thisformtype in project.formtype_set.all %}
+                                     {% if thisformtype.flagged_for_deletion == False %}
+                                        <option value="{{thisformtype.pk}}"  {% if formrecordreferencetype.form_type_reference == thisformtype %} {{counter.set_true}}selected{% endif %}>{{thisformtype}}</option>
+                                      {%endif %}
+                                    {% endfor %}
+                                        {% if counter.count == 0 %}<option value="-1" selected>None Selected</option>{%else%}<option value="-1">None Selected</option>{%endif%}
+                                        {{counter.set_false}}
+                                    </select>
+                                </div>
+                                <div class="new-attr-chk-box">
+                                    <span class="glyphicon glyphicon-text-height" title="Convert Field to A Reference Type"></span>
+                                    <input class="attribute-conversion" type="checkbox" name="frrt__{{formrecordreferencetype.pk}}__is-new-att">
+                                </div>                                
+                            </div> 
+                            {% endif %}
+                        {% endfor %}
+                    
+                    </div>
+                
+                <div class="add-field-button">
+                     <button id="add_mediatypereference" class="btn btn-info btn-small" type="button">+Add Attribute</button> 
+                </div>
+                
+             
+            </div>
+            </form>
+        </div>
+    </div>
+
+    
+
+
+{% endblock %}
+
+{% block footer %}
+    <!--   
+    //================================================================================================================
+    //
+    //  This script acts as a standarized set of functions and variables that all templates in the maqlu engine need
+    //  --to access and utilize. e.g. Because these scripts access the back-end API outside of a template, I needed
+    //  --a way to access the API endpoint URIs so I store a list of the URIs and pass them as a template variables
+    //  --that the rest of the included javascripts can utilize. I had contemplated just adding all the javascript to
+    //  --each <template>.html file within <script> tags, but that will increase the file template size, and there will
+    //  --be redundant code that can't be cached, nor edited easily in the future.
+    //
+    //  These global variables and Endpoints should be on every main admin template page 
+    //
+    //  It additionally, adds a CSRF token reader for the scripts to use POST AJAX with.
+    //================================================================================================================
+    -->
+    {% if user_access >= access_level %}   
+    <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+    <script>          
+    //GLOBAL FUNCTIONS//
+    function getAPIEndpoints(){
+        return JSON.parse('{{api_urls|safe}}');
+    }
+    //GLOBALS VARIABLES//
+    var RTYPE_LIST;
+    var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
+    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
+    var CURRENT_PROJECT_PK = '{{project.pk}}';
+    var INITIALIZATION_CODE = 0;
+    var API_URLS = getAPIEndpoints();
+    </script>
+    {% endif %}   
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+
+
+    <script src="{% static 'js/enki_form_type_editor_controls.js' %}"></script>  
+    <script>
+        $('#toolbar-delete').click( function(){
+        formData = {'ID':'{{formtype.pk}}'}
+            if(confirm("Are you sure you want to delete this Form Type?")){
+                $.ajax({ 
+                     url   : API_URLS['recycle_formtype'],
+                     type  : "POST",
+                     data  : formData, // data to be submitted
+                     success : function(returnedQuery)
+                     {
+                        console.log(returnedQuery);
+                        window.location.replace('{% url 'maqlu_admin:project_home' project_pk=project.pk %}');
+                        
+                     },
+                    // handle a non-successful response
+                    fail : function(xhr,errmsg,err) {
+                        console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+                    }
+                }); 
+            }                
+        
+        }); 
+        
+    </script>    
+{% endblock %}

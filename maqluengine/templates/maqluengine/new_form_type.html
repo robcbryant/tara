@@ -1,0 +1,227 @@
+
+{% extends "admin/base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine{% endblock %}
+
+
+{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+
+{% block breadcrumbs %}
+    {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project  form=form %}
+{% endblock %}
+
+{% block content %} 
+
+    <div id="project-header" class="container-fluid">
+
+    </div><!-- project header -->
+    
+    <div id="project-content" class="container-fluid">
+    
+        <!-- This panel is the side column for listing available form types -->
+        <div id="left-pane" class="col-md-2">
+            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                              
+        </div>
+        
+        
+        <div id="center-pane" class="col-md-10">
+             {% if user_access >= access_level %}
+            <div id="form-type-controls" class="btn-group btn-group-sm save-delete-buttons" role="group">
+                <label for="submit-form" data-toggle="tooltip" data-placement="bottom" title="Save New Form or Form Template" class="btn btn-success" role="button"><span class="glyphicon glyphicon-floppy-disk"></span></label>
+                
+                <button id="toolbar-delete" disabled data-toggle="tooltip" data-placement="bottom" title="Delete Current Form or Form Template" class="btn btn-danger" role="button"><span class="glyphicon glyphicon-trash"></span></button>
+
+            </div>  
+           {% endif %}   
+            <form id="new-form-type-form" method="post">
+            {% if user_access >= access_level %}{% csrf_token %}{% endif %}
+            <input type="text" class="hidden" name='sesID' value="{{ -1|getUniqueSessionToken }}">
+            
+            <input type="submit" id="submit-form" class="hidden">
+            <input type="submit" id="submit-delete-form" class="hidden" name='delete-form-type'>
+            <input type="text" class="hidden" name='formtype-type' value="0">
+
+                <!-- FormType Name Entry for Editing-->
+                    <div id="form-type-title">
+                        <h2 class='bg-primary'>Enter New Label for Form Type: <input type="text" style="" name="form_type_name" value=""></input><input type="submit" class="btn btn-success" id="submit-button" style="display:none; float:right" value="Import!"></h2>
+                        <input id="parsed-json" type="hidden" name='csv_json' value="{{csv_json}}">
+                    
+           
+                        <!-- FORM TYPE GROUP OPTIONS CONTAINER-->
+                         <div class="container-fluid">
+                         <div class="input-group col-sm-4" style="float:left;">
+                            <div class="input-group-addon">Add to Group?</div>
+                            
+                            <div>
+                                <select name="ft_group" class="selectpicker" data-size="5" data-width="90%" data-live-search="true" >
+                                    <option value="NONE" selected>---------</option>
+                                    <option value="NEW">NEW GROUP</option>
+                                            {% for aformtypegroup in project.formtypegroup_set.all %}
+                                                <option value="{{aformtypegroup.pk}}">{{aformtypegroup}}</option>
+                                            {% endfor %}
+                                </select>
+                            </div>
+                            <div><input type="text" name="ft_group_new" value="Enter Name if New" style=""></div>
+                        </div>
+                        <!-- IS HIERCHICAL OPTIONS CONTAINER-->
+                        <div class="input-group col-sm-3" style="float:left;">                    
+                            <div class="input-group-addon small-option">Is Hierchical?</div>
+                            <div class="importer-title-check-box" style=""><input type="checkbox" name="is_hierarchical"></div>
+                        </div>
+                                                
+             
+                        <!-- MEDIA TYPE OPTIONS CONTAINER-->                            
+                       
+                         <div class="input-group col-sm-5 form-type-media-dropdown" style="float:left;">
+                            <div class="input-group-addon small-option">Is Media Type?</div>
+                            <div>
+                                <select class="selectpicker" name="ft_media_type">
+                                    <option value="-1" selected>Not a Media Type</option>
+                                    <option value="1">Image(.jpg,.tif, etc.)</option>
+                                    <option value="2">Pdf Document</option>
+                                    <option value="3">3D Object</option>
+                                    <option value="0">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                        </div>
+                        
+                        
+                    </div>               
+                <!-- Area for Adding, Deleting, and Editing Form Record Attribute Types-->
+                <div class="col-md-12 title-band">Attribute Fields</div> 
+               <div id="formattributegrid" class="col-md-12">  
+                       
+                            <div class="attribute-float" style="display:none">
+                                <div class="input-group attribute-input">
+                                    <span class="input-group-btn">
+                                        <a role="button" class="btn btn-danger del-field-button" href="#">
+                                        <span class="glyphicon glyphicon-remove-sign" aria-hidden="true"></span>
+                                        </a>
+                                    </span>
+                                    <input class="form-type-label-entry" type="text" name="CLONE" value="">
+                                    <div class="order-field">
+                                        <span class="glyphicon glyphicon-sort-by-order" title="Order of Priority"></span>
+                                        <input type="text" class="order-num-field" maxlength="3" name="frat__CLONE__order" value="">
+                                    </div>
+                               </div>
+                            </div>
+                        
+                </div>
+                <div class="add-field-button">
+                     <button id="add_recordattribute" class="btn btn-info btn-small new-form-type-but" type="button">+Add Attribute</button> 
+                </div>
+
+
+                 
+                <!-- Area for Adding, Deleting, and Editing Form Record Reference Types-->
+                <div class="col-md-12 title-band">
+                    References to Other Forms
+                </div>
+                <div id="formreferencegrid" class="col-md-12 reference-grid"> 
+                    {# --We create a hidden row and set it to disabled. This gives the javascript something to #}
+                    {# --clone for the add new button #}
+                        <div class="row" style="display:none">
+                            <div class=""><a class="btn del-reference-button" href="#"><span class="glyphicon glyphicon-remove-sign" aria-hidden="true"></span></a></div>
+                            <div class="reference-input"><input type="text"  name="forcloning" value="nothing"></div>                            
+                            <span class="glyphicon glyphicon-resize-horizontal"></span>
+                            <div class="reference-input"><select name="forcloning">
+                                    <option value="-1" selected>None Selected</option>
+                                {% for thisformtype in project.formtype_set.all %}
+                                    {% if thisformtype.type == 0 %}
+                                    <option value="{{thisformtype.pk}}">{{thisformtype}}</option>
+                                    {%  endif %}
+                                {% endfor %}
+                            </select></div>
+                            <div class="order-field"><span class="glyphicon glyphicon-sort-by-order" title="Order of Priority"></span><input type="text" class="order-num-field" maxlength="3" name="forcloning" value=""> </div>
+                            <div class="new-ref-chk-box" hidden disabled>
+                                <span class="glyphicon glyphicon glyphicon-refresh" title="Convert Field to A Reference Type"></span>
+                                <input class="reference-conversion" type="checkbox" name="">
+                                <select class="offline" name="" hidden disabled>
+                                    <option value="-1">None Selected</option>
+      
+                                </select>
+                            </div>
+                        </div> 
+                </div>
+                <div class="add-field-button">
+                      <button id="add_recordreference" class="btn btn-info btn-small new-form-type-but" type="button">+Add Reference</button> 
+                </div>
+                
+                
+                <!-- Area for Adding, Deleting, and Editing Form Media Attribute Types-->
+                <div class="col-md-12 title-band">Media Entries</div> 
+                <div id="formmediareferencegrid" class="col-md-12 reference-grid"> 
+                    {# --We create a hidden row and set it to disabled. This gives the javascript something to #}
+                    {# --clone for the add new button #}
+                        <div class="row" style="display:none">
+                            <div class=""><a class="btn del-reference-button" href="#"><span class="glyphicon glyphicon-remove-sign" aria-hidden="true"></span></a></div>
+                            <div class="reference-input"><input type="text"  name="forcloning" value="nothing"></div>                            
+                            <span class="glyphicon glyphicon-resize-horizontal"></span>
+                            <div class="reference-input"><select name="forcloning">
+                                    <option value="-1"  selected>None Selected</option>
+                                {% for thisformtype in project.formtype_set.all %}
+                                    {% if thisformtype.type == 1 %}
+                                    <option value="{{thisformtype.pk}}">{{thisformtype}}</option>
+                                    {%  endif %}
+                                {% endfor %}
+                            </select></div>
+                            <div class="order-field"><span class="glyphicon glyphicon-sort-by-order" title="Order of Priority"></span><input type="text" class="order-num-field" maxlength="3" name="forcloning" value=""> </div>
+                        </div>                    
+                </div>
+                
+                <div class="add-field-button">
+                     <button id="add_mediatypereference" class="btn btn-info btn-small new-form-type-but" type="button">+Add Attribute</button> 
+                </div>
+            </form>
+        </div>
+    </div>
+    
+
+
+{% endblock %}
+
+{% block footer %}
+    <!--   
+    //================================================================================================================
+    //
+    //  This script acts as a standarized set of functions and variables that all templates in the maqlu engine need
+    //  --to access and utilize. e.g. Because these scripts access the back-end API outside of a template, I needed
+    //  --a way to access the API endpoint URIs so I store a list of the URIs and pass them as a template variables
+    //  --that the rest of the included javascripts can utilize. I had contemplated just adding all the javascript to
+    //  --each <template>.html file within <script> tags, but that will increase the file template size, and there will
+    //  --be redundant code that can't be cached, nor edited easily in the future.
+    //
+    //  These global variables and Endpoints should be on every main admin template page 
+    //
+    //  It additionally, adds a CSRF token reader for the scripts to use POST AJAX with.
+    //================================================================================================================
+    -->
+    {% if user_access >= access_level %}   
+    <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+    <script>          
+    //GLOBAL FUNCTIONS//
+    function getAPIEndpoints(){
+        return JSON.parse('{{api_urls|safe}}');
+    }
+    //GLOBALS VARIABLES//
+    var RTYPE_LIST;
+    var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
+    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
+    var CURRENT_PROJECT_PK = '{{project.pk}}';
+    var INITIALIZATION_CODE = 0;
+    var API_URLS = getAPIEndpoints();
+    </script>
+    {% endif %}   
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+
+    
+    <script src="{% static 'js/enki_form_type_editor_controls.js' %}"></script>   
+    
+
+{% endblock %}

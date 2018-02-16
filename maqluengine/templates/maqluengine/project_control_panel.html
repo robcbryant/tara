@@ -1,0 +1,233 @@
+
+{% extends "admin/base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine{% endblock %}
+
+
+{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+
+{% block breadcrumbs %}
+    {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}
+{% endblock %}
+
+{% block content %} 
+
+    <div id="project-header" class="container-fluid">
+
+    </div><!-- project header -->
+    
+    
+    <div id="project-content" class="container-fluid">
+    
+        <!-- This panel is the side column for listing available form types -->
+        <div id="left-pane" class="col-md-2">
+            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}               
+        </div>
+        
+        
+        <div id="center-pane" class="col-md-10">
+            
+            <form id="project-form" method="post">
+           {% if user_access >= access_level %}{% csrf_token %}{% endif %}
+            <input type="text" class="hidden" name='sesID' value="{{ -1|getUniqueSessionToken }}">
+            <div class="row">
+                <div class="col-md-6">
+                <div class="input-group "><div class="input-group-addon">Project Name</div><input type="text" class="form-control" name="project_name" value="{{project.name}}"></div>
+                <div class="input-group"><div class="input-group-addon">Date Created</div><input type="text" class="form-control" name="date_created" value="{{project.date_created}}"></div>
+                <div class="input-group"><div class="input-group-addon" title="Digital Asset Management System URI For Images">DAM Image URI</div><input type="text" class="form-control" name="dam_uri_img" value="{{project.uri_img}}"></div>
+                <div class="input-group"><div class="input-group-addon" title="Digital Asset Management System URI For Thumbnails">DAM Thumbnail URI</div><input type="text" class="form-control" name="dam_uri_thumb" value="{{project.uri_thumbnail}}"></div>
+                <div class="input-group"><div class="input-group-addon" title="Digital Asset Management System URI For Downloads">DAM Download URI</div><input type="text" class="form-control" name="dam_uri_download" value="{{project.uri_download}}"></div>
+                <div class="input-group"><div class="input-group-addon" title="Digital Asset Management System URI For Uploads">DAM Upload URI</div><input type="text" class="form-control" name="dam_uri_upload" value="{{project.uri_upload}}"></div>
+                <div class="input-group"><div class="input-group-addon" title="Digital Asset Management System Hask Key for Uploads">DAM upload Key</div><input type="text" class="form-control" name="dam_upload_key" value="{{project.uri_upload_key}}"></div>                                                         
+                <div class="user-list">
+                        <div class="user-list-title"><span>Project Members</span>{% if user_access >= access_level %}<button id="submit-user-changes" type="button" class="btn btn-success" disabled><span class="glyphicon glyphicon-floppy-disk"></span></button>{% endif %}</div>
+                          
+                    <div class="user-scroll">
+                        <table id='user-table'>
+                        <tbody>
+                        <tr class='header'>
+                        {% if user_access >= access_level %} <td class="user-tool-col"></td>{% endif %}
+                         <td></td>
+                         <td>Access</td>
+                         <td>Username</td>
+                         <td>Name</td>
+                         <td>Title</td>
+                         <td>Email</td>
+                        </tr>
+                        {% for aUserPermission in project.permissions_set.all %}
+                           
+                           <tr class="_EDITUSER">
+                            {% if user_access >= access_level %}
+                                <td class="user-tool-col"><div>
+                                
+                                    <button class="btn del-user-btn" type="button" title="{{aUserPermission.user.pk}}"><span class="glyphicon glyphicon-remove-circle"></span></button>
+                                    <button class="btn edit-user-btn" type="button" title="{{aUserPermission.user.pk}}"><span class="glyphicon glyphicon-pencil"></span></button>
+                               
+                                </div></td>
+                             {% endif %}
+                            <td><span class="glyphicon glyphicon-user"></span></td>
+                            <td><span>{{aUserPermission.access_level}}</span><select class="_REQUIRED" style="display:none;">
+                                  <option value="5"{%if aUserPermission.access_level == 5 %}selected{%endif%}>5</option>
+                                  <option value="4"{%if aUserPermission.access_level == 4 %}selected{%endif%}>4</option>
+                                  <option value="3"{%if aUserPermission.access_level == 3 %}selected{%endif%}>3</option>
+                                  <option value="2"{%if aUserPermission.access_level == 2 %}selected{%endif%}>2</option>
+                                  <option value="1"{%if aUserPermission.access_level == 1 %}selected{%endif%}>1</option></select></td>
+                            <td><span>{{aUserPermission.user.username}}</span><input class="_REQUIRED" value="{{aUserPermission.user.username}}" title="{{aUserPermission.user.username}}" style="display:none"></input></td>
+                            <td><span>{{aUserPermission.user.first_name}} {{aUserPermission.user.last_name}}</span><input value="{{aUserPermission.user.first_name}} {{aUserPermission.user.last_name}}" style="display:none"></input></td>
+                            <td><span>{{aUserPermission.job_title}}</span><input value="{{aUserPermission.job_title}}" style="display:none"></input></td>
+                            <td><span>{{aUserPermission.user.email}}</span><input value="{{aUserPermission.user.email}}" style="display:none"></input></td>
+                            
+                           </tr>
+                        {% endfor %}
+                        
+                        </tbody>
+                        </table>
+                    </div>
+                    <div class="button-container">
+                        <button id="add-user-btn" class="btn btn-info btn-small" type="button">Add Member</button>
+                        
+                    </div>
+                </div>
+                
+                </div>
+                <div class="col-md-6">
+                    <div id="geospatial" style="min-height:400px;">
+                        <!--geospatial stuff goes here-->
+                        <div id="gis-help-text-box" class="col-md-12"></div>
+                        <div style="display:none;"><strong>GeoJSON Data</strong></div>
+                        <div style="display:none;"><textarea id="id_geojson_string" name ="project_geojson_string">{{project.geojson_string}}</textarea></div>
+                    </div>
+                    <div>
+                        <div class="project-description">Project Description</div>
+                        <textarea id="id_project_description" class="form-control" name="project_description" rows="10">{{project.description}}</textarea><br>
+                    </div>
+                    {% if user_access >= access_level %}<input type="submit" value="Save Project">      {% endif %}
+                </div>
+            </div>
+            </form>
+            
+            <div id="project-stats">
+                <div id="stats-formtype">
+                    <div class="stats-title">Form Overview</div>
+                    <div class="canvas-parent">
+                        <canvas id="myChart" width="400" height="400"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+
+{% endblock %}
+
+
+{% block footer %} 
+
+    <!--   
+    //================================================================================================================
+    //
+    //  This script acts as a standarized set of functions and variables that all templates in the maqlu engine need
+    //  --to access and utilize. e.g. Because these scripts access the back-end API outside of a template, I needed
+    //  --a way to access the API endpoint URIs so I store a list of the URIs and pass them as a template variables
+    //  --that the rest of the included javascripts can utilize. I had contemplated just adding all the javascript to
+    //  --each <template>.html file within <script> tags, but that will increase the file template size, and there will
+    //  --be redundant code that can't be cached, nor edited easily in the future.
+    //
+    //  These global variables and Endpoints should be on every main admin template page 
+    //
+    //  It additionally, adds a CSRF token reader for the scripts to use POST AJAX with.
+    //================================================================================================================
+    -->
+    {% if user_access >= access_level %}   
+    <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+    <script>          
+    //GLOBAL FUNCTIONS//
+    function getAPIEndpoints(){
+        return JSON.parse('{{api_urls|safe}}');
+    }
+    //GLOBALS VARIABLES//
+    var RTYPE_LIST;
+    var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
+    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
+    var CURRENT_PROJECT_PK = '{{project.pk}}';
+    var INITIALIZATION_CODE = 0;
+    var API_URLS = getAPIEndpoints();
+    
+    //Query Engine Specific
+    var GLOBAL_CURRENT_QUERY; console.log('{{user.permissions.saved_queries|escapejs}}');
+    var GLOBAL_USER_QUERIES{% if user.permissions.saved_queries == None %}; {% else %} = JSON.parse('{{user.permissions.saved_queries|escapejs}}'); {%endif%}
+        
+    </script>
+    {% endif %}   
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+
+    
+    <script src="{% static 'js/enki_geoeditor_single_entity.js'  %}"></script> 
+    <script src="{% static 'chart/Chart.min.js'  %}"></script>
+    
+    {% if user_access >= access_level %}<script src="{% static 'js/enki-project-control-panel-modify-user.js'  %}"></script>{% endif %}     
+    
+    <script>
+    //
+    //  THE SCRIPT BELOW DOES NOTHING BUT PUT A QUICK AND DIRTY GRAPH OF ALL AVAILABLE FORMTYPES AND THEIR FORM COUNTS--IT CAN BE WORKED ON LATER
+    //
+    var formtypes = [
+    {% for formtype in project.formtype_set.all %}
+        "{{formtype}}"{% if not forloop.last %},{%endif%}
+    {% endfor %}
+                    ];
+    var counts = [
+    {% for formtype in project.formtype_set.all %}
+        {{formtype.form_set.all.count}}{% if not forloop.last %},{%endif%}
+    {% endfor %}
+                    ];
+                    
+    var colors = [];
+    for(i=0; i < counts.length; i++) { 
+        colors.push('rgba(' + (Math.floor(Math.random()*(245-115+1))+115) +','+(Math.floor(Math.random()*(245-115+1))+115)+','+(Math.floor(Math.random()*(255-225+1))+225)+', 1)');
+    }                    
+                    
+    var ctx = document.getElementById("myChart");
+    var myBarChart = new Chart(ctx, {
+        type: 'horizontalBar',
+        data: {
+                labels: formtypes,
+                datasets: [{
+                    data: counts,
+                    backgroundColor: colors,
+                    label: "Number of Forms by Form Type",
+                    }]
+                },
+        legend: {
+            display: false
+        },
+        options: {
+            title:{display: false},
+            barDatasetSpacing : 10,
+            barValueSpacing : 10,
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+
+                yAxes: [{
+                    categoryPercentage: 1.0,
+                    barPercentage: 1.0,
+                    
+                    ticks: {
+                        beginAtZero:true
+                    }
+                }]
+            }
+        }
+        });
+</script>   
+    
+    {% endblock %}
+    
+

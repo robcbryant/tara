@@ -1,0 +1,1251 @@
+
+{% extends "admin/base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine&nbsp;&nbsp;-&nbsp;&nbsp;{{project}}&nbsp;&nbsp;:&nbsp;&nbsp;{{formtype}}&nbsp;&nbsp;:&nbsp;&nbsp;{{form}}{% endblock %}
+
+
+{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+
+{% block breadcrumbs %}
+    {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}
+{% endblock %}
+
+{% block content %} 
+    
+    <div id="project-header" class="container-fluid">
+               
+    </div><!-- project header -->
+    
+    
+    <div id="project-content" class="container-fluid">
+    
+        <!-- This panel is the side column for listing available form types -->
+        <div id="left-pane" class="col-md-2">
+            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                              
+        </div>
+         
+        <div id="center-pane" class="col-md-10">
+             <!-- I believe I still need this form for the csrf token supplied by Django--will have to research later to see if that's the case-->
+             <form id="geospatial-engine-form" method="post">
+             {% if user_access >= access_level %}{% csrf_token %}{% endif %}
+             </form>
+                
+            <div id="geospatial-engine" class="">
+                <!-- TOOL BAR HEADER #####################################################################################################################-->
+                <div class="toolbar-header">
+                    <div class="toolbar-A">
+                    </div>
+                    
+                    <div class="toolbar-B">
+                    <button type="button" class="btn tool-measure"><span class="glyphicon glyphicon-minus"></span></button>
+                    <button type="button" id="toolbutton_draw"class="btn tool-draw"><span class="glyphicon glyphicon-pencil"></span></button>
+                    <button type="button" class="btn tool-zoomin"><span class="glyphicon glyphicon-zoom-in"></span></button>
+                    <button type="button" class="btn tool-zoomout"><span class="glyphicon glyphicon-zoom-out"></span></button>
+                    <button type="button" id="toolbutton_zoomextent" class="btn tool-zoomextent"><span class="glyphicon glyphicon-fullscreen"></span></button>
+                    <button type="button" class="btn tool-select"><span class="glyphicon glyphicon-hand-up"></span></button>
+                    <button type="button" class="btn tool-delete"><span class="glyphicon glyphicon-trash"></span></button>
+                    <button type="button" class="btn tool-editfeature"><span class="glyphicon glyphicon-wrench"></span></button>
+                    <button type="button" class="btn"><span class="glyphicon glyphicon-certificate"></span></button>
+                    <button type="button" class="btn"><span class="glyphicon glyphicon-certificate"></span></button>
+                    <button type="button" class="btn"><span class="glyphicon glyphicon-certificate"></span></button>
+                    <button type="button" class="btn"><span class="glyphicon glyphicon-certificate"></span></button>
+                    <button type="button" id="toolbutton_testScript" class="btn"><span class="glyphicon glyphicon-play-circle"></span></button>
+                    </div>
+                </div>
+                
+                <!-- MAIN WINDOW #####################################################################################################################-->
+                
+                <div class="main-window">
+                    <!-- LEFT SIDE BAR FOR LAYER SORTING ---------------------------------------------------------------------------------------------------->
+                    <div class="layers-side-pane">
+
+                        <div class="layers-header">
+                            <div>Layers Panel</div>
+                            <button type="button" class="btn layers-add-menu CLOSED"><span class="glyphicon glyphicon-plus"></span></button> 
+                        </div>
+
+    
+                        <div class="layers-list">
+                            
+                        </div>
+                    </div>
+
+
+
+                    <!-- MAIN MAP WINDOW ---------------------------------------------------------------------------------------------------->                    
+                    <div class="center-map-view">
+                   
+                    
+                        <div class="add-layer-select" style="display:none">
+                        </div>
+                        
+                        <div id="geo-engine-map" class="main-map-view">
+                                <!--geospatial stuff goes here-->
+                        </div>
+                    
+                        <div class="map-footer-stats">
+                        </div>
+                    
+                    </div>
+                    
+                    <!-- RIGHT SIDE BAR FOR DETAILS ---------------------------------------------------------------------------------------------------->                    
+                    <div class="details-side-pane">
+                    
+                    </div>
+                    
+                </div>
+            </div>
+                                                      
+
+
+            
+        </div>
+    </div>
+
+        <div id="testgeojson" hidden></div>
+    
+    
+    
+<!--=================================================================================================================-->
+<!--    ALL DOM TEMPLATES    -->
+<!--=================================================================================================================-->
+
+<div class="layer-parent vector TEMPLATE" style="display:none;">
+    <div class="layer-header">
+        <div class="layer-icon" title="Vector Layer"><span class="glyphicon glyphicon-star-empty"></span></div>
+        <div class="layer-title"></div>
+        <button type="button" class="layer-tools" onclick="showSelectedLayerTools(this)"><span class="glyphicon glyphicon-wrench"></span></button>
+        <div class="layer-visibility"><span class="glyphicon glyphicon-eye-open"></span></div>
+    </div>    
+</div>
+    
+<div class="layer-parent tile TEMPLATE"  style="display:none;">
+    <div class="layer-header">
+        <div class="layer-icon" title="Tile Layer"><span class="glyphicon glyphicon-th"></span></div>
+        <div class="layer-title"></div>
+        <button type="button" class="layer-tools"><span class="glyphicon glyphicon-wrench"></span></button>
+        <div class="layer-visibility"><span class="glyphicon glyphicon-eye-open"></span></div>
+    </div>    
+</div>
+
+<div class="layer-parent raster TEMPLATE" style="display:none;">
+    <div class="layer-header">
+        <div class="layer-icon" title="Raster Layer" ><span class="glyphicon glyphicon-picture"></span></div>
+        <div class="layer-title"></div>
+        <button type="button" class="layer-tools" onclick="showSelectedLayerTools(this)"><span class="glyphicon glyphicon-wrench"></span></button>
+        <div class="layer-visibility"><span class="glyphicon glyphicon-eye-open"></span></div>
+    </div>    
+</div>    
+    
+    
+<div class="layer-list-project TEMPLATE" style="display:none;">
+    <div class="layer-list-project-header">
+        <div class="layer-list-collapse"><span class="glyphicon glyphicon-triangle-right"></span></div>
+        <div class="layer-list-project-title">Project Name</div>
+    </div>
+    <div class="layer-list-formtype-container">
+
+   </div>
+</div>    
+    
+<div class="layer-list-formtype TEMPLATE" style="display:none;">
+    <div class="layer-list-formtype-header">
+        <div class="layer-list-formtype-title">Form Type Name</div>
+        <div class="layer-list-formtype-addall"><span class="glyphicon glyphicon-plus"></span></div>
+    </div>
+</div>    
+    
+<div class="class-entry TEMPLATE" style="display:none;">
+    <button type="button" class="btn class-remove"><span class="glyphicon glyphicon-remove"></span></button>
+
+    <select class="class-code">
+        <option value="0">Contains(Case Sensitive)</option>
+        <option value="1">Contains</option>
+        <option value="2">Matches Exact</option>
+        <option value="3">Excludes</option>
+        <option value="4">Is Null</option>
+    </select>
+    <input class="class-value"></input>
+    <input type="color" class="class-color"></input>
+</div> 
+
+<div class="layer-symbology-panel TEMPLATE" style="display:none;"> 
+    
+    <div class="layer-tab"></div>
+    
+    <div class="tab-buttons">
+        <div class="single tab-btn btn ACTIVE" onclick="switchClassificationTab(this)">Single Classification</div>
+        <div class="category tab-btn btn" onclick="switchClassificationTab(this)">Categorical Classification</div>
+        <div class="quantity tab-btn btn" onclick="switchClassificationTab(this)">Quantities Classification</div>
+    </div>
+    
+    <div class="tab-panel single">
+        <div class="preview">
+            <div class="header">Preview</div>
+            <div class="vector-preview"></div>
+        </div>
+        
+        <div class="single-options">
+            <div><span>Border Color</span><input class="border-color" type="color"></input></div>
+            <div><span>Fill Color</span><input class="fill-color" type="color"></input></div>
+            <div><span>Opacity (%)</span><input class="fill-transparency" type="text" value="100"></input></div>
+        </div>
+        <button type="button" class="btn single-apply-style">Apply Style to Layer</button>
+    </div>
+    
+    
+    <div class="tab-panel category" style="display:none;">
+
+        <div class="layer-opacity"><span> Layer Opacity (%)</span><input class="fill-transparency" type="text" value="100"></input></div>
+        <div class="rtype-list">
+            <div class="rtype-select-title">Choose a Record Type</div>
+            <select class="rtype-select"><option>Testing</option></select>
+        </div>
+        <div class="category-buttons">
+            <button class="btn apply-gradient" type="button">Apply Gradient</button>
+            <button class="btn auto-classifications" type="button">Auto-Classify</button>
+            <button class="btn apply-classifications" type="button">Apply Classes</button>
+        </div>
+        
+        <div class="classification-options-title">Classification Options<div class="btn add-class"><span class="glyphicon glyphicon-plus"></span></div></div>
+        
+        <div class="classification-options">
+            
+            <div class="classification-color-ramp">
+                <button class="btn random-gradient" type="button" title="Randomize Gradient"><span class="glyphicon glyphicon-random"></span></button>
+                <input type="color" class="color-one" onchange="updateClassGradientBar(this)"></input>
+                <div class="color-gradient A"></div>
+                <input type="color" class="color-two" onchange="updateClassGradientBar(this)"></input>
+                <div class="color-gradient B"></div>
+                <input type="color" class="color-three" onchange="updateClassGradientBar(this)"></input>
+            </div>
+            
+            <div class="class-list">
+
+            </div>
+        
+        </div>    
+    </div>
+    
+    <div class="tab-panel quantity" style="display:none;">
+        QUANTITY
+    </div>
+    
+
+</div>
+
+
+{% endblock %}
+
+
+{% block footer %}
+      
+    <!--   
+    //================================================================================================================
+    //
+    //  This script acts as a standarized set of functions and variables that all templates in the maqlu engine need
+    //  --to access and utilize. e.g. Because these scripts access the back-end API outside of a template, I needed
+    //  --a way to access the API endpoint URIs so I store a list of the URIs and pass them as a template variables
+    //  --that the rest of the included javascripts can utilize. I had contemplated just adding all the javascript to
+    //  --each <template>.html file within <script> tags, but that will increase the file template size, and there will
+    //  --be redundant code that can't be cached, nor edited easily in the future.
+    //
+    //  These global variables and Endpoints should be on every main admin template page 
+    //
+    //  It additionally, adds a CSRF token reader for the scripts to use POST AJAX with.
+    //================================================================================================================
+    -->
+    {% if user_access >= access_level %}   
+    <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+    <script>          
+    //GLOBAL FUNCTIONS//
+    function getAPIEndpoints(){
+        return JSON.parse('{{api_urls|safe}}');
+    }
+    //GLOBALS VARIABLES//
+    var RTYPE_LIST;
+    var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
+    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
+    var CURRENT_PROJECT_PK = '{{project.pk}}';
+    var INITIALIZATION_CODE = 0;
+    var API_URLS = getAPIEndpoints();
+    </script>
+    {% endif %}   
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->  
+    
+    <script>
+    //
+    //  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!Eventually this script below should be in its own separate .js file for caching. Will leave
+    //  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!as part of the template until the main development is done on the geospatial engine
+    //
+    // ***************************************START OF GEOSPATIAL ENGINE ******************************************* 
+    //--------------------------------------------------------
+    //  Define all needed Projections here
+    //
+    //  I may move this to the database, or a static file that contains all relevant projections, e.g. all UTM WGS84 projections
+    //  --and load them in a loop, or alternatively on the fly depending on what projection is defined in the geometry of the 
+    //  --geojson. for NOW--we will stick with the 38n UTM projection Al-Hiba(and probably other Iraqi arch sites will use
+
+
+    //***NOTES
+    //  --Openlayers actual <canvas> element is incredibliy difficult to control with page resizing.
+    //  --I finally found a way to tame its behavior by setting the canvas element to "Absolute" positioning
+    //  --Seems...? to do the trick? Otherwise the 100% height attribute was forcing the parent element to 
+    //  --constantly increase in height on resizing. This is because openlayers works with raw pixel values for height/width
+    //  --of the canvas rather than browser percentages. Absolute--I suppose--gets the browser to send it proper pixel
+    //  --values to use.
+
+    proj4.defs("EPSG:32638","+proj=utm +zone=38 +ellps=WGS84 +datum=WGS84 +units=m +no_defs");
+
+
+    //---------------------------------------------------------
+    //  Setup all GLOBAL variables for the engine
+
+    //The main MAP div
+    var MAP;
+    var DRAW_EVENT;
+    var SELECTION_EVENT;
+
+    var mainProjection = new ol.proj.Projection({code: 'EPSG:32638', units: 'm' });
+    //=====================================
+    //setup buttons associated with engine 
+
+    //---------------------------
+    //  TOOL BAR
+
+    $toolbutton_editmode  = $('#toolbutton_editmode');
+    $toolbutton_delfeature  = $('#toolbutton_delfeature');
+    $toolbutton_select  = $('#toolbutton_select');
+    $toolbutton_measure  = $('#toolbutton_measure');
+    $toolbutton_draw  =  $('#toolbutton_draw');
+    $toolbutton_zoomin = $('#toolbutton_zoomin');
+    $toolbutton_zoomout = $('#toolbutton_zoomout');
+    $toolbutton_zoomextent = $('#toolbutton_zoomextent');
+    $toolbutton_selectMode = $('#toolbutton_selectMode');
+    $toolbutton_testScript = $('#toolbutton_testScript');
+
+
+
+
+
+
+    //---------------------------------------------------
+    //  This function loads the provided classes in the class_list in the classification options box
+    //      in the Categorical Classes panel. Once the classes are loaded for a given RTYPE, it then
+    //      queries the server for each class and returns a list of the classes with the respective Forms
+    //      that match them.
+    //
+    //  It takes this returned JSON object, and matches it with a color key generated by creating a list 
+    //      of 'class_value':'color'  pairs based on the existing class-list
+    //
+    //
+    function applyClassesToCurrentLayer(theInput){
+
+        $parentPanel = $(this).parent().parent();
+        var pk = $parentPanel.parent().attr('pk');
+        class_value_list = [];
+        $parentPanel.find('.class-list').children().each( function(index) {
+            var color = $(this).find('.class-color').val();
+            var value = $(this).find('.class-value').val();
+            class_value_list.push({'class_value':value, 'query_type':'contains', 'color':color});
+        });
+        var transparency = $parentPanel.find('.fill-transparency').val();
+        if (transparency < 0) transparency = 0;
+        if (transparency > 100) transparency = 100;
+        transparency = transparency / 100.0;
+        console.log($parentPanel);
+        console.log($parentPanel.find('.rtype-select').val());
+         $.ajax({ url   : API_URLS['get_geo_category_matches'], type  : "POST", 
+            data : [{name:'formtype_pk',value:pk},{name:'rtype_code', value:$parentPanel.find('.rtype-select').val()},{name:'class_list', value:JSON.stringify(class_value_list)}], // data to be submitted
+            success : function(returnedQuery){
+            console.log("finished");
+            console.log(returnedQuery);
+             
+            var colorKey = returnedQuery.form_color_key;
+            
+            MAP.getLayers().getArray().forEach(function(layer,i){
+            
+                if( pk == layer.get('pk')){
+                  console.log('WE MADE IT');
+                  console.log($(this));
+                  console.log(layer);
+                  var allFeatures = layer.getSource().getFeatures();
+                      for (i = 0; i < allFeatures.length; i++){
+                        var currentFeature = allFeatures[i];
+                        var fillColor = colorKey[currentFeature.get('pk')];
+                        if (!fillColor) fillColor = 'rgba(0,0,0,0)';
+                        var borderColor = 'rgba(0,0,0,1)';
+                        var newStyle = new ol.style.Style({
+                            
+                            fill: new ol.style.Fill({ color: fillColor }),
+                            stroke: new ol.style.Stroke({ color: borderColor, width: 1 }),
+
+                        });
+                        currentFeature.setStyle(newStyle);
+                        currentFeature.set('default_style', newStyle);
+                      }
+                    layer.setOpacity(transparency);
+                }
+                
+            });           
+            
+            
+            
+            }
+        });
+
+    }
+
+
+
+
+
+    function removeClass(){
+        $(this).parent().remove();
+    }
+
+    $('.class-remove').click(removeClass);
+
+
+
+    function addClass(){
+        $newEntry = $('.class-entry.TEMPLATE').clone(true);
+        $newEntry.removeClass('TEMPLATE');
+        $newEntry.show();
+        console.log( $(this).parent().parent().find('.class-list') );
+        $(this).parent().parent().find('.class-list').append($newEntry);
+    }
+
+    $('.add-class').click(addClass);
+
+
+
+    function applySingleClassSymbology(){
+        var borderColor = $(this).parent().find('.vector-preview').css('border-color');
+        var fillColor = $(this).parent().find('.vector-preview').css('background-color');
+        var pk = $(this).parent().parent().attr('pk');
+        var transparency = $(this).parent().find('.fill-transparency').val();
+        if (transparency < 0) transparency = 0;
+        if (transparency > 100) transparency = 100;
+        transparency = transparency / 100.0;
+        
+        MAP.getLayers().getArray().forEach(function(layer,i){
+        
+            if( pk == layer.get('pk')){
+              console.log('WE MADE IT');
+              console.log($(this));
+              console.log(layer);
+              console.log(layer.getSource());
+              console.log(layer.getSource());
+              var allFeatures = layer.getSource().getFeatures();
+              console.log(allFeatures);
+                      for (i = 0; i < allFeatures.length; i++){
+                        //console.log(allFeatures[i].get('pk'));
+                        var currentFeature = allFeatures[i];
+
+                        var newStyle = new ol.style.Style({
+                            
+                            fill: new ol.style.Fill({ color: fillColor }),
+                            stroke: new ol.style.Stroke({ color: borderColor, width: 1 }),
+
+                        });
+                        currentFeature.setStyle(newStyle);
+                        currentFeature.set('default_style', newStyle);
+                      }
+                layer.setOpacity(transparency);
+            }
+            
+        });    
+    }
+
+    $('.border-color').change( function() {
+        console.log("Is it working?");
+        $(this).parent().parent().parent().find('.vector-preview').css('border-color', $(this).val());
+    });
+
+    $('.fill-color').change( function() {
+        $(this).parent().parent().parent().find('.vector-preview').css('background-color', $(this).val());
+    });
+
+
+    function switchClassificationTab(clickedTab){
+        var currentIndex = $(clickedTab).index();
+        console.log(currentIndex);
+        $currentPanel = $(clickedTab).parent().parent();
+        $currentPanel.find('.tab-panel').hide();
+        $(clickedTab).parent().find('.tab-btn').removeClass('ACTIVE');
+        $(clickedTab).addClass('ACTIVE');
+        $currentPanel.find('.tab-panel').eq(currentIndex).show();
+    }
+
+
+
+
+
+    function loadClassifications() {
+        var rtype_tag = $(this).parent().parent().find('.rtype-select').val();
+        var $classList = $(this).parent().parent().find('.class-list');
+        console.log($(this).parent().parent());
+        var transparency = $(this).parent().parent().find('.fill-transparency').val();
+        if (transparency < 0) transparency = 0;
+        if (transparency > 100) transparency = 100;
+        
+        transparency = transparency / 100.0;
+        $parentPanel = $(this).parent().parent().parent();
+        console.log($parentPanel.attr('pk'));
+        $.ajax({ url   : API_URLS['get_geo_unique_rtype_rvals'], type  : "POST", data  : [{name: 'entity_tag', value:rtype_tag}], // data to be submitted
+            success : function(returnedQuery){
+                console.log(returnedQuery);
+                //Empty the current class list
+                console.log($classList);
+                console.log("LOOK HERE ^^^^^");
+                $classList.empty();
+                for (i=0; i < returnedQuery.distinct_value_list.length; i++){
+                    var currentRVAL = returnedQuery.distinct_value_list[i];
+                    $newClass = $('.class-entry.TEMPLATE').clone(true);
+                    $newClass.removeClass('TEMPLATE');
+                    $newClass.find('.class-value').val(currentRVAL);
+                    $classList.append($newClass);
+                    $newClass.show();
+                }
+                colorKey = updateClassificationColorsFromGradientRamp($parentPanel);
+                console.log(colorKey);
+                MAP.getLayers().getArray().forEach(function(layer,i){
+                    if( $parentPanel.attr('pk') == layer.get('pk') ){
+                      console.log('WE MADE IT');
+                      console.log(layer);
+                      console.log(layer.getSource());
+                      console.log(layer.getSource());
+                      var allFeatures = layer.getSource().getFeatures();
+                      layer.setOpacity(transparency);
+                      console.log(allFeatures);
+                              for (i = 0; i < allFeatures.length; i++){
+                                //console.log(allFeatures[i].get('pk'));
+                                var currentFeature = allFeatures[i];
+                                var currentColor = colorKey[  returnedQuery.form_rval_list[currentFeature.get('pk')]  ];
+                                console.log(currentColor);
+                                if (!currentColor) currentColor = 'rgba(0, 0, 0, 0.25)'; 
+                                var newStyle = new ol.style.Style({
+                                    
+                                    fill: new ol.style.Fill({ color: currentColor }),
+                                    stroke: new ol.style.Stroke({ color: '#000', width: 1 }),
+                                    text: new ol.style.Text({
+                                        text: returnedQuery.form_rval_list[currentFeature.get('pk')],
+                                        font: '12px Calibri,sans-serif',
+                                        fill: new ol.style.Fill({ color: '#000' }),
+                                        stroke: new ol.style.Stroke({
+                                            color: '#fff', width: 2
+                                        })
+                                    })
+                                });
+                                currentFeature.setStyle(newStyle);
+                                currentFeature.set('default_style', newStyle);
+                              }
+                    }
+                });
+            }
+        });
+    }
+
+    //Converts a #000000 color value to separated integer RGB values
+    function convertHexToRGB(hexValue){
+        cleanHex = hexValue;
+        if(hexValue[0] == "#") cleanHex = hexValue.substring(1);
+        R = parseInt(cleanHex.substring(0,2),16);
+        G = parseInt(cleanHex.substring(2,4),16);
+        B = parseInt(cleanHex.substring(4,6),16);
+        
+        return [R,G,B];
+    }
+
+
+    //This assumes a RGB [r,g,b] array of 0-255 values, and returns an array of each stepped color
+    function getSteppedRGBColor(colorA, colorB, numberOfSteps){
+        r_step = (colorB[0] - colorA[0]) / numberOfSteps;
+        g_step = (colorB[1] - colorA[1]) / numberOfSteps;
+        b_step = (colorB[2] - colorA[2]) / numberOfSteps;
+        steppedColors = []
+        //Now that we calculated the steps, let's return a hex browser color string again
+        for (i = 0; i < numberOfSteps; i++){
+            color = "#"
+            color += ( "00" +(colorA[0]+Math.round( (r_step*i)) ).toString(16)).substr(-2);//convert to hex -- also make sure we ADD the stepped values to the original color -- ColorA
+            color += ( "00" +(colorA[1]+Math.round( (g_step*i)) ).toString(16)).substr(-2);//convert to hex -- also make sure we ADD the stepped values to the original color -- ColorA
+            color += ( "00" +(colorA[2]+Math.round( (b_step*i)) ).toString(16)).substr(-2);//convert to hex -- also make sure we ADD the stepped values to the original color -- ColorA
+            steppedColors.push(color);
+            //console.log(Math.round(r_step*i) + " : " + (r_step*i));
+        }
+        return steppedColors;
+    }
+
+
+
+    function updateClassGradientBar(theInput){
+        $parentPanel = $(theInput).parent().parent().parent();
+        var colorOne = $parentPanel.find('.color-one').val();
+        var colorTwo = $parentPanel.find('.color-two').val();
+        var colorThree = $parentPanel.find('.color-three').val();
+        var gradientA = 'linear-gradient('+colorOne+', '+colorTwo+')';
+        var gradientB = 'linear-gradient('+colorTwo+', '+colorThree+')';
+
+        $parentPanel.find('.color-gradient.A').css('background', gradientA);
+        $parentPanel.find('.color-gradient.B').css('background', gradientB);
+
+    }
+
+    function updateClassificationColorsFromGradientRamp(theInput){
+        //Going to be sticking with an 'equal' interval gramp. Find total number of colors, divide by 2.
+        //  --each half represents one of the colors on the two ramps.
+        $parentPanel = $(theInput);
+        console.log("HERE HERE HERE");
+        console.log($parentPanel);
+        var numOfClassGroups = 2;
+        var numOfTotalClasses = $parentPanel.find('.class-list').children().length;
+        var numOfStepsPerGroup = Math.round(numOfTotalClasses / numOfClassGroups);
+        var colorA = convertHexToRGB($parentPanel.find('.color-one').val());
+        var colorB = convertHexToRGB($parentPanel.find('.color-two').val());
+        var colorC = convertHexToRGB($parentPanel.find('.color-three').val());
+        console.log(colorA +  "  "  + colorB + "   " + colorC);
+        var setA = getSteppedRGBColor(colorA, colorB, numOfTotalClasses - numOfStepsPerGroup);
+        var setB = getSteppedRGBColor(colorB, colorC, numOfStepsPerGroup);
+        //Combine both arrays into a single one
+        setA.push(...setB);
+        colorKey = {};
+        $parentPanel.find('.class-list').children().each( function(index) {
+            $(this).find('.class-color').val(setA[index]);
+            //Add our new key value to the dictionary
+            colorKey[$(this).find('.class-value').val()] = setA[index];
+            
+        });
+        return colorKey;
+    }
+
+    function showSelectedLayerTools(selectedElement){
+        console.log(selectedElement);
+        var formtypePK = $(selectedElement).parent().parent().attr('pk');
+        if ($(selectedElement).parent().parent().attr('type') == 'VECTOR' ){
+            if ($('.layer-symbology-panel[pk="'+formtypePK+'"]').is(':visible')){ 
+                //We are just turning this layer off if it's already on,
+                $('.layer-symbology-panel').hide();
+            }else {   
+                //first hide all the panels
+                $('.layer-symbology-panel').hide();
+                //Then show the one that was selected
+                $('.layer-symbology-panel[pk="'+formtypePK+'"]').show();
+                //Now adjust the tab marker for the layer
+                //Adjust the position of the layer tab to highlight which layer is chosen(Just good UX design I think)
+                $('.layer-symbology-panel[pk="'+formtypePK+'"]').find('.layer-tab').css('top', 'calc('+$(selectedElement).parent().position().top+'px - 8%)')
+            }
+        } 
+    }
+
+    function buildLayerToolPanel(selectedElement){
+    console.log("Trying to look at tools?");
+        $('.layer-list').children().each( function(){
+            
+        });
+
+        var formtypePK = $(selectedElement).parent().parent().attr('pk');
+        if ($(selectedElement).parent().parent().attr('type') == 'IMAGE'){
+
+        }
+
+    }
+
+    //-------------------------------------------------------------------------------------------------------
+    //  Special Functions
+    //
+
+
+
+    function getRandomHexColor() {
+      var letters = '0123456789ABCDEF';
+      var color = '#';
+      for (var i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+      }
+      return color;
+    }
+
+    //This function just randomizes the current gradient bar
+    function randomizeClassGradient(theElement){
+        //Add random colors for the color ramp
+        $thisPanel = $(this).parent().parent();
+        console.log($(this));
+        $thisPanel.find('.classification-color-ramp input').each(function(){
+            var color = getRandomHexColor();
+            $(this).val(color);
+            updateClassGradientBar($(this));
+        });
+
+    }
+
+    //This function will take the provided classification list and apply it to the current map layer features
+    function applyClassifications(theElement) {
+        var rtype_tag = $(this).parent().find('.rtype-select').val();
+        var $classList = $(this).parent().find('.class-list');
+        console.log($(this).parent());
+        var transparency = $(this).parent().find('.fill-transparency').val();
+        if (transparency < 0) transparency = 0;
+        if (transparency > 100) transparency = 100;
+        
+        transparency = transparency / 100.0;
+        $parentPanel = $(this).parent().parent();
+        console.log($parentPanel.attr('pk'));
+    }
+
+    //This function takes the current gradient and applies it to the classification list
+    function applyGradientToCurrentClasses(){
+        //We need to loop through each class in the class list and apply our stepped gradient color list to it
+        updateClassificationColorsFromGradientRamp($(this).parent().parent());
+    }
+
+
+
+    $('#geospatial-engine .layers-add-menu').click( function() {
+        if ($(this).hasClass('CLOSED')){
+            $(this).removeClass('CLOSED');
+            $(this).addClass('OPEN');
+            $('#geospatial-engine .add-layer-select').show();
+        } else {
+            $(this).removeClass('OPEN');
+            $(this).addClass('CLOSED');
+            $('#geospatial-engine .add-layer-select').hide();    
+        }
+    });
+
+
+
+    function initializeLayerList(){
+        $.ajax({ url   : API_URLS['get_projects'], type  : "POST", data  : [], // data to be submitted
+            success : function(returnedQuery){
+                console.log(returnedQuery);
+                for (i = 0; i < returnedQuery.project_list.length; i++){
+                    var currentProject = returnedQuery.project_list[i];
+                    $newProject = $('.layer-list-project.TEMPLATE').clone(true);
+                    $newProject.removeClass('TEMPLATE');
+                    //Set our collapse button to 'collapsed'
+                    $newProject.find('.layer-list-collapse').attr('COLLAPSED', 'true');
+                    $newProject.find('.layer-list-collapse').attr('pk', currentProject.pk);
+                    $newProject.find('.layer-list-project-title').html(currentProject.name);
+                    $newProject.find('.layer-list-collapse').click( function() {
+                        $parentProject = $(this).parent().parent();
+                        console.log($(this));
+                        console.log($parentProject);
+                        if ($(this).attr('COLLAPSED') == 'true'){
+                            $(this).find('span').removeClass('glyphicon-triangle-right');
+                            $(this).find('span').addClass('glyphicon-triangle-top');
+                            $(this).attr('COLLAPSED', 'false');
+                            $parentProject.find('.layer-list-formtype-container').show();
+                            if ($parentProject.find('.layer-list-formtype-container').children().length == 0){
+                                getProjectFormTypeList($(this).attr('pk'), $(this).parent().parent());
+                            } else {
+     
+                            }
+                        } else {
+                               $(this).find('span').removeClass('glyphicon-triangle-top');
+                                $(this).find('span').addClass('glyphicon-triangle-bottom');                        
+                                $(this).attr('COLLAPSED', 'true');
+                                $parentProject.find('.layer-list-formtype-container').hide();
+                        }
+                    });
+                    
+                    $('.add-layer-select').append($newProject);
+                    $newProject.show();
+                }
+            }
+        });       
+    }
+
+
+    function getProjectFormTypeList(project_pk, currentProjectDIV){
+        console.log(this);
+        console.log($(this).attr('pk'));
+        $.ajax({ url   : API_URLS['get_geo_formtypes'], type  : "POST", data  : [{name:'project_pk', value: project_pk}], // data to be submitted
+            success : function(returnedQuery){
+                console.log(returnedQuery);
+                $(currentProjectDIV).find('.layer-list-formtype-container').empty();
+                for (i = 0; i < returnedQuery.formtype_list.length; i++){
+                    var currentFormtype = returnedQuery.formtype_list[i];
+                    $newFormtype = $('.layer-list-formtype.TEMPLATE').clone(true);
+                    $newFormtype.removeClass('TEMPLATE');
+                    $newFormtype.find('.layer-list-formtype-header').attr('pk', currentFormtype.pk);
+                    $newFormtype.find('.layer-list-formtype-title').html(currentFormtype.name);
+                    console.log($newFormtype);
+                    $(currentProjectDIV).find('.layer-list-formtype-container').append($newFormtype);
+                    $newFormtype.show();
+                    
+                    $newFormtype.find('.layer-list-formtype-header').click( function ()  {
+                        //If clicked, we need to add it to our map AND update the layer list
+                        var postJSON = [];
+                        var layerName = $(this).find('.layer-list-formtype-title').html();
+                        var layerPK = $(this).attr('pk');
+                        console.log(layerName);
+                        console.log($(this).find('.layer-list-formtype-title'));
+                        postJSON.push( {name:'formtype_pk', value:$(this).attr('pk')});
+                        $.ajax({ url   : API_URLS['get_geo_formtype_layers'], type  : "POST", data  : postJSON, // data to be submitted
+                            success : function(returnedQuery){
+                                console.log(returnedQuery);
+                                var geojson_collection;
+                                var geojson_object = new ol.format.GeoJSON().readFeatures(returnedQuery);
+                                var templayer = new ol.layer.Vector({
+                                            name: "Base Vector Layer",
+                                            renderMode:'image',
+                                            name: layerName,
+                                            pk: layerPK,
+                                            source: new ol.source.Vector({features: new ol.Collection(geojson_object)}),
+                                            style: new ol.style.Style({
+                                                fill: new ol.style.Fill({
+                                                  color: 'rgba(255, 255, 255, 0.6)'
+                                                }),
+                                                stroke: new ol.style.Stroke({
+                                                  color: '#319FD3',
+                                                  width: 1
+                                                })
+                                            })
+                                         
+                                          })
+                                    
+                                MAP.addLayer(templayer);
+                                displayListOfLayers(); 
+                                $('.add-layer-select').hide();
+                                //Add random colors for the single classification, and apply it to the newly added layer
+                                var border = getRandomHexColor();
+                                var fill = getRandomHexColor();
+                                $newPanel.find('.tab-panel.single .border-color').val(border);
+                                $newPanel.find('.tab-panel.single .fill-color').val(fill);
+                                $newPanel.find('.tab-panel.single .vector-preview').css('border-color', border);
+                                $newPanel.find('.tab-panel.single .vector-preview').css('background-color', fill);
+                                $newPanel.find('.tab-panel.single .single-apply-style').click(applySingleClassSymbology);
+                                $newPanel.find('.tab-panel.single .single-apply-style').trigger('click');
+                                $toolbutton_zoomextent.trigger('click'); 
+                            }
+                        });   
+                        //We will now add the sibling panel for symbology from a template
+                        $newPanel = $('.layer-symbology-panel.TEMPLATE').clone(true);
+                        $newPanel.removeClass('TEMPLATE');
+                        $newPanel.attr('pk', layerPK); 
+                        console.log("LOOOOOOOOOOK AAAAATTTTT MMMEEEEEEEE!!!!");
+                        console.log($newPanel);
+                        $newPanel.find('.auto-classifications').click(loadClassifications);
+                        $newPanel.find('.apply-classifications').click(applyClassesToCurrentLayer);
+                        $newPanel.find('.random-gradient').click(randomizeClassGradient);
+                        $newPanel.find('.apply-gradient').click(applyGradientToCurrentClasses);
+                        $('.center-map-view').prepend($newPanel);
+                        //Add random colors for the color ramp
+                        $newPanel.find('.classification-color-ramp input').each(function(){
+                            var color = getRandomHexColor();
+                            $(this).val(color);
+                            updateClassGradientBar($(this));
+                        });
+                        
+
+                            $.ajax({ url   : API_URLS['get_deep_rtypes'], type  : "POST", data  : [{name: 'formtype_pk', value:layerPK}], // data to be submitted
+                                success : function(returnedQuery){
+                                    $rtypeList = $newPanel.find('.rtype-select');
+                                    //clear list and add first option--the formtype's ID field
+                                    $rtypeList.empty();
+                                    $rtypeList.append('<option value="FORMID-'+layerPK+'">'+layerName+' ID</option>');
+                                    //For reach returned RTYPE, make an option for the rtype select element
+                                    //If it's a FRRT, then requery for another set of rtypes
+                                    for(i=0; i < returnedQuery.rtype_list.length; i ++){
+                                        var currentRTYPE = returnedQuery.rtype_list[i];
+                                        //If it's a FRAT, then just add the option
+                                        if(currentRTYPE.rtype == "FRAT"){
+                                            $rtypeList.append( $('<option value="FRAT-'+currentRTYPE.pk+'">'+currentRTYPE.label+'</option>') );                            
+                                        //Otherwise we have an FRRT and need to perform a new action
+                                        } else if(currentRTYPE.rtype == "FRRT"){
+                                            $rtypeList.append('<option value="FRRT_ID-'+currentRTYPE.pk+'">'+currentRTYPE.label+' ID</option>');
+                                        } else if(currentRTYPE.rtype == "DEEP-FRAT"){
+                                            $rtypeList.append('<option value="DEEP_FRAT-'+currentRTYPE.pk+'">'+currentRTYPE.label+'</option>');
+                                        } else if(currentRTYPE.rtype == "DEEP-FRRT"){
+                                            $rtypeList.append('<option value="DEEP_FRRT-'+currentRTYPE.pk+'">'+currentRTYPE.label+' ID</option>');
+                                        } else if(currentRTYPE.rtype == "BACK-FRRT"){
+                                            $rtypeList.append('<option value="BACK_FRRT-'+currentRTYPE.pk+'">REVERSE<< '+currentRTYPE.label+' ID</option>');
+                                        } else if(currentRTYPE.rtype == "BACK-DEEP-FRAT"){
+                                            $rtypeList.append('<option value="BACK_DEEP_FRAT-'+currentRTYPE.pk+'">REVERSE<< '+currentRTYPE.label+'</option>');
+                                        }
+                                    }
+                                   
+                                }
+                             });
+                    });
+                    
+                }
+            }
+        });         
+    }
+
+    function displayListOfLayers(){
+        $('#geospatial-engine').find('.layers-list').empty();
+        MAP.getLayers().getArray().forEach(function(layer,i){
+            console.log(layer.type);
+            console.log(layer.get('name'));
+             
+            if (layer.type == "TILE"){
+                console.log('test');
+                $newLayer = $('.layer-parent.tile.TEMPLATE').clone(true);
+            } else if (layer.type == "IMAGE") {
+                $newLayer = $('.layer-parent.raster.TEMPLATE').clone(true);
+                //TODO: Temporary because our vector data is stored as an image type
+                $newLayer.attr('type', 'IMAGE');
+                $newLayer.attr('pk', layer.get('pk'));
+            } else if (layer.type == "VECTOR") {
+                $newLayer = $('.layer-parent.vector.TEMPLATE').clone(true);
+                $newLayer.attr('pk', layer.get('pk'));
+                $newLayer.attr('type', 'VECTOR');
+            }
+            console.log($newLayer);
+            $newLayer.removeClass('TEMPLATE');
+            $newLayer.attr('layer_id', layer.id);
+            var name = layer.get('name');
+            var title = layer.get('name');
+            if (name.length > 10) name = name.substring(0,10) + "...";
+            
+            $newLayer.find('.layer-title').html(name);
+            $newLayer.find('.layer-title').prop('title', title);
+            
+            $('#geospatial-engine').find('.layers-list').append($newLayer);
+            $newLayer.show();
+            
+            $newLayer.find('.layer-visibility').click(function(){ 
+                var layer_name = $(this).parent().parent().find('.layer-title').attr('title');
+                switchLayerVisibility(layer_name);
+                if ($(this).find('span').hasClass('glyphicon-eye-open')) {$(this).find('span').removeClass('glyphicon-eye-open'); $(this).find('span').addClass('glyphicon-eye-close')}
+                else {$(this).find('span').removeClass('glyphicon-eye-close'); $(this).find('span').addClass('glyphicon-eye-open')}
+            });
+            
+        });
+
+    }
+
+    function switchLayerVisibility(layerToSwitch){
+        console.log(layerToSwitch);
+
+        MAP.getLayers().forEach(function(layer) {
+            console.log(layerToSwitch + "  ::  " + layer.get('name'));
+            if(layerToSwitch == layer.get('name')){
+                if (layer.getVisible() == true) layer.setVisible(false);
+                else layer.setVisible(true);
+            }
+        });
+
+    }
+
+
+    //-------------------------------------------------------------------------------------------------------
+    //  Start the geospatial engine once the document as fully loaded
+    //
+    $(document).ready(function(){
+
+
+    //====================================================================
+    // Button Action Setup
+
+
+    $toolbutton_zoomextent.click( function(){
+    console.log("Zooming extent?");
+        var extent = ol.extent.createEmpty();
+        MAP.getLayers().forEach(function(layer) {
+            if (layer.get('name') != "Base Vector Layer" && layer.get('name') != "Base Vector" && layer.get('name') != "Base Map") {
+                //Dirty way of checking if there are extents set(we don't want them for the default layers)
+                console.log(layer.get('name'));
+                console.log(layer.getSource().getExtent());
+                try{
+                    console.log(layer.getSource().getExtent());
+                    ol.extent.extend(extent, layer.getSource().getExtent());
+                } catch (exception) {console.log("nada");}
+            }
+        });
+            console.log(extent);
+        MAP.getView().fit(extent, MAP.getSize());
+
+    });
+
+     
+    $toolbutton_testScript.click( function(){
+        var postJSON = [];
+        postJSON.push( {name:'formtype_pk', value:'339'});
+        $.ajax({ 
+         url   : API_URLS['get_geo_formtype_layers'],
+         type  : "POST",
+         data  : postJSON, // data to be submitted
+
+         success : function(returnedQuery){
+                console.log(returnedQuery);
+                var geojson_collection;
+                var geojson_object = new ol.format.GeoJSON().readFeatures($('#testgeojson').html());
+
+            var templayer = new ol.layer.Image({
+                source: new ol.source.ImageVector({
+                    source: new ol.source.Vector({features: new ol.Collection(geojson_object)}),
+                    style: new ol.style.Style({
+                    fill: new ol.style.Fill({
+                      color: 'rgba(255, 255, 255, 0.6)'
+                    }),
+                    stroke: new ol.style.Stroke({
+                      color: '#319FD3',
+                      width: 1
+                    })
+                  })
+                })
+              })
+                
+                MAP.addLayer(templayer);
+            }
+        });    
+    });
+
+
+
+    function drawEnd(event){
+        console.log('We did it?');
+        console.log(event);
+        MAP.removeInteraction(DRAW_EVENT); 
+
+    }
+
+    $toolbutton_draw.click( function(){
+
+
+        DRAW_EVENT = new ol.interaction.Draw({
+            source: baseImageLayer.getSource().getSource(),
+            type: ('Polygon')
+        });
+        DRAW_EVENT.on('drawend', drawEnd);
+        //This activates AFTER drawend--and since we need the information after the feature has been added to the source, this is a better event listener
+        baseImageLayer.getSource().getSource().on('addfeature', function (event){
+                console.log('Successful drawing!')
+        });
+        MAP.addInteraction(DRAW_EVENT);
+
+
+    });
+
+
+
+    $('.layers-add-menu').click( function() {
+        //first populate a list of available projects
+        
+        
+        
+    });
+
+
+    //====================================================================
+    // Map Setup
+
+
+    //*********************************************************************
+    // Setup the base map vector layer 
+    var emptyCollection = '{"type": "FeatureCollection","name": "alhiba-areas","crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:EPSG::32638" } },"features": []}'
+
+
+    var baseVectorLayer = new ol.layer.Vector({
+        name: "Base Vector",
+        source: new ol.source.Vector(),
+        style: new ol.style.Style({
+            fill: new ol.style.Fill({
+                color: 'rgba(255, 255, 255, 0.2)'
+            }),
+            stroke: new ol.style.Stroke({
+                color: '#ffcc33',
+                width: 2
+            }),
+            image: new ol.style.Circle({
+                radius: 7,
+                fill: new ol.style.Fill({
+                    color: '#ffcc33'
+                })
+            })
+        })
+    });
+        
+
+
+    //*********************************************************************
+    // Setup a test Image Layer for faster Vector processing
+
+    var baseImageLayer = new ol.layer.Vector({
+                name: "Base Vector Layer",
+                renderMode:'image',
+                source: new ol.source.Vector(),
+                style: new ol.style.Style({
+                    fill: new ol.style.Fill({
+                      color: 'rgba(255, 255, 255, 0.6)'
+                    }),
+                    stroke: new ol.style.Stroke({
+                      color: '#319FD3',
+                      width: 1
+                    })
+                })
+                
+              })
+
+    //*********************************************************************
+    // Setup the base map raster layer 
+
+
+    //Set up the tile server / Background image raster
+    var baseRasterLayer = new ol.layer.Tile({
+        name: "Base Map",
+        //We are going to set the background tileset to ESRI's satellite imagery using this source()
+        source: new ol.source.XYZ({
+                projection: 'EPSG:3857',
+                wrapX: false,
+                attributions: [
+                  new ol.Attribution({
+                    html: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                  })
+                ],
+                url: 'http://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+              })
+            
+    });
+
+
+    //**********************************************************************       
+    // Draw the actual map on the screen
+    MAP = new ol.Map({
+        //Add our controls
+        controls: ol.control.defaults({
+          attributionOptions: /** @type {olx.control.AttributionOptions} */ ({
+            collapsible: false
+          })
+        }).extend([new ol.control.ScaleLine({ units: 'metric'})] ),
+        //set the layers to the tile server (raster) and add the initial Vector(shapeFile) layer 
+        layers: [baseRasterLayer, baseVectorLayer, baseImageLayer],
+        target: 'geo-engine-map',
+        //This is a default view set that views the whole world from an appropriate zoom level
+        view: new ol.View({
+          projection:mainProjection,
+          center: [0,0],
+          zoom: 1,
+        })
+    });
+
+    displayListOfLayers();
+    initializeLayerList();
+
+
+
+
+    //**********************************************************************
+    // Setup cursor highliting  
+
+
+    var style_modify = new ol.style.Stroke({
+            width: 6,
+            color: [150, 150, 255, 1]
+        });
+
+            var selectInteraction = new ol.interaction.Select();
+            selectInteraction.style = 
+            MAP.addInteraction(selectInteraction);       
+
+            var highlight;
+           
+            var displayFeatureInfo = function(pixel) {
+
+
+
+        
+
+
+
+          };
+
+    /*   MAP.on('click', function(evt) {
+           if (evt.dragging) {
+              return;
+            }
+            var pixel = MAP.getEventPixel(evt.originalEvent);
+            displayFeatureInfo(pixel);
+
+        }); 
+     */   
+        selectInteraction.on('select', function(evt){
+        var selected = evt.selected;
+        var deselected = evt.deselected;
+        console.log(deselected);
+        if (selected.length) {
+            selected.forEach(function(feature){
+                console.log(feature);
+               
+                var selected_style = feature.get('default_style');
+                 if (selected_style) selected_style = selected_style.clone();
+                 else {
+                      selected_style = new ol.style.Style({
+                        fill: new ol.style.Fill({
+                          color: 'rgba(255, 255, 255, 0.6)'
+                        }),
+                        stroke: new ol.style.Stroke({
+                          color: '#319FD3',
+                          width: 1
+                        })
+                    });  
+                    feature.set('default_style', selected_style.clone());
+                 }
+                selected_style.setStroke(style_modify);
+                feature.setStyle(selected_style);
+                console.log(selected_style);
+
+                
+                var info = $('.details-side-pane')[0];
+                if (feature) {
+                    $.ajax({ url   : API_URLS['get_form_rtypes'],type  : "POST", data  : {"form_pk":feature.get('pk')}, // data to be submitted
+                        success : function(returnedQuery){
+                            var newString = ""
+                            returnedQuery.rtype_list.forEach(function(rtype){
+                                //console.log(rtype);
+                                if (rtype.rtype == "FRAT")      newString += "<div><span>"+rtype.rtype_label+"</span>::<span>"+rtype.rval.value+"</span></div>";
+                                else if (rtype.rtype == "FRRT"){ 
+                                    newString += "<div><span>"+rtype.rtype_label+"</span>::";
+                                    for (var rval in rtype.rval){newString += "<span>"+rtype.rval.name+"</span>,";}
+                                    newString += "</div>";
+                                }
+                            });
+                          info.innerHTML = newString;
+                        }
+                    });
+                } else {
+                  info.innerHTML = '&nbsp;';
+                }
+            });
+            
+            deselected.forEach(function(feature){
+                console.info(feature);
+                console.log(feature.get('default_style'));
+                feature.setStyle(feature.get('default_style'));
+            });
+            
+        } else {
+            deselected.forEach(function(feature){
+                console.info(feature);
+                console.log(feature.get('default_style'));
+                feature.setStyle(feature.get('default_style'));
+            });
+        }
+
+    });
+
+
+
+
+
+
+    });
+
+      $(window).resize(function () {
+           // $("#geo-engine-map").css("height", 'calc('+$('#geo-engine-map').parent().height()+'px - 5%)' ); MAP.updateSize();
+       });
+    //----------------------------------------------------------------------------------------------------------
+    //End of geospatial engine
+    //^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    </script>
+
+{% endblock %}
