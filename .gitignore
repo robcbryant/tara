@@ -17,7 +17,7 @@ tmp/*
 db/
 test_db/
 media/*
-wsgi.py
+tara/wsgi.py
 settings.py
 wsgi.py
 __pycache__
