@@ -20,4 +20,6 @@ media/*
 settings.py
 wsgi.py
 __pycache__
-*.pycwsgi.py
+*.pyc
+wsgi.py
+
