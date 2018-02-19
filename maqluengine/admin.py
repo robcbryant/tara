@@ -3863,150 +3863,7 @@ class MyAdminSite(AdminSite):
         return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")    
 
  
-    #=======================================================#
-    #   ACCESS LEVEL :  1      GET_ALL_UNIQUE_RTYPE_RVALS *RECYCLING
-    #=======================================================#   
-    def get_all_unique_rtype_rvals(self, request):
-        #***************#
-        ACCESS_LEVEL = 1
-        #***************#            
-        
-        #----------------------------------------------------------------------------------------------------------------------------
-        #   This Endpoint returns a list of all unique values for a given FRAT's RVALS
-        #   --For FRATS: get all unique values of all possible FRAVs
-        #   --for FRAVs: get all possible form name's attached to the form type reference that
-        #   --this particular FRRT can reference
-        
-        
-        ERROR_MESSAGE = ""
-        
-        #Check our user's session and access level
-        if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
-        
-            #We need to return a json list of all RVALS that match the provided RTYPE
-            if request.method == "POST":
-                #Figure out if a FRRT or FRAT was submitted
-                logger.info( request.POST)
-                finalJSON = {}
-                distinct_value_list = {}
-                form_rval_list = {}    
-                code, entity_pk = request.POST['entity_tag'].split('-')
-                
-                if   code == "DEEP_FRAT":   # We need to get all the unique rvals of the provided related FRAT
-                    entity_type = FormRecordAttributeType.objects.get(pk=entity_pk)    
-                elif code == "DEEP_FRRT":   # We need to get all the unique form IDs of the FRRT's related FRRTs FormType
-                    entity_type = FormRecordReferenceType.objects.get(pk=entity_pk)
-                elif code == "FRRT_ID":     # We need to get all the unique form IDs of the FRRT's related FormType
-                    entity_type = FormRecordReferenceType.objects.get(pk=entity_pk)
-                    #Now this is where it gets tricky I think. Normally our form_rval_list is a 1:1 form PK and it's value, but because we are dealing
-                    #   --with a FRRT, it can have multiple values, or other forms, assigned to this parent form. We will store it as a key value where
-                    #   --the value is a list of values
-                    #Test: Get unique values for each form's frrt
-                    #When we get a pk/value list of all the form values, we can loop through the dictionary list and add a new
-                    #key to a new dict--if the key aleady exists, do a += to the existing key with the new value
-                    #After that we need to sort and get ONLY unique values as a separate list--so maybe work in reverse how how we've already
-                    #done this here
-                    new_form_rval_list = {}
-                    test_list = entity_type.formrecordreferencevalue_set.values('record_reference__form_name','form_parent__pk')
-                    logger.info( test_list)
-                    for pair in test_list:
-                        if pair['form_parent__pk'] in new_form_rval_list:
-                            new_form_rval_list[pair['form_parent__pk']] = new_form_rval_list[pair['form_parent__pk']] + "," + pair['record_reference__form_name']
-                        else:
-                            new_form_rval_list[pair['form_parent__pk']] = pair['record_reference__form_name']
-                    logger.info( new_form_rval_list)
-                    
-                    distinct_value_list = sorted( list( set( list( new_form_rval_list.values() ) ) ) )
-                    finalJSON['distinct_value_list'] = distinct_value_list
-                elif code == "FORMID":      # We need to get all the unique form IDs of this current FormType
-                    entity_type = FormType.objects.get(pk=entity_pk)    
-                    distinct_value_list = entity_type.form_set.order_by('form_name').values_list('form_name', flat=True).distinct()
-                    form_rval_list = entity_type.form_set.values('pk','form_name')   
-                    new_form_rval_list = {}
-                    for pair in form_rval_list:
-                        new_form_rval_list[pair['pk']] = pair['form_name']
-                    if entity_type.is_numeric: finalJSON['distinct_value_list'] = sorted(list(distinct_value_list), key=lambda e: float(e['form_name']))
-                    else : finalJSON['distinct_value_list'] = list(distinct_value_list)
-                elif code == "FRAT":        #We need to get all the unique values of the provided FRAT's RVALs
-                    entity_type = FormRecordAttributeType.objects.get(pk=entity_pk)    
-                    distinct_value_list = entity_type.formrecordattributevalue_set.order_by('record_value').values_list('record_value', flat=True).distinct()  
-                    form_rval_list = entity_type.formrecordattributevalue_set.values('form_parent__pk','record_value')   
-                    new_form_rval_list = {}
-                    for pair in form_rval_list:
-                        new_form_rval_list[pair['form_parent__pk']] = pair['record_value']
-                    if entity_type.is_numeric: finalJSON['distinct_value_list'] = sorted(list(distinct_value_list), key=lambda e: float(e['record_value']))
-                    else : finalJSON['distinct_value_list'] = list(distinct_value_list)
-                    
-                elif code == "BACK_FRRT":
-                    #We need a distinct list of the frrt's formtype_parent form ids
-                    #We then need a form list of the CURRENT formtype's forms that have a match
-                    entity_type = FormRecordReferenceType.objects.get(pk=entity_pk) 
-                    new_form_rval_list = {}
-                    
-                    test_list = entity_type.formrecordreferencevalue_set.values('record_reference__form_name','form_parent__pk')
-                    logger.info( test_list)
-                    for pair in test_list:
-                        if pair['form_parent__pk'] in new_form_rval_list:
-                            new_form_rval_list[pair['form_parent__pk']] = new_form_rval_list[pair['form_parent__pk']] + "," + pair['record_reference__form_name']
-                        else:
-                            new_form_rval_list[pair['form_parent__pk']] = pair['record_reference__form_name'] 
-                    distinct_value_list = sorted( list( set( list( new_form_rval_list.values() ) ) ) )
-                    finalJSON['distinct_value_list'] = distinct_value_list    
-                    
-                elif code == "BACK_DEEP_FRAT":
-                    back_frat_pk, frrt_pk = entity_pk.split(',')
-                    entity_type = FormRecordAttributeType.objects.get(pk=back_frat_pk) 
-                    frrt_ref = FormRecordReferenceType.objects.get(pk=frrt_pk) 
-                    forms = frrt_ref.form_type_reference.form_set.all()
-                    #First we need a distinct list of the back frat's unique values
-                    #distinct_value_list = entity_type.formrecordattributevalue_set.order_by('record_value').values_list('record_value', flat=True).distinct()  
-                    #Now we need a list of all the parent formtype(the formtype that's making the backwards request to the back frat) and their values for this FRAT
-                    new_form_rval_list = {}#parent_formtype.formrecordattributevalue_set.values('form_parent__pk','record_value')   
-                    distinct_value_list = []
-                    if forms:
-                        for form in forms:
-                            try:
-                                #Get all the FRRVs linking to this form 
-                                ref_val = form.ref_to_value_form.filter(record_reference_type__pk=frrt_pk)
-                                #Use the first FRRV from the list (for now)
-                                frat_val = ref_val[0].form_parent.formrecordattributevalue_set.filter(record_attribute_type__pk=back_frat_pk)
-                                logger.info( ref_val)
-                                logger.info( ref_val.count())
-                                if ref_val:
-                                    values = []
-                                    logger.info( "Working?")
-                                    for refval in ref_val:
-                                        values.append(refval.form_parent.formrecordattributevalue_set.filter(record_attribute_type__pk=back_frat_pk)[0].record_value)
-                                    logger.info( "Working?")
-                                    values = list(set(values)) 
-                                    teststring =  ",".join(values)
-                                    logger.info( teststring)
-                                    distinct_value_list.append(teststring)
-                                new_form_rval_list[form.pk] = teststring
-                            except:
-                                new_form_rval_list[form.pk] = "None"
-                    distinct_value_list = list(set(distinct_value_list))            
-                    if entity_type.is_numeric: finalJSON['distinct_value_list'] = sorted(list(distinct_value_list), key=lambda e: float(e['record_value']))
-                    else : finalJSON['distinct_value_list'] = list(distinct_value_list)          
-                    
-                #If the requested entity_type isn't the user's project, and flagged as being inaccessible then stop the request
-                if entity_type.project.pk != request.user.permissions.project.pk and (entity_type.flagged_for_deletion == True or entity_type.is_public == False): ERROR_MESSAGE += "Error: You are attempting to access records that don't exist. This probably occurred because your client attempted altering the POST data before sending"
-                else:#Otherwise we are in the clear so grab the list and return it
-                    #Return the JSON response
-                    finalJSON['form_rval_list'] = new_form_rval_list                    
-                    finalJSON = json.dumps(finalJSON)
-                    return HttpResponse(finalJSON, content_type="application/json" )
-                   
-                
-            else: ERROR_MESSAGE += "Error: You have not submitted through POST"
-            
-        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying user information"
-        
-        #If anything goes wrong in the process, return an error in the json HTTP Response
-        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
-        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")    
 
-     
      
     #=======================================================#
     #   ACCESS LEVEL :  1      GET_FORM_CLASS_STYLES *RECYCLING
@@ -7089,7 +6946,9 @@ class MyAdminSite(AdminSite):
                 class_list = []
                 jsonData['class_list'] = class_list
                 form_color_key = {}
+                form_value_key = {}
                 jsonData['form_color_key'] = form_color_key
+                jsonData['form_value_key'] = form_value_key
                 rtype_code = request.POST['rtype_code']
                 code, PK = rtype_code.split('-')
                 
@@ -7105,6 +6964,7 @@ class MyAdminSite(AdminSite):
                         class_list.append(new_class)
                         for aForm in new_class['matching_forms']:
                             form_color_key[aForm] = aClass['color']
+                            form_value_key[aForm] = aClass['class_value']
                 #This handles a query on this formtype's FRRT's form IDs
                 elif code == "FRRT_ID" :
                     for aClass in classList:
@@ -7114,6 +6974,7 @@ class MyAdminSite(AdminSite):
                         class_list.append(new_class)
                         for aForm in new_class['matching_forms']:
                             form_color_key[aForm] = aClass['color']
+                            form_value_key[aForm] = aClass['class_value']
                 #This handles a query on this formtype's forms FRATs
                 elif code == "FRAT" :
                     for aClass in classList:
@@ -7122,7 +6983,8 @@ class MyAdminSite(AdminSite):
                         new_class['class_value'] = aClass['class_value']
                         class_list.append(new_class)
                         for aForm in new_class['matching_forms']:
-                            form_color_key[aForm] = aClass['color']               
+                            form_color_key[aForm] = aClass['color']            
+                            form_value_key[aForm] = aClass['class_value']                            
                 #This handles a query on a forward relation's FRRTs realted IDs
                 elif code == "DEEP_FRRT" :
                     parent_formtype = FormType.objects.get(pk=request.POST['formtype_pk'])
@@ -7135,7 +6997,8 @@ class MyAdminSite(AdminSite):
                         new_class['class_value'] = aClass['class_value']
                         class_list.append(new_class)
                         for aForm in new_class['matching_forms']:
-                            form_color_key[aForm] = aClass['color']   
+                            form_color_key[aForm] = aClass['color']
+                            form_value_key[aForm] = aClass['class_value']
                 #This handles a query on a forward relation's FRAT
                 elif code == "DEEP_FRAT" :
                     parent_formtype = FormType.objects.get(pk=request.POST['formtype_pk'])
@@ -7147,6 +7010,7 @@ class MyAdminSite(AdminSite):
                         class_list.append(new_class)
                         for aForm in new_class['matching_forms']:
                             form_color_key[aForm] = aClass['color']   
+                            form_value_key[aForm] = aClass['class_value']
                 #This handles if we're doing a query on the backwards relation's form ID
                 elif code == "BACK_FRRT" :
                     parent_formtype = FormType.objects.get(pk=request.POST['formtype_pk'])
@@ -7155,7 +7019,8 @@ class MyAdminSite(AdminSite):
                         new_class = {}
                         new_class['matching_forms'] = list(parent_formtype.form_set.all().filter(ref_to_value_form__form_parent__form_name__icontains=aClass['class_value']).values_list('pk',flat=True).distinct())
                         for aForm in new_class['matching_forms']:
-                            form_color_key[aForm] = aClass['color']                             
+                            form_color_key[aForm] = aClass['color']
+                            form_value_key[aForm] = aClass['class_value']                            
                 #This is if we're doing a query on a backwards relation's associated FRAT
                 elif code == "BACK_DEEP_FRAT" :
                     parent_formtype = FormType.objects.get(pk=request.POST['formtype_pk'])
@@ -7169,7 +7034,8 @@ class MyAdminSite(AdminSite):
                         for aForm in flattenedSet:
                             testB = aForm.ref_to_parent_form.all().filter(record_reference_type__pk=frrt_pk).values_list('record_reference', flat=True)
                             for test in testB:
-                                form_color_key[test] = aClass['color']                       
+                                form_color_key[test] = aClass['color']
+                                form_value_key[test] = aClass['class_value']
                     
                     
                 #convert python dict to a json string and send it back as a response
@@ -7183,7 +7049,172 @@ class MyAdminSite(AdminSite):
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")        
     
+    #=======================================================#
+    #   ACCESS LEVEL :  1      GET_ALL_UNIQUE_RTYPE_RVALS *RECYCLING
+    #=======================================================#   
+    def get_all_unique_rtype_rvals(self, request):
+        #***************#
+        ACCESS_LEVEL = 1
+        #***************#            
+        
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This Endpoint returns a list of all unique values for a given FRAT's RVALS
+        #   --For FRATS: get all unique values of all possible FRAVs
+        #   --for FRAVs: get all possible form name's attached to the form type reference that
+        #   --this particular FRRT can reference
+        
+        
+        ERROR_MESSAGE = ""
+        
+        #Check our user's session and access level
+        if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
+        
+            #We need to return a json list of all RVALS that match the provided RTYPE
+            if request.method == "POST":
+                #Figure out if a FRRT or FRAT was submitted
+                logger.info( request.POST)
+                finalJSON = {}
+                distinct_value_list = {}
+                form_rval_list = {}    
+                code, entity_pk = request.POST['entity_tag'].split('-')
+                
+                if   code == "DEEP_FRAT":   # We need to get all the unique rvals of the provided related FRAT
+                    entity_type = FormRecordAttributeType.objects.get(pk=entity_pk)    
+                    flattenedSet = list(Form.objects.all().filter(formrecordattributevalue__record_value__icontains=aClass['class_value'], formrecordattributevalue__record_attribute_type__pk=PK).values_list('pk', flat=True)) #CONTAINS    
+                    new_form_rval_list = {}
+                    test_list = entity_type.formrecordreferencevalue_set.values('record_reference__form_name','form_parent__pk')
+                    logger.info( test_list)
+                    for pair in test_list:
+                        if pair['form_parent__pk'] in new_form_rval_list:
+                            new_form_rval_list[pair['form_parent__pk']] = new_form_rval_list[pair['form_parent__pk']] + "," + pair['record_reference__form_name']
+                        else:
+                            new_form_rval_list[pair['form_parent__pk']] = pair['record_reference__form_name']
+                    logger.info( new_form_rval_list)
+                    
+                elif code == "DEEP_FRRT":   # We need to get all the unique form IDs of the FRRT's related FRRTs FormType
+                    entity_type = FormRecordReferenceType.objects.get(pk=entity_pk) 
+                    new_form_rval_list = {}
+                    test_list = entity_type.formrecordreferencevalue_set.values('record_reference__form_name','form_parent__pk')
+                    logger.info( test_list)
+                    for pair in test_list:
+                        if pair['form_parent__pk'] in new_form_rval_list:
+                            new_form_rval_list[pair['form_parent__pk']] = new_form_rval_list[pair['form_parent__pk']] + "," + pair['record_reference__form_name']
+                        else:
+                            new_form_rval_list[pair['form_parent__pk']] = pair['record_reference__form_name'] 
+                    distinct_value_list = sorted( list( set( list( new_form_rval_list.values() ) ) ) )
+                    finalJSON['distinct_value_list'] = distinct_value_list    
+                    
+                elif code == "FRRT_ID":     # We need to get all the unique form IDs of the FRRT's related FormType
+                    entity_type = FormRecordReferenceType.objects.get(pk=entity_pk)
+                    #Now this is where it gets tricky I think. Normally our form_rval_list is a 1:1 form PK and it's value, but because we are dealing
+                    #   --with a FRRT, it can have multiple values, or other forms, assigned to this parent form. We will store it as a key value where
+                    #   --the value is a list of values
+                    #Test: Get unique values for each form's frrt
+                    #When we get a pk/value list of all the form values, we can loop through the dictionary list and add a new
+                    #key to a new dict--if the key aleady exists, do a += to the existing key with the new value
+                    #After that we need to sort and get ONLY unique values as a separate list--so maybe work in reverse how how we've already
+                    #done this here
+                    new_form_rval_list = {}
+                    test_list = entity_type.formrecordreferencevalue_set.values('record_reference__form_name','form_parent__pk')
+                    logger.info( test_list)
+                    for pair in test_list:
+                        if pair['form_parent__pk'] in new_form_rval_list:
+                            new_form_rval_list[pair['form_parent__pk']] = new_form_rval_list[pair['form_parent__pk']] + "," + pair['record_reference__form_name']
+                        else:
+                            new_form_rval_list[pair['form_parent__pk']] = pair['record_reference__form_name']
+                    logger.info( new_form_rval_list)
+                    
+                    distinct_value_list = sorted( list( set( list( new_form_rval_list.values() ) ) ) )
+                    finalJSON['distinct_value_list'] = distinct_value_list
+                elif code == "FORMID":      # We need to get all the unique form IDs of this current FormType
+                    entity_type = FormType.objects.get(pk=entity_pk)    
+                    distinct_value_list = entity_type.form_set.order_by('form_name').values_list('form_name', flat=True).distinct()
+                    form_rval_list = entity_type.form_set.values('pk','form_name')   
+                    new_form_rval_list = {}
+                    for pair in form_rval_list:
+                        new_form_rval_list[pair['pk']] = pair['form_name']
+                    if entity_type.is_numeric: finalJSON['distinct_value_list'] = sorted(list(distinct_value_list), key=lambda e: float(e['form_name']))
+                    else : finalJSON['distinct_value_list'] = list(distinct_value_list)
+                elif code == "FRAT":        #We need to get all the unique values of the provided FRAT's RVALs
+                    entity_type = FormRecordAttributeType.objects.get(pk=entity_pk)    
+                    distinct_value_list = entity_type.formrecordattributevalue_set.order_by('record_value').values_list('record_value', flat=True).distinct()  
+                    form_rval_list = entity_type.formrecordattributevalue_set.values('form_parent__pk','record_value')   
+                    new_form_rval_list = {}
+                    for pair in form_rval_list:
+                        new_form_rval_list[pair['form_parent__pk']] = pair['record_value']
+                    if entity_type.is_numeric: finalJSON['distinct_value_list'] = sorted(list(distinct_value_list), key=lambda e: float(e['record_value']))
+                    else : finalJSON['distinct_value_list'] = list(distinct_value_list)
+                    
+                elif code == "BACK_FRRT":
+                    #We need a distinct list of the frrt's formtype_parent form ids
+                    #We then need a form list of the CURRENT formtype's forms that have a match
+                    entity_type = FormRecordReferenceType.objects.get(pk=entity_pk) 
+                    new_form_rval_list = {}
+                    
+                    test_list = entity_type.formrecordreferencevalue_set.values('record_reference__form_name','form_parent__pk')
+                    logger.info( test_list)
+                    for pair in test_list:
+                        if pair['form_parent__pk'] in new_form_rval_list:
+                            new_form_rval_list[pair['form_parent__pk']] = new_form_rval_list[pair['form_parent__pk']] + "," + pair['record_reference__form_name']
+                        else:
+                            new_form_rval_list[pair['form_parent__pk']] = pair['record_reference__form_name'] 
+                    distinct_value_list = sorted( list( set( list( new_form_rval_list.values() ) ) ) )
+                    finalJSON['distinct_value_list'] = distinct_value_list    
+                    
+                elif code == "BACK_DEEP_FRAT":
+                    back_frat_pk, frrt_pk = entity_pk.split(',')
+                    entity_type = FormRecordAttributeType.objects.get(pk=back_frat_pk) 
+                    frrt_ref = FormRecordReferenceType.objects.get(pk=frrt_pk) 
+                    forms = frrt_ref.form_type_reference.form_set.all()
+                    #First we need a distinct list of the back frat's unique values
+                    #distinct_value_list = entity_type.formrecordattributevalue_set.order_by('record_value').values_list('record_value', flat=True).distinct()  
+                    #Now we need a list of all the parent formtype(the formtype that's making the backwards request to the back frat) and their values for this FRAT
+                    new_form_rval_list = {}#parent_formtype.formrecordattributevalue_set.values('form_parent__pk','record_value')   
+                    distinct_value_list = []
+                    if forms:
+                        for form in forms:
+                            try:
+                                #Get all the FRRVs linking to this form 
+                                ref_val = form.ref_to_value_form.filter(record_reference_type__pk=frrt_pk)
+                                #Use the first FRRV from the list (for now)
+                                frat_val = ref_val[0].form_parent.formrecordattributevalue_set.filter(record_attribute_type__pk=back_frat_pk)
+                                logger.info( ref_val)
+                                logger.info( ref_val.count())
+                                if ref_val:
+                                    values = []
+                                    logger.info( "Working?")
+                                    for refval in ref_val:
+                                        values.append(refval.form_parent.formrecordattributevalue_set.filter(record_attribute_type__pk=back_frat_pk)[0].record_value)
+                                    logger.info( "Working?")
+                                    values = list(set(values)) 
+                                    teststring =  ",".join(values)
+                                    logger.info( teststring)
+                                    distinct_value_list.append(teststring)
+                                new_form_rval_list[form.pk] = teststring
+                            except:
+                                new_form_rval_list[form.pk] = "None"
+                    distinct_value_list = list(set(distinct_value_list))            
+                    if entity_type.is_numeric: finalJSON['distinct_value_list'] = sorted(list(distinct_value_list), key=lambda e: float(e['record_value']))
+                    else : finalJSON['distinct_value_list'] = list(distinct_value_list)          
+                    
+                #If the requested entity_type isn't the user's project, and flagged as being inaccessible then stop the request
+                if entity_type.project.pk != request.user.permissions.project.pk and (entity_type.flagged_for_deletion == True or entity_type.is_public == False): ERROR_MESSAGE += "Error: You are attempting to access records that don't exist. This probably occurred because your client attempted altering the POST data before sending"
+                else:#Otherwise we are in the clear so grab the list and return it
+                    #Return the JSON response
+                    finalJSON['form_rval_list'] = new_form_rval_list                    
+                    finalJSON = json.dumps(finalJSON)
+                    return HttpResponse(finalJSON, content_type="application/json" )
+                   
+                
+            else: ERROR_MESSAGE += "Error: You have not submitted through POST"
+            
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying user information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")    
 
+     
        
    
 

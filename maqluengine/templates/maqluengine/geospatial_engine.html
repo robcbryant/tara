@@ -334,7 +334,7 @@
 
 
 
-    //---------------------------------------------------
+    //---------------------------------------------------------------------------------------------------------
     //  This function loads the provided classes in the class_list in the classification options box
     //      in the Categorical Classes panel. Once the classes are loaded for a given RTYPE, it then
     //      queries the server for each class and returns a list of the classes with the respective Forms
@@ -363,36 +363,47 @@
          $.ajax({ url   : API_URLS['get_geo_category_matches'], type  : "POST", 
             data : [{name:'formtype_pk',value:pk},{name:'rtype_code', value:$parentPanel.find('.rtype-select').val()},{name:'class_list', value:JSON.stringify(class_value_list)}], // data to be submitted
             success : function(returnedQuery){
-            console.log("finished");
-            console.log(returnedQuery);
-             
-            var colorKey = returnedQuery.form_color_key;
-            
-            MAP.getLayers().getArray().forEach(function(layer,i){
-            
-                if( pk == layer.get('pk')){
-                  console.log('WE MADE IT');
-                  console.log($(this));
-                  console.log(layer);
-                  var allFeatures = layer.getSource().getFeatures();
-                      for (i = 0; i < allFeatures.length; i++){
-                        var currentFeature = allFeatures[i];
-                        var fillColor = colorKey[currentFeature.get('pk')];
-                        if (!fillColor) fillColor = 'rgba(0,0,0,0)';
-                        var borderColor = 'rgba(0,0,0,1)';
-                        var newStyle = new ol.style.Style({
-                            
-                            fill: new ol.style.Fill({ color: fillColor }),
-                            stroke: new ol.style.Stroke({ color: borderColor, width: 1 }),
-
-                        });
-                        currentFeature.setStyle(newStyle);
-                        currentFeature.set('default_style', newStyle);
-                      }
-                    layer.setOpacity(transparency);
-                }
+                console.log("finished");
+                console.log(returnedQuery);
+                 
+                var colorKey = returnedQuery.form_color_key;
+                var valueKey = returnedQuery.form_value_key;
                 
-            });           
+                MAP.getLayers().getArray().forEach(function(layer,i){
+                
+                    if( pk == layer.get('pk')){
+                      console.log('WE MADE IT');
+                      console.log($(this));
+                      console.log(layer);
+                      var allFeatures = layer.getSource().getFeatures();
+                          for (i = 0; i < allFeatures.length; i++){
+                            var currentFeature = allFeatures[i];
+                            var fillColor = colorKey[currentFeature.get('pk')];
+                            var labelText = "";
+                            if (valueKey[currentFeature.get('pk')]) labelText = valueKey[currentFeature.get('pk')];
+                            if (!fillColor) fillColor = 'rgba(0,0,0,0)';
+                            var borderColor = 'rgba(0,0,0,1)';
+                            var newStyle = new ol.style.Style({
+                                
+                                fill: new ol.style.Fill({ color: fillColor }),
+                                stroke: new ol.style.Stroke({ color: borderColor, width: 1 }),
+                                text: new ol.style.Text({
+                                    text: labelText,
+                                    font: '12px Calibri,sans-serif',
+                                    fill: new ol.style.Fill({ color: '#000' }),
+                                    stroke: new ol.style.Stroke({
+                                        color: '#fff', width: 2
+                                    })
+                                })
+
+                            });
+                            currentFeature.setStyle(newStyle);
+                            currentFeature.set('default_style', newStyle);
+                          }
+                        layer.setOpacity(transparency);
+                    }
+                    
+                });           
             
             
             
