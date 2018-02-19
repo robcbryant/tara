@@ -19,6 +19,5 @@ test_db/
 media/*
 tara/wsgi.py
 settings.py
-wsgi.py
 __pycache__
 *.pyc
