@@ -312,7 +312,7 @@
     
     
     function showBusyGraphic(elementToCover){
-        $busyIndicator = $('<div id="busy-indicator"><img src="http://67.205.135.223/static/site-images/busy-indicator.gif"></img></div>');
+        $busyIndicator = $('<div id="busy-indicator"><img src="{% static 'site-images/busy-indicator.gif' %}"></img></div>');
         $(elementToCover).append($busyIndicator);
     }
     
@@ -485,7 +485,7 @@
                 $newRow.append('<td><a href="#"><img class="enki-img-popup IMG-404" src="' + $currentForm.thumbnail_URI +'"></img></a></td>');
             //Otherwise add it as normal
             }else{
-                $newRow.append('<td><img class="enki-img-popup" src="' + $currentForm.thumbnail_URI +'" onError="this.onerror=null;this.src=\'http://67.205.135.223/static/site-images/no-thumb-missing.png\';this.classList.add(\'IMG-404\');"></img></td>');
+                $newRow.append('<td><img class="enki-img-popup" src="' + $currentForm.thumbnail_URI +'" onError="this.onerror=null;this.src=\'{% static 'site-images/no-thumb-missing.png' %}\';this.classList.add(\'IMG-404\');"></img></td>');
             }       
             //Add the form id link
             $newRow.append('<td style=""><a href="http://'+ document.location.hostname +'/admin/project/' + results.project_pk +'/formtype/' + results.formtype_pk + '/form_editor/' + $currentForm.pk + '/">' + results.formtype +': ' + $currentForm.form_id + '</a></td>');

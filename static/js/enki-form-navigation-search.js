@@ -40,11 +40,11 @@ $('#form-nav-search-form').submit(function(e){
                     for (i=0; i< returnedQuery.form_list.length; i++){
                         var currentForm = returnedQuery.form_list[i];
                         if (currentForm.label.length > 24){ 
-                            if (i == 0) $newListItem = $('<div class="search-box-item first-result"><a style="font-size:10px;" href="http://67.205.135.223/admin/project/'+currentForm.projectPK +'/formtype/'+ currentForm.formtypePK +'/form_editor/'+ currentForm.formPK +'/">'+ currentForm.label +'</a>(Press Enter to Go)</div>');
-                            else        $newListItem = $('<div class="search-box-item"><a style="font-size:10px;" href="http://67.205.135.223/admin/project/'+currentForm.projectPK +'/formtype/'+ currentForm.formtypePK +'/form_editor/'+ currentForm.formPK +'/">'+ currentForm.label +'</a></div>');
+                            if (i == 0) $newListItem = $('<div class="search-box-item first-result"><a style="font-size:10px;" href="/admin/project/'+currentForm.projectPK +'/formtype/'+ currentForm.formtypePK +'/form_editor/'+ currentForm.formPK +'/">'+ currentForm.label +'</a>(Press Enter to Go)</div>');
+                            else        $newListItem = $('<div class="search-box-item"><a style="font-size:10px;" href="/admin/project/'+currentForm.projectPK +'/formtype/'+ currentForm.formtypePK +'/form_editor/'+ currentForm.formPK +'/">'+ currentForm.label +'</a></div>');
                         } else {
-                            if (i == 0) $newListItem = $('<div class="search-box-item first-result"><a href="http://67.205.135.223/admin/project/'+currentForm.projectPK +'/formtype/'+ currentForm.formtypePK +'/form_editor/'+ currentForm.formPK +'/">'+ currentForm.label +'</a>(Press Enter to Go)</div>');
-                            else        $newListItem = $('<div class="search-box-item"><a href="http://67.205.135.223/admin/project/'+currentForm.projectPK +'/formtype/'+ currentForm.formtypePK +'/form_editor/'+ currentForm.formPK +'/">'+ currentForm.label +'</a></div>');                           
+                            if (i == 0) $newListItem = $('<div class="search-box-item first-result"><a href="/admin/project/'+currentForm.projectPK +'/formtype/'+ currentForm.formtypePK +'/form_editor/'+ currentForm.formPK +'/">'+ currentForm.label +'</a>(Press Enter to Go)</div>');
+                            else        $newListItem = $('<div class="search-box-item"><a href="/admin/project/'+currentForm.projectPK +'/formtype/'+ currentForm.formtypePK +'/form_editor/'+ currentForm.formPK +'/">'+ currentForm.label +'</a></div>');                           
                         }
                         $newSelect.append($newListItem);
                     }

@@ -433,10 +433,10 @@
                 $newRow.append('<td><a href="#"><img class="enki-img-popup IMG-404" src="' + $currentForm.thumbnail_URI +'"></img></a></td>');
             //Otherwise add it as normal
             }else{
-                $newRow.append('<td><img class="enki-img-popup" src="' + $currentForm.thumbnail_URI +'" onError="this.onerror=null;this.src=\'http://67.205.135.223/static/site-images/no-thumb-missing.png\';this.classList.add(\'IMG-404\');"></img></td>');
+                $newRow.append('<td><img class="enki-img-popup" src="' + $currentForm.thumbnail_URI +'" onError="this.onerror=null;this.src=\'{% static 'static/site-images/no-thumb-missing.png' %}\';this.classList.add(\'IMG-404\');"></img></td>');
             }       
             //Add the form id link
-            $newRow.append('<td style=""><a href="http://'+ document.location.hostname +'dev/admin/project/' + results.project_pk +'/formtype/' + results.formtype_pk + '/form_editor/' + $currentForm.pk + '/">' + results.formtype +': ' + $currentForm.form_id + '</a></td>');
+            $newRow.append('<td style=""><a href="http://'+ document.location.hostname +'/admin/project/' + results.project_pk +'/formtype/' + results.formtype_pk + '/form_editor/' + $currentForm.pk + '/">' + results.formtype +': ' + $currentForm.form_id + '</a></td>');
             //now add each individual column from the query results
             for(col=0; col < $currentForm.rvals.length;col++){
                $thisRval = $currentForm.rvals[col];
@@ -448,7 +448,7 @@
                } else {
                    var FRRVlist = $thisRval.value.split("^,^");
                    var parsedHTML = ""; 
-                   for(i=0; i<FRRVlist.length;i++){parsedHTML+='<a class="relation-link" href="http://'+ document.location.hostname +'dev/admin/project/' + results.project_pk +'/formtype/' + FRRVlist[i].split("|^|")[1] + '/form_editor/' + FRRVlist[i].split("|^|")[2] + '/">' + FRRVlist[i].split("|^|")[0] + '</a>';}
+                   for(i=0; i<FRRVlist.length;i++){parsedHTML+='<a class="relation-link" href="http://'+ document.location.hostname +'/admin/project/' + results.project_pk +'/formtype/' + FRRVlist[i].split("|^|")[1] + '/form_editor/' + FRRVlist[i].split("|^|")[2] + '/">' + FRRVlist[i].split("|^|")[0] + '</a>';}
                    $newRow.append('<td><div>' + parsedHTML + '</div></td>');
                }
             }

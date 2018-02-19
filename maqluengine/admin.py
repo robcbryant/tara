@@ -319,6 +319,8 @@ class MyAdminSite(AdminSite):
         super(MyAdminSite, self).__init__(*args, **kwargs)
         self.name = 'maqlu_admin'
         self.app_name = 'admin'
+        logger.warning(self.__dict__)
+        
 
 
     ##==========================================================================================================================   
@@ -3003,8 +3005,8 @@ class MyAdminSite(AdminSite):
                                             splitName = aUser['name'].split(' ')
                                             newUser.first_name = splitName[0]
                                             lastName = ""
-                                            if len(splitName) > 1:
                                                 #start at index 1--we don't need the first name
+                                            if len(splitName) > 1:
                                                 for i in range(1, len(splitName)):
                                                     lastName += splitName[i]
                                                 newUser.last_name = lastName
@@ -6961,11 +6963,11 @@ class MyAdminSite(AdminSite):
                             
                     #If Statement forces evaluation of the query set before the loop
                     if frrv_list:
-                        print >>sys.stderr, frrv_list
+                        logger.info(frrv_list)
                         for FRRV in frrv_list:
                             currentRTYPE = {}
                             rvalList = []
-                            print >>sys.stderr, FRRV.pk
+                            logger.info(FRRV.pk)
                             currentRTYPE['rtype_pk'] = FRRV.record_reference_type.pk
                             currentRTYPE['rtype_label'] = FRRV.record_reference_type.record_type
                             currentRTYPE['rtype'] = "FRRT"
@@ -6987,11 +6989,11 @@ class MyAdminSite(AdminSite):
                     #If there are no FRRVs then just attach a list of the FRRT's instead with no rval data 
                     else:       
                         frrt_list = currentForm.form_type.ref_to_parent_formtype.all()
-                        print >>sys.stderr, frrt_list
+                        logger.info(frrt_list)
                         
                         if frrt_list:
                             for FRRT in frrt_list:
-                                print >>sys.stderr, FRRT.form_type_reference
+                                logger.info(FRRT.form_type_reference)
                                 currentRTYPE = {}
                                 currentRTYPE['rtype_pk'] = FRRT.pk
                                 currentRTYPE['rtype_label'] = FRRT.record_type
@@ -7083,9 +7085,6 @@ class MyAdminSite(AdminSite):
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
             #$$$ SECURITY $$$ Make sure we only take POST requests
             if request.method == 'POST':   
-                print >>sys.stderr, "NEW FUNCTION"
-                print >>sys.stderr, request.POST
-
                 jsonData = {}
                 class_list = []
                 jsonData['class_list'] = class_list
@@ -7095,8 +7094,7 @@ class MyAdminSite(AdminSite):
                 code, PK = rtype_code.split('-')
                 
                 classList = csv_json = json.loads(request.POST['class_list'])
-                print >>sys.stderr, classList
-                print >>sys.stderr, rtype_code
+
                 #This queries this formtype's forms IDs
                 if code == "FORMID" :
                     #Let's loop through each of the provided class values, and add the flattened form pks to our list
@@ -7230,6 +7228,7 @@ class MyAdminSite(AdminSite):
         if project.pk == request.user.permissions.project.pk and formtype.project.pk == request.user.permissions.project.pk:
             counter = Counter()
             counter.reset()
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7288,6 +7287,7 @@ class MyAdminSite(AdminSite):
         if project.pk == request.user.permissions.project.pk and formtype.project.pk == request.user.permissions.project.pk:
             counter = Counter()
             counter.reset()
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7343,6 +7343,7 @@ class MyAdminSite(AdminSite):
         if project.pk == request.user.permissions.project.pk:
             counter = Counter()
             counter.reset()
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7394,6 +7395,7 @@ class MyAdminSite(AdminSite):
         if project.pk == request.user.permissions.project.pk:
             counter = Counter()
             counter.reset()
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7443,6 +7445,7 @@ class MyAdminSite(AdminSite):
         if project.pk == request.user.permissions.project.pk:
             counter = Counter()
             counter.reset()
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7493,6 +7496,7 @@ class MyAdminSite(AdminSite):
         if project.pk == request.user.permissions.project.pk:
             counter = Counter()
             counter.reset()
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7541,6 +7545,7 @@ class MyAdminSite(AdminSite):
         if project.pk == request.user.permissions.project.pk:
             counter = Counter()
             counter.reset()
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7569,6 +7574,11 @@ class MyAdminSite(AdminSite):
     #   ACCESS LEVEL :  1   TEMPLATE_ACCESS_LEVEL : 5    PROJECT_HOME()
     #=====================================================================================#          
     def project_home(self, request, **kwargs):
+        print(admin.site.has_permission(request), file=sys.stderr)
+        print(request.user, file=sys.stderr)
+        logger.warning(request)
+        logger.warning(kwargs)
+        
         #************************#
         ACCESS_LEVEL = 1
         TEMPLATE_ACCESS_LEVEL = 5
@@ -7588,6 +7598,7 @@ class MyAdminSite(AdminSite):
             raise Http404("Project Does Not Exist!")       
         
         if request.user.permissions.project.pk == project.pk:
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7638,6 +7649,7 @@ class MyAdminSite(AdminSite):
         if project.pk == request.user.permissions.project.pk and formtype.project.pk == request.user.permissions.project.pk:
             counter = Counter()
             counter.reset()
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7686,6 +7698,7 @@ class MyAdminSite(AdminSite):
         #If they are trying to access another project--warn them their action has been logged
         #after redirecting them to a warning page
         if project.pk == request.user.permissions.project.pk:       
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7749,7 +7762,7 @@ class MyAdminSite(AdminSite):
             
             frrt_list = form_type.ref_to_parent_formtype.all().filter(flagged_for_deletion=False)
             frrv_list = form.ref_to_parent_form.all().filter(record_reference_type__flagged_for_deletion=False)
-            
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'frat_list':frat_list})
@@ -7807,7 +7820,8 @@ class MyAdminSite(AdminSite):
         #Make sure the user is trying to access their project and not another project
         #If they are trying to access another project--warn them their action has been logged
         #after redirecting them to a warning page
-        if project.pk == request.user.permissions.project.pk and form_type.project.pk == request.user.permissions.project.pk:    
+        if project.pk == request.user.permissions.project.pk and form_type.project.pk == request.user.permissions.project.pk: 
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7855,7 +7869,8 @@ class MyAdminSite(AdminSite):
         #Make sure the user is trying to access their project and not another project
         #If they are trying to access another project--warn them their action has been logged
         #after redirecting them to a warning page
-        if project.pk == request.user.permissions.project.pk and form_type.project.pk == request.user.permissions.project.pk:       
+        if project.pk == request.user.permissions.project.pk and form_type.project.pk == request.user.permissions.project.pk:
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7899,7 +7914,8 @@ class MyAdminSite(AdminSite):
         #Make sure the user is trying to access their project and not another project
         #If they are trying to access another project--warn them their action has been logged
         #after redirecting them to a warning page
-        if project.pk == request.user.permissions.project.pk:       
+        if project.pk == request.user.permissions.project.pk:
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})        
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
@@ -7952,6 +7968,7 @@ class MyAdminSite(AdminSite):
         if project.pk == request.user.permissions.project.pk:
             counter = Counter()
             counter.reset()
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
             kwargs.update({'api_urls':get_api_endpoints()})
             kwargs.update({'access_level':TEMPLATE_ACCESS_LEVEL})
             kwargs.update({'user_access':request.user.permissions.access_level})
