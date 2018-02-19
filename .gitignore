@@ -18,5 +18,6 @@ db/
 test_db/
 media/*
 settings.py
+wsgi.py
 __pycache__
 *.pyc
