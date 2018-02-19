@@ -106,7 +106,18 @@
     margin-bottom: 4%;
     }
    
-  
+    .login-access {
+    position: absolute;
+    right: 3em;
+    top: 1em;
+    z-index: 10;
+    }
+    
+    .login-access a{
+    color: white;
+    font-weight: bold;
+    text-decoration: none;
+    }
     </style>
   </head>
   
@@ -116,7 +127,7 @@
   
     <div class="main_page">
         
-        
+    <div class="login-access"><a href="{% url 'maqlu_admin:index' %}">>>PROJECT LOGIN</a></div>    
         
     <div class="top">
 	<img class="img-logo" src="http://tara.museum.upenn.edu/static/site-images/TARA_logo.png"></img>
