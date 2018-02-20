@@ -7074,36 +7074,107 @@ class MyAdminSite(AdminSite):
                 #Figure out if a FRRT or FRAT was submitted
                 logger.info( request.POST)
                 finalJSON = {}
-                distinct_value_list = {}
                 form_rval_list = {}    
                 code, entity_pk = request.POST['entity_tag'].split('-')
-                
+                parent_formtype = FormType.objects.get(pk=request.POST['formtype_pk'])
+                #Setup out necessary lists etc.
+                new_form_rval_list = {}
+                distinct_value_list = []               
                 if   code == "DEEP_FRAT":   # We need to get all the unique rvals of the provided related FRAT
-                    entity_type = FormRecordAttributeType.objects.get(pk=entity_pk)    
-                    flattenedSet = list(Form.objects.all().filter(formrecordattributevalue__record_value__icontains=aClass['class_value'], formrecordattributevalue__record_attribute_type__pk=PK).values_list('pk', flat=True)) #CONTAINS    
-                    new_form_rval_list = {}
-                    test_list = entity_type.formrecordreferencevalue_set.values('record_reference__form_name','form_parent__pk')
-                    logger.info( test_list)
-                    for pair in test_list:
-                        if pair['form_parent__pk'] in new_form_rval_list:
-                            new_form_rval_list[pair['form_parent__pk']] = new_form_rval_list[pair['form_parent__pk']] + "," + pair['record_reference__form_name']
-                        else:
-                            new_form_rval_list[pair['form_parent__pk']] = pair['record_reference__form_name']
-                    logger.info( new_form_rval_list)
+                    #OKAY--So what I want is a list of all relevant FRAVs per Parent Formtype, e.g. I want all the relevant "Object Type"s per "Grid Square" that
+                    #   --references the objects. So What I need to do is, for each Grid Square Form, provide a list of all it's referenced objects, FRAVs for the
+                    #   --"Object Type" FRAT they are connected to.
                     
+                    # Let's loop through each "Grid Square" Form, grab it's relevant FRRV form(s) using the FRRT parent provided--then:
+                    #   *for each FRRV's referenced forms(Object Form), Let's grab it's desired FRAV that has our provided DEEP FRAT as its parent and add it to a list
+                    #   *attach that list to our current parent form in json 
+                    
+                    #Load our DEEP FRAT
+                    entity_type = FormRecordAttributeType.objects.get(pk=entity_pk) 
+                    #Figure out the FRRT referencing the FRAT by crossreferencing it between the provided FormType and FRAT
+                    frrt_ref = parent_formtype.ref_to_parent_formtype.all().filter(form_type_reference__pk=entity_type.form_type.pk)[0]
+                    #Get our list of forms of this parent formtype
+                    forms = parent_formtype.form_set.all();
+                    #This If statement simply forces the query to activate before looping through the forms--otherwise we'll be querying every loop which takes far longer
+                    if forms:
+                        for parent_form in forms:
+                            #Try loading the form's FRAV--and if it can't/doesn't exist then fall back to a default value
+                            try:
+                                #Get our FRRV for this form matching the Parent Form's selected FRRT
+                                frrv_forms = parent_form.ref_to_parent_form.filter(record_reference_type__pk=frrt_ref.pk)[0].record_reference.all()
+                                #Now loop through it's related forms(usually will just be 1, but there could be multiple as well) if it exists                             
+                                if frrv_forms:
+                                    values = [] 
+                                    for deep_form in frrv_forms:
+                                        #For this deep parent form, find the FRAV with a FRAT parent that matches the provided Deep PK
+                                        deep_frav_value = deep_form.formrecordattributevalue_set.filter(record_attribute_type__pk=entity_pk)[0].record_value
+                                        #Only add this value to our list if it isn't blank--this will make sure we aren't adding arbitrary commas later
+                                        if deep_frav_value and deep_frav_value != "":
+                                            values.append(deep_frav_value)
+                                    #make sure we are only using unique values by converting to a Set and back
+                                    values = list(set(values)) 
+                                    #add it to our list of distinct values
+                                    distinct_value_list.append(",".join(values))
+                                    #add it to our form_pk lookup dictionary
+                                    new_form_rval_list[parent_form.pk] = ",".join(values)
+                            except Exception as inst:
+                                logger.warning(inst)
+                                #If it fails, just default it to a 'blank' for this form--which means it has no values--in essence a 'default' value
+                                new_form_rval_list[parent_form.pk] = ""
+                    #Do some last minute cleanup here, like sorting the lists etc.
+                    distinct_value_list = list(set(distinct_value_list))            
+                    if entity_type.is_numeric: finalJSON['distinct_value_list'] = sorted(list(distinct_value_list), key=lambda e: float(e['record_value']))
+                    else : finalJSON['distinct_value_list'] = list(distinct_value_list)                      
+              
                 elif code == "DEEP_FRRT":   # We need to get all the unique form IDs of the FRRT's related FRRTs FormType
-                    entity_type = FormRecordReferenceType.objects.get(pk=entity_pk) 
-                    new_form_rval_list = {}
-                    test_list = entity_type.formrecordreferencevalue_set.values('record_reference__form_name','form_parent__pk')
-                    logger.info( test_list)
-                    for pair in test_list:
-                        if pair['form_parent__pk'] in new_form_rval_list:
-                            new_form_rval_list[pair['form_parent__pk']] = new_form_rval_list[pair['form_parent__pk']] + "," + pair['record_reference__form_name']
-                        else:
-                            new_form_rval_list[pair['form_parent__pk']] = pair['record_reference__form_name'] 
-                    distinct_value_list = sorted( list( set( list( new_form_rval_list.values() ) ) ) )
-                    finalJSON['distinct_value_list'] = distinct_value_list    
+                    # So for this guy I need a list of all the provided DEEP_FRRT's FRRVs referenced form ids(or names) and attach that to each of the parent forms
+                    #   I mean..sounds easy enough right? WRONG.
+                    #
+                    #   Let's keep up the Grid Square metaphor from the previous if block and say I want to loop through all the grid square forms, and then find
+                    #   --their relevant deep frrt values
+                    #       *Let's loop through the parent grid square forms and grab it's relevant FRRV using the FRRT parent provided, then:
+                    #       *for each 
                     
+                    #Load our DEEP FRAT
+                    entity_type = FormRecordReferenceType.objects.get(pk=entity_pk) 
+                    #Figure out the FRRT referencing the DEEP FRRT by crossreferencing it between the provided FormType and FRRT
+                    frrt_ref = parent_formtype.ref_to_parent_formtype.all().filter(form_type_reference__pk=entity_type.form_type_parent.pk)[0]
+                    #Get our list of forms of this parent formtype
+                    forms = parent_formtype.form_set.all();                   
+                    #This if is just caching/processing the forms query before looping through it
+                    if forms:
+                        for parent_form in forms:
+                            #Try loading the forms FRRV--and if it can't/doesn't exist then fall back to a default value
+                            try:
+                                #Get our FRRV for this form matching the parents Form's selected FRRT
+                                frrv_forms = parent_form.ref_to_parent_form.filter(record_reference_type__pk=frrt_ref.pk)[0].record_reference.all()
+                                #Now loop through it's related forms(usually will be 1, but ca be multiple) if it(they) exist(s)
+                                if frrv_forms:
+                                    values = []
+                                    for deep_form in frrv_forms:
+                                        #For this deep parent form, we need to find the frrv with a frrt that matches the provided Deep PK
+                                        deep_frrv = deep_form.ref_to_parent_form.filter(record_reference_type__pk=entity_pk)
+                                        #This is where we divert from the Deep FRAT code. We're going to have to get a list of the form names of this frrv's ManyToMany 'record_reference' field
+                                        #First--we need to check if it exists, if it doesn't exist then just skip it and move on to the next deep_form
+                                        if deep_frrv:
+                                            deep_frrv_forms = deep_frrv[0].record_reference.all()
+                                            for deep_frrv_form in deep_frrv_forms:
+                                                values.append(deep_frrv_form.form_name)
+                                    #Make sure we only use unique values by converting to a set and back. No double values needed
+                                    values = list(set(values))
+                                    #make sure we are only using unique values by converting to a Set and back
+                                    values = list(set(values)) 
+                                    #add it to our list of distinct values
+                                    distinct_value_list.append(",".join(values))
+                                    #add it to our form_pk lookup dictionary
+                                    new_form_rval_list[parent_form.pk] = ",".join(values)
+                            except Exception as inst:
+                                logger.warning(inst)
+                                #If it fails, just default it to a 'blank' for this form--which means it has no values--in essence a 'default' value
+                                new_form_rval_list[parent_form.pk] = ""
+                    #Do some last minute cleanup here, like sorting the lists etc.
+                    distinct_value_list = sorted(list(set(distinct_value_list)))      
+                    finalJSON['distinct_value_list'] = distinct_value_list
                 elif code == "FRRT_ID":     # We need to get all the unique form IDs of the FRRT's related FormType
                     entity_type = FormRecordReferenceType.objects.get(pk=entity_pk)
                     #Now this is where it gets tricky I think. Normally our form_rval_list is a 1:1 form PK and it's value, but because we are dealing
@@ -7167,7 +7238,7 @@ class MyAdminSite(AdminSite):
                     frrt_ref = FormRecordReferenceType.objects.get(pk=frrt_pk) 
                     forms = frrt_ref.form_type_reference.form_set.all()
                     #First we need a distinct list of the back frat's unique values
-                    #distinct_value_list = entity_type.formrecordattributevalue_set.order_by('record_value').values_list('record_value', flat=True).distinct()  
+                   
                     #Now we need a list of all the parent formtype(the formtype that's making the backwards request to the back frat) and their values for this FRAT
                     new_form_rval_list = {}#parent_formtype.formrecordattributevalue_set.values('form_parent__pk','record_value')   
                     distinct_value_list = []

@@ -508,8 +508,8 @@
         
         transparency = transparency / 100.0;
         $parentPanel = $(this).parent().parent().parent();
-        console.log($parentPanel.attr('pk'));
-        $.ajax({ url   : API_URLS['get_geo_unique_rtype_rvals'], type  : "POST", data  : [{name: 'entity_tag', value:rtype_tag}], // data to be submitted
+        var pk = $parentPanel.attr('pk');
+        $.ajax({ url   : API_URLS['get_geo_unique_rtype_rvals'], type  : "POST", data  : [{name:'formtype_pk',value:pk},{name: 'entity_tag', value:rtype_tag}], // data to be submitted
             success : function(returnedQuery){
                 console.log(returnedQuery);
                 //Empty the current class list
