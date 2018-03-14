@@ -85,50 +85,52 @@ $('#form-nav-search-form').submit(function(e){
 function loadPreviousAndNextFormValues(){
     
     //setup our json
-    //If there is no form PK we're in the view form type view so don't worry about next previous navigation
-    if ("CURRENT_FORM_PK" in window){
         var jsonData = {"project_pk" : CURRENT_PROJECT_PK, "formtype_pk" : CURRENT_FORMTYPE_PK, "form_pk" : CURRENT_FORM_PK};
         //Setup our element variables for editing
         $previousLink = $('#previous-form-link');
         $nextLink = $('#next-form-link');
+        //Only run this function IF the elements above exist. If they don't, then don't run it. Otherwise we're sending the
+        //server empty data and it will error. This doesn't affect performance or functionality, I just hate seeing the error and
+        //a wasted AJAX request in the console for no reason. This function only needs to run on 'edit_form' which makes me think maybe
+        //it should be its own js file separate from the admin toolbar search
+        if ($previousLink.length && $nextLink.length){ //checking the elements length will be '0' if it doesn't exist, and therefore false
         
-        
-        //perform our AJAX request to the endpoint to get the values
-        $.ajax({ 
-                 url   : API_URLS.get_forms_previous_next,
-                 type  : "POST",
-                 data  : jsonData, // data to be submitted
-                 success : function(returnedQuery)
-                 {
-                    console.log(returnedQuery);
-                    //if our returned query contains an 'ERROR' key, then create fake links with a '#'
-                    if (returnedQuery['ERROR']){
+            //perform our AJAX request to the endpoint to get the values
+            $.ajax({ 
+                     url   : API_URLS.get_forms_previous_next,
+                     type  : "POST",
+                     data  : jsonData, // data to be submitted
+                     success : function(returnedQuery)
+                     {
+                        console.log(returnedQuery);
+                        //if our returned query contains an 'ERROR' key, then create fake links with a '#'
+                        if (returnedQuery['ERROR']){
+                            $previousLink.attr("href", "#");
+                            $nextLink.attr("href", "#");
+                        //Otherwise we are in the clear--edit our links/labels!
+                        } else {
+                            //Handle the Previous Form Link--and make the font size adaptive to the length of the label
+                            $previousLink.attr("href", "/admin/project/"+returnedQuery.project_pk+"/formtype/"+returnedQuery.formtype_pk+"/form_editor/"+returnedQuery.previous_pk+"/");
+                            if(returnedQuery.previous_label.length >= 12)$previousLink.parent().css('font-size', '12px');
+                            if(returnedQuery.previous_label.length > 16) {$previousLink.parent().prepend(returnedQuery.previous_label.substring(0,12)+"...");$previousLink.parent().prop('title', returnedQuery.previous_label);}
+                            else $previousLink.parent().prepend(returnedQuery.previous_label);
+                            
+                            //Handle the Next Form Link--and make the font size adaptive to the length of the label
+                            $nextLink.attr("href", "/admin/project/"+returnedQuery.project_pk+"/formtype/"+returnedQuery.formtype_pk+"/form_editor/"+returnedQuery.next_pk+"/");
+                            if(returnedQuery.next_label.length >= 12)$nextLink.parent().css('font-size', '12px');
+                            if(returnedQuery.next_label.length > 16) {$nextLink.parent().append(returnedQuery.next_label.substring(0,12)+"..."); $nextLink.parent().prop('title', returnedQuery.next_label);} 
+                            else $nextLink.parent().append(returnedQuery.next_label);
+                        }
+                     },
+
+                    // handle a non-successful response
+                    fail : function(xhr,errmsg,err) {
+                        console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
                         $previousLink.attr("href", "#");
                         $nextLink.attr("href", "#");
-                    //Otherwise we are in the clear--edit our links/labels!
-                    } else {
-                        //Handle the Previous Form Link--and make the font size adaptive to the length of the label
-                        $previousLink.attr("href", "/admin/project/"+returnedQuery.project_pk+"/formtype/"+returnedQuery.formtype_pk+"/form_editor/"+returnedQuery.previous_pk+"/");
-                        if(returnedQuery.previous_label.length >= 12)$previousLink.parent().css('font-size', '12px');
-                        if(returnedQuery.previous_label.length > 16) {$previousLink.parent().prepend(returnedQuery.previous_label.substring(0,12)+"...");$previousLink.parent().prop('title', returnedQuery.previous_label);}
-                        else $previousLink.parent().prepend(returnedQuery.previous_label);
-                        
-                        //Handle the Next Form Link--and make the font size adaptive to the length of the label
-                        $nextLink.attr("href", "/admin/project/"+returnedQuery.project_pk+"/formtype/"+returnedQuery.formtype_pk+"/form_editor/"+returnedQuery.next_pk+"/");
-                        if(returnedQuery.next_label.length >= 12)$nextLink.parent().css('font-size', '12px');
-                        if(returnedQuery.next_label.length > 16) {$nextLink.parent().append(returnedQuery.next_label.substring(0,12)+"..."); $nextLink.parent().prop('title', returnedQuery.next_label);} 
-                        else $nextLink.parent().append(returnedQuery.next_label);
                     }
-                 },
-
-                // handle a non-successful response
-                fail : function(xhr,errmsg,err) {
-                    console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
-                    $previousLink.attr("href", "#");
-                    $nextLink.attr("href", "#");
-                }
             });   
-    }
+        }
 }
 
 

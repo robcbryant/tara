@@ -6,7 +6,7 @@
 {% block title %}Maqlu Engine&nbsp;&nbsp;-&nbsp;&nbsp;{{project}}&nbsp;&nbsp;:&nbsp;&nbsp;{{formtype}}&nbsp;&nbsp;:&nbsp;&nbsp;{{form}}{% endblock %}
 
 
-{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+{% block branding %}{% endblock %}
 
 {% block breadcrumbs %}
     {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}
@@ -83,7 +83,7 @@
     //GLOBALS VARIABLES//
     var RTYPE_LIST;
     var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
-    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORM_PK = '{{form.pk}}';
     var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
     var CURRENT_PROJECT_PK = '{{project.pk}}';
     var INITIALIZATION_CODE = 0;
@@ -132,7 +132,7 @@
                                 var pk = $(this).parent().attr('pk');
                                 var widget = $(this).parent();
                                 $.ajax({ 
-                                     url   : API_URLS.restore_form_type, type  : "POST", data  : {"ID": pk}, 
+                                     url   : API_URLS.restore_formtype, type  : "POST", data  : {"ID": pk}, 
                                      success : function(message){
                                         console.log(message);
                                         location.reload();
@@ -141,7 +141,7 @@
                             });
                             $newItem.find('.perma-delete-item').click ( function(){
                                 $.ajax({ 
-                                     url   : API_URLS.delete_form_type, type  : "POST", data  : {"ID": $(this).parent().attr('pk')}, 
+                                     url   : API_URLS.delete_formtype, type  : "POST", data  : {"ID": $(this).parent().attr('pk')}, 
                                      success : function(message){
                                         console.log(message);
                                         location.reload();

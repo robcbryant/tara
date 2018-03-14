@@ -23,7 +23,7 @@ import sys
 from django.db.models import Q, Count, Max
 import re
 from django.contrib.contenttypes.models import ContentType
-from django.shortcuts import render_to_response
+from django.shortcuts import render_to_response, render
 from django.template import RequestContext
 import urllib
 from django.conf import settings
@@ -252,7 +252,7 @@ def get_api_endpoints():
     #Create Endpoints
     jsonData['create_form'] = reverse('maqlu_admin:create_new_form')
     jsonData['create_template'] = reverse('maqlu_admin:create_new_form_type_template')
-    jsonData['create_formtype'] = reverse('maqlu_admin:create_new_form')
+    jsonData['create_formtype'] = reverse('maqlu_admin:create_new_form_type')
     
     #Edit Endpoints
     jsonData['save_form'] = reverse('maqlu_admin:save_form_changes')
@@ -285,6 +285,11 @@ def get_api_endpoints():
     jsonData['get_geo_unique_rtype_rvals'] = reverse('maqlu_admin:get_all_unique_rtype_rvals')
     jsonData['get_geo_category_matches'] = reverse('maqlu_admin:get_geo_category_matches')
     jsonData['get_forms_previous_next'] = reverse('maqlu_admin:get_previous_next_forms')
+    jsonData['get_geo_quantity_frat_counter_auto'] = reverse('maqlu_admin:get_geo_quantity_frat_counter_auto')
+    jsonData['get_geo_numeric_rtypes'] = reverse('maqlu_admin:get_geo_numeric_rtypes')
+    jsonData['get_geo_graduated_applied_classes'] = reverse('maqlu_admin:get_geo_graduated_applied_classes')
+    jsonData['get_geo_rules_classes'] = reverse('maqlu_admin:get_geo_rules_classes')
+    
     
     #Run Various Tools Endpoints
     jsonData['run_formtype_query_engine'] = reverse('maqlu_admin:run_query_engine')
@@ -1246,7 +1251,6 @@ class MyAdminSite(AdminSite):
                         currentFormType.template_json = json.dumps(currentTemplateDict)
                     else:
                         currentFormType.template_json = newTemplateString
-                    
                     
                     currentFormType.save()
                     #SUCCESS!!
@@ -3685,8 +3689,10 @@ class MyAdminSite(AdminSite):
         
             #We need to return a json list of all formtype RTYPES that match the provided formtype pk
             if request.method == "POST":
+                logger.info(request.POST)
                 #Grab the formtype
-                currentFormType = FormType.objects.get(pk=request.POST['formtype_pk'])
+                if 'formtype_pk' in request.POST:   currentFormType = FormType.objects.get(pk=request.POST['formtype_pk'])
+                else:                               currentFormType = FormRecordReferenceType.objects.get(pk=request.POST['frrt-pk']).form_type_parent
                 #If the requested formtype isn't the user's project, and flagged as being inaccessible then stop the request
                 if currentFormType.project.pk != request.user.permissions.project.pk and (currentFormType.flagged_for_deletion == True or currentFormType.is_public == False):
                     ERROR_MESSAGE += "Error: You are attempting to access records that don't exist. This probably occurred because your client attempted altering the POST data before sending"
@@ -3801,12 +3807,14 @@ class MyAdminSite(AdminSite):
                                 currentDeepRTYPE['label'] = FRRT.record_type + " :: " + deepFRAT.record_type
                                 currentDeepRTYPE['pk'] = deepFRAT.pk
                                 currentDeepRTYPE['rtype'] = 'DEEP-FRAT'
+                                currentDeepRTYPE['parent_pk'] = FRRT.pk
                                 rtypeList.append(currentDeepRTYPE)
                             for deepFRRT in FRRT.form_type_reference.ref_to_parent_formtype.all().filter(flagged_for_deletion=False):
                                 currentDeepRTYPE = {}
                                 currentDeepRTYPE['label'] = FRRT.record_type + " :: " + deepFRRT.record_type
                                 currentDeepRTYPE['pk'] = deepFRRT.pk
                                 currentDeepRTYPE['rtype'] = 'DEEP-FRRT'  
+                                currentDeepRTYPE['parent_pk'] = FRRT.pk
                                 if FRRT.form_type_reference: currentDeepRTYPE['ref_formtype_pk'] = deepFRRT.form_type_reference.pk
                                 else: currentDeepRTYPE['ref_formtype_pk'] = "None"
                                 rtypeList.append(currentDeepRTYPE)
@@ -3826,7 +3834,13 @@ class MyAdminSite(AdminSite):
                                 currentDeepRTYPE['label'] = currentRTYPE['label'] + " :: " + deepFRAT.record_type
                                 currentDeepRTYPE['pk'] = str(deepFRAT.pk)+","+str(FRRT.pk)
                                 currentDeepRTYPE['rtype'] = 'BACK-DEEP-FRAT'
-                                rtypeList.append(currentDeepRTYPE)                            
+                                rtypeList.append(currentDeepRTYPE)   
+                            for deepFRRT in FRRT.form_type_parent.ref_to_parent_formtype.all().filter(flagged_for_deletion=False):
+                                currentDeepRTYPE = {}
+                                currentDeepRTYPE['label'] = currentRTYPE['label'] + " :: " + deepFRRT.record_type
+                                currentDeepRTYPE['pk'] = str(deepFRRT.pk)+","+str(FRRT.pk)
+                                currentDeepRTYPE['rtype'] = 'BACK-DEEP-FRRT'
+                                rtypeList.append(currentDeepRTYPE)                                     
                     else:
                         #***RECYCLING BIN***  Make sure that the returned FRAT AND FRRTS are filtered by their deletion flags. Don't want them returned in the query
                         for FRAT in currentFormType.formrecordattributetype_set.all().filter(flagged_for_deletion=False, is_public=True):
@@ -4139,7 +4153,7 @@ class MyAdminSite(AdminSite):
                 #POST values submitted are :  formtype_pk   &  form_pk & project_pk
                 #Check if they exist, and only continue if they do
                 if 'formtype_pk' in request.POST and 'form_pk' in request.POST and 'project_pk' in request.POST:
-                    
+                    logger.warning(request.POST)
                     thisQuery = Form.objects.filter(form_type__pk=request.POST['formtype_pk'])
                     # $$$-SECURITY-$$$: Make sure we filter by the users project as usual
                     thisQuery.filter( project__pk=request.user.permissions.project.pk)
@@ -6798,11 +6812,18 @@ class MyAdminSite(AdminSite):
                     jsonData = {}
                     rtype_list = []
                     jsonData['rtype_list'] = rtype_list
-                    
+                    jsonData['form_name'] = currentForm.form_name
+                    jsonData['form_pk'] = currentForm.pk
+                    jsonData['formtype_name'] = currentForm.form_type.form_type_name
+                    jsonData['formtype_pk'] = currentForm.form_type.pk
                     #Alright--let's load our RTYPEs from the current Form requested
                     #*** RECYCLING BIN *** Let's filter them out by their recycling flags as well
                     frav_list = currentForm.formrecordattributevalue_set.all().filter(flagged_for_deletion=False)
                     frrv_list = currentForm.ref_to_parent_form.all().filter(flagged_for_deletion=False)
+                    
+                    #Let's try and grab our backward referencing forms now.
+                    back_frrv_list = currentForm.ref_to_value_form.all().filter(flagged_for_deletion=False)
+                    
                     
                     #If Statement forces evaluation of the query set before the loop
                     if frav_list:                    
@@ -6860,7 +6881,34 @@ class MyAdminSite(AdminSite):
                                 currentRTYPE['rval_pk'] = ""
                                 currentRTYPE['rval'] = ""
                                 rtype_list.append(currentRTYPE)   
-                                
+
+                    #If Statement forces evaluation of the query set before the loop
+                    if back_frrv_list:
+                        logger.info(back_frrv_list)
+                        formTypeList = {}
+                        for FRRV in back_frrv_list:
+                            #Create Our RVAL
+                            newRVAL = {}
+                            newRVAL['form_pk'] = FRRV.form_parent.pk
+                            newRVAL['form_name'] = FRRV.form_parent.form_name
+                            newRVAL['thumbnail'] = FRRV.form_parent.get_ref_thumbnail()
+                            newRVAL['url'] =  reverse('maqlu_admin:edit_form',kwargs={'project_pk': request.user.permissions.project.pk, 'form_type_pk':FRRV.form_parent.form_type.pk, 'form_pk': FRRV.form_parent.pk})
+                            #create Our Back FRRT RTYPE dictionary entry
+                            #We only need to create it once--if it already exists, then just add the rval to its existing list 
+                            if FRRV.form_parent.form_type.pk in formTypeList:
+                                formTypeList[FRRV.form_parent.form_type.pk]['rval'].append(newRVAL)
+                            else:
+                                formRef = {}
+                                formRef['rtype'] = "BACK_FRRT"
+                                formRef['formtype_name'] = FRRV.form_parent.form_type.form_type_name
+                                formRef['formtype_pk'] = FRRV.form_parent.form_type.pk
+                                formRef['rval'] = []
+                                formRef['rval'].append(newRVAL)
+                                formTypeList[FRRV.form_parent.form_type.pk] = formRef
+                        #Now add it to the format in our rtype_list    
+                        for key in formTypeList:
+                            rtype_list.append(formTypeList[key])                    
+
                     #convert python dict to a json string and send it back as a response
                     jsonData = json.dumps(jsonData);
                     return HttpResponse(jsonData, content_type="application/json")    
@@ -6952,7 +7000,7 @@ class MyAdminSite(AdminSite):
                 rtype_code = request.POST['rtype_code']
                 code, PK = rtype_code.split('-')
                 
-                classList = csv_json = json.loads(request.POST['class_list'])
+                classList = json.loads(request.POST['class_list'])
 
                 #This queries this formtype's forms IDs
                 if code == "FORMID" :
@@ -7213,24 +7261,41 @@ class MyAdminSite(AdminSite):
                     new_form_rval_list = {}
                     for pair in form_rval_list:
                         new_form_rval_list[pair['form_parent__pk']] = pair['record_value']
-                    if entity_type.is_numeric: finalJSON['distinct_value_list'] = sorted(list(distinct_value_list), key=lambda e: float(e['record_value']))
+                    if entity_type.is_numeric:
+                        sorted_list = list(distinct_value_list)
+                        sorted_list.sort(key=float)
+                        finalJSON['distinct_value_list'] = sorted_list
                     else : finalJSON['distinct_value_list'] = list(distinct_value_list)
                     
                 elif code == "BACK_FRRT":
-                    #We need a distinct list of the frrt's formtype_parent form ids
+                    #We need a distinct list of the given frrt's formtype_parent form ids
                     #We then need a form list of the CURRENT formtype's forms that have a match
+                    #  So using the same Grid Square Metaphor--we have a reverse lookup to "Object Forms" that are referencing a grid square.
+                    #       **First let's get a list of all the Grid Squares
+                    #       **Then we need a list of all the Object Forms referencing each grid square in a loop and add them to a list to return
                     entity_type = FormRecordReferenceType.objects.get(pk=entity_pk) 
-                    new_form_rval_list = {}
-                    
-                    test_list = entity_type.formrecordreferencevalue_set.values('record_reference__form_name','form_parent__pk')
-                    logger.info( test_list)
-                    for pair in test_list:
-                        if pair['form_parent__pk'] in new_form_rval_list:
-                            new_form_rval_list[pair['form_parent__pk']] = new_form_rval_list[pair['form_parent__pk']] + "," + pair['record_reference__form_name']
-                        else:
-                            new_form_rval_list[pair['form_parent__pk']] = pair['record_reference__form_name'] 
-                    distinct_value_list = sorted( list( set( list( new_form_rval_list.values() ) ) ) )
-                    finalJSON['distinct_value_list'] = distinct_value_list    
+                    #Load up our grid squares
+                    forms = parent_formtype.form_set.all();
+                    #activate the query to load it in cache before we loop through it
+                    if forms:
+                        for parent_form in forms:
+                            values = []
+                            #Do the reverse query lookup to get all the frrvs referencing the main parent form
+                            back_reference_frrvs = parent_form.ref_to_value_form.all()
+                            #Now we need to store all these frrv's parent forms' form names in a list and attach it to our current parent form in the loop
+                            if back_reference_frrvs:
+                                for back_ref_frrv in back_reference_frrvs:
+                                    values.append(back_ref_frrv.form_parent.form_name)
+                                #Make sure we only have distinct values
+                                values = list(set(values))
+                                #Now add our list with injected commas as a string to out value lists
+                                distinct_value_list.append(",".join(values))
+                                new_form_rval_list[parent_form.pk] = ",".join(values)
+                            else:
+                                new_form_rval_list[parent_form.pk] = "" 
+                    #sort our list and add it to our JSON
+                    distinct_value_list = sorted(distinct_value_list)
+                    finalJSON['distinct_value_list'] = list(distinct_value_list)         
                     
                 elif code == "BACK_DEEP_FRAT":
                     back_frat_pk, frrt_pk = entity_pk.split(',')
@@ -7261,9 +7326,9 @@ class MyAdminSite(AdminSite):
                                     teststring =  ",".join(values)
                                     logger.info( teststring)
                                     distinct_value_list.append(teststring)
-                                new_form_rval_list[form.pk] = teststring
+                                    new_form_rval_list[form.pk] = teststring
                             except:
-                                new_form_rval_list[form.pk] = "None"
+                                new_form_rval_list[form.pk] = ""
                     distinct_value_list = list(set(distinct_value_list))            
                     if entity_type.is_numeric: finalJSON['distinct_value_list'] = sorted(list(distinct_value_list), key=lambda e: float(e['record_value']))
                     else : finalJSON['distinct_value_list'] = list(distinct_value_list)          
@@ -7284,14 +7349,467 @@ class MyAdminSite(AdminSite):
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")    
-
      
        
-   
+    #=======================================================#
+    #   ACCESS LEVEL :  1      GET_GEO_QUANTITY_FRAT_COUNTER_AUTO *RECYCLING
+    #=======================================================#   
+    def get_geo_quantity_frat_counter_auto(self, request):
+        #***************#
+        ACCESS_LEVEL = 1
+        #***************#            
+        
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This Endpoint returns a json/dictionary of formPks and a count number for a given query
+        #       --The query is for the quantitities classification in the geo-engine.
+        #       --It allows the user to select from a list of the layer/formtype's available FRAT's that are tagged as "is_numeric = true"
+        #           --It will sort all the values in a list, find the smallest/largest value and default to a "regular interval" classification
+        #           --based on the # of classes provided by the user's request. 
+        #               *If it's more than the number of found values, it will divide/round up between the min and max
+        #               *If it's less than the number of found values, the classes will still be divided/round up between the max and min
+        #           --It will then produce a dictionary of json objects that follow the structure:
+        #               { "<form_pk>": {"frat_value":"<numeric value>", "class_color":"<#ffffff>"},
+        #                 "<form_pk>": {"frat_value":"<numeric value>", "class_color":"<#ffffff>"}
+        #               }
+        #           --The client-side javascript will then use this dictionary to loop through the openlayers formtype layer features, 
+        #           --and color them according to their PK value in this dictionary
+        #
+        #
+        
+        ERROR_MESSAGE = ""
+        
+        #Check our user's session and access level
+        if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
+        
+            #We need to return a json list of all RVALS that match the provided RTYPE
+            if request.method == "POST":
+                #Setup the necessary variables
+                finalJSON = {}
+                rtype_code = request.POST['rtype_code']
+                code, PK = rtype_code.split('-')
+                num_of_classes = int(request.POST['num_of_classes'])
+                color_list = request.POST['color_list']
+                color_list = color_list.split(",")
+                logger.info(request.POST['color_list'])
+                parent_formtype = FormType.objects.get(pk=request.POST['formtype_pk'])   
+                frat = FormRecordAttributeType.objects.get(pk=PK)
+                parent_forms = parent_formtype.form_set.all()
+                value_list = []
+                issues = []
+                form_dict = {}
+                finalJSON['issues'] = issues
+                finalJSON['form_dict'] = form_dict
+                #First let's build our dictionary but leave the class value blank
+                #We'll need to loop through a list of the forms and build it form by form                
+                if parent_forms:
+                    num_of_forms = parent_forms.count()
+                    #if num_of_classes > num_of_forms: num_of_classes = num_of_forms
+                    for form in parent_forms:
+                        new_class = {}
+                        #Set the frat value of our new dictionary entry
+                        #--also check that one exists for the form as a precaution, if not, then give it a blank
+                        frat_value = form.formrecordattributevalue_set.filter(record_attribute_type__pk=frat.pk)
+                        if frat_value: 
+                            new_class['frat_value'] = frat_value[0].record_value
+                            try:
+                                value_list.append(float(frat_value[0].record_value))
+                            except:
+                               issues.append("Form " + str(form.form_name) + " does not a valid Float value for its FRAT: "  + str(frat.record_type) + " --value skipped and treated as blank.")
+                        else: new_class['frat_value'] = ""    
+                        form_dict[form.pk] = new_class
+
+                #Now that we have our dictionary setup, let's classify our number list
+                #Idealling, just sort it is as easy as sort() lol 
+                value_list.sort()
+                #Let's get our min and max which should now be the first and last index of our list
+                min_value = value_list[0]
+                max_value = value_list[len(value_list)-1]
+
+                class_interval =  (max_value - min_value) / num_of_classes
+                final_class_list = []
+                #round our interval to a whole number--this rounds it as best possible as a float--truncates it to a whole number by casting int() and then makes it a float again
+                class_interval = float(int(round(class_interval))) 
+                #Start Our loop--our class structure will look like this:
+                #   [  {"max":<#>, "min":<#>},
+                #      {"max":<#>, "min":<#>},
+                #      {"max":<#>, "min":<#>}
+                #   ]
+                #
+                #   My equal interval range class algorithm is as follows: (pretty simple--not perfect but works)
+                #
+                #       For Each Loop iteration (n)
+                #       range_start =  min + (n x class_interval)
+                #       range_end   =  range_start + (class_interval - 1)
+                #       --->If last iteration, then range_end = max
+                
+                for n in range(num_of_classes):
+                    new_class = {}
+                    new_class['min'] = str(min_value + (n * class_interval))
+                    if n < num_of_classes - 1: new_class['max'] = str( float(new_class['min']) + (class_interval - 1 ))
+                    else:                      new_class['max'] = str(max_value)
+                    #add our color
+                    new_class['color'] = color_list[n]
+                    final_class_list.append(new_class)
+                finalJSON['class_list'] = final_class_list
+                
+                #   Now let's determine the color for each form's found FRAT value.
+                #   --The color_list will be the same length as our class_list so we can use whatever index value from
+                #   --our class_list to find the matching color.
+                #
+                #   First let's loop through our new form dictionary and look up it's value in our class list
+                
+                for key, value in form_dict.items():
+                    val = value['frat_value']
+                    logger.info(val)
+                    #set our initial default color(transparent)
+                    value['color'] = "rgba(0,0,0,0)"
+                    #We use a try statement to see if the form has an actual value assigned--if it's "" (blank) it will fail and we'll keep our default as a transparent color passed as a string
+                    try: 
+                        val = float(val)
+                        #It worked! Now loop through our classes and determine which one this value falls in
+                        #   --If no range is matched(which should never happen--but just in case--we still have our default value
+                        for index, range_set in enumerate(final_class_list):
+                            logger.info(float(range_set['min']))
+                            logger.info(float(range_set['max']))
+                            if val >= float(range_set['min']) and val <= float(range_set['max']):
+                                value['color'] = range_set['color']
+                                logger.info("FOUND A RANGE ^^")
+                            if (index+1) == len(final_class_list) and value['color'] == "rgba(0,0,0,0)": 
+                                issues.append("Issue: The value '" + str(val) + "' for pk=" +key+ " Form didn't match the provided ranges")
+                    except Exception as e: logger.warning(e)
+                #If the requested frat isn't the user's project, and flagged as being inaccessible then stop the request
+                if frat.project.pk != request.user.permissions.project.pk and (frat.flagged_for_deletion == True or frat.is_public == False): ERROR_MESSAGE += "Error: You are attempting to access records that don't exist. This probably occurred because your client attempted altering the POST data before sending"
+                else:#Otherwise we are in the clear so grab the list and return it
+                    #Return the JSON response
+                    finalJSON = json.dumps(finalJSON)
+                    return HttpResponse(finalJSON, content_type="application/json")
+                   
+                
+            else: ERROR_MESSAGE += "Error: You have not submitted through POST"
+            
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying user information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")    
+
+        
+    #=======================================================#
+    #   ACCESS LEVEL :  1      GET_GEO_NUMERIC_RTYPES *RECYCLING
+    #=======================================================#   
+    def get_geo_numeric_rtypes(self, request):
+        #***************#
+        ACCESS_LEVEL = 1
+        #***************#            
+        
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This Endpoint returns a list of all rtypes (FRATS) for a provided formtype pk if their "is_numeric" flag is set to TRUE.
+        
+        
+        ERROR_MESSAGE = ""
+        
+        #Check our user's session and access level
+        if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
+        
+            #We need to return a json list of all formtype RTYPES that match the provided formtype pk
+            if request.method == "POST":
+                #Grab the formtype
+                currentFormType = FormType.objects.get(pk=request.POST['formtype_pk'])
+                #If the requested formtype isn't the user's project, and flagged as being inaccessible then stop the request
+                if currentFormType.project.pk != request.user.permissions.project.pk and (currentFormType.flagged_for_deletion == True or currentFormType.is_public == False):
+                    ERROR_MESSAGE += "Error: You are attempting to access records that don't exist. This probably occurred because your client attempted altering the POST data before sending"
+                #Otherwise we are in the clear so grab the list and return it
+                else:
+                    finalJSON = {}
+                    rtypeList = []    
+                    #Don't filter out the public flags if this formtype is the users project--if it's not then absolutely use the is_public flags
+                    if currentFormType.project.pk == request.user.permissions.project.pk:          
+                        #***RECYCLING BIN***  Make sure that the returned FRAT AND FRRTS are filtered by their deletion flags. Don't want them returned in the query
+                        for FRAT in currentFormType.formrecordattributetype_set.all().filter(flagged_for_deletion=False, is_numeric=True):
+                            currentRTYPE = {}
+                            currentRTYPE['label'] = FRAT.record_type
+                            currentRTYPE['pk'] = FRAT.pk
+                            currentRTYPE['rtype'] = 'FRAT'
+                            rtypeList.append(currentRTYPE)
+
+                    else:
+                        #***RECYCLING BIN***  Make sure that the returned FRAT AND FRRTS are filtered by their deletion flags. Don't want them returned in the query
+                        for FRAT in currentFormType.formrecordattributetype_set.all().filter(flagged_for_deletion=False, is_public=True, is_numeric=True):
+                            currentRTYPE = {}
+                            currentRTYPE['label'] = FRAT.record_type
+                            currentRTYPE['pk'] = FRAT.pk
+                            currentRTYPE['rtype'] = 'FRAT'
+                            rtypeList.append(currentRTYPE)
+
+                   
+                    #sort our rtype list by the label
+                    rtypeList = sorted(rtypeList, key=lambda k: k['label']) 
+                    
+                    #Return the JSON response
+                    finalJSON['rtype_list'] = rtypeList
+                    finalJSON = json.dumps(finalJSON)
+                    return HttpResponse(finalJSON, content_type="application/json" )
+                    
+
+            else: ERROR_MESSAGE += "Error: You have not submitted through POST"
+            
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying user information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")    
+
+    #=======================================================#
+    #   ACCESS LEVEL :  1      GET_GEO_GRADUATED_APPLIED_CLASSES *RECYCLING
+    #=======================================================#   
+    def get_geo_graduated_applied_classes(self, request):
+        #***************#
+        ACCESS_LEVEL = 1
+        #***************#            
+        
+        #----------------------------------------------------------------------------------------------------------------------------
+        #  
+        
+        
+        ERROR_MESSAGE = ""
+        
+        #Check our user's session and access level
+        if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
+        
+            #We need to return a json list of all formtype RTYPES that match the provided formtype pk
+            if request.method == "POST":
+                #Grab the formtype
+                currentFormType = FormType.objects.get(pk=request.POST['formtype_pk'])
+                rtype_code = request.POST['rtype_code']
+                class_list = json.loads(request.POST['class_list'])
+                issues = []
+                #If the requested formtype isn't the user's project, and flagged as being inaccessible then stop the request
+                if currentFormType.project.pk != request.user.permissions.project.pk and (currentFormType.flagged_for_deletion == True or currentFormType.is_public == False):
+                    ERROR_MESSAGE += "Error: You are attempting to access records that don't exist. This probably occurred because your client attempted altering the POST data before sending"
+                #Otherwise we are in the clear so grab the list and return it
+                else:
+                    rtype, rtype_pk = rtype_code.split('-')
+                    if rtype == "FRAT":  
+                        form_list = {}
+                        for form in currentFormType.form_set.all():
+                            value = form.formrecordattributevalue_set.filter(record_attribute_type__pk=rtype_pk)
+                            if value.exists(): value = value[0].record_value
+                            else: value = ""
+                            new_class = {}
+                            new_class['color'] = "rgba(0,0,0,0)"
+                            new_class['value'] = value
+                            #Now let's make sure that our 'value' is a proper number--if not just add our defaults for this form and move to the next
+                            try:
+                                value = float(value)                            
+                                # Now loop through our classes and determine which one this value falls in
+                                #   --If no range is matched(which should never happen--but just in case--we still have our default value
+                                for index, range_set in enumerate(class_list):
+                                    if value >= float(range_set['min']) and value <= float(range_set['max']):                                    
+                                        new_class['color'] = range_set['color']
+                                        logger.info("FOUND A RANGE ^^")
+                                    if (index+1) == len(class_list) and value['color'] == "rgba(0,0,0,0)": 
+                                        issues.append("Issue: The value '" + str(val) + "' for pk=" +key+ " Form didn't match the provided ranges")
+                            except: pass
+
+                            form_list[form.pk] = new_class
+                            
+                        #Send off our completed query
+                        finalJSON = {}
+                        finalJSON['issues'] = issues
+                        finalJSON['form_list'] = form_list                    
+                        finalJSON = json.dumps(finalJSON)
+                        return HttpResponse(finalJSON, content_type="application/json" )                        
+            else: ERROR_MESSAGE += "Error: You have not submitted through POST"
+            
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying user information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")    
 
 
-   
-    
+    #=======================================================#
+    #   ACCESS LEVEL :  1      GET_GEO_RULES_CLASSES *RECYCLING
+    #=======================================================#   
+    def get_geo_rules_classes(self, request):
+        #***************#
+        ACCESS_LEVEL = 1
+        #***************#            
+        
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This Endpoint returns a list of all forms of a given formtype with a corresponding color to a provided class if it matches
+        #   
+        #   --This is incredibly similar to how the master query engine works, but we aren't ripping out a series of counts. We are ripping
+        #   ----what amounts to a T/F value for each form in the formtype. It goes by order--so the last class checked will overwrite any
+        #   ----previous class tested, so ordering is VERY important, e.g. if a Form is tested for two rules checking for different things
+        #   ----but it matches both classes, the latter test will we the test that is returned in the JSON response rather than the former.
+        #
+        #   --Esentially we will loop through each provided class in the POST data, and run a Django query for each rule or "filter" in Django
+        #   ----terms. It will either exists()  or not. If it does not, it's skipped, otherwise it's given the corresponding color of the class
+        #   ----checked.
+        #
+        #   --This will be slightly less complicated than the master query engine, A: I'm better at coding this system, and B: It's not returning
+        #   ----a dense list of forms etc. It's only returning simplified and necessary information.
+        #
+        #   We should have 'formtype_pk'  'class_list'  in our POST data
+        
+        
+        ERROR_MESSAGE = ""
+        
+        #Check our user's session and access level
+        if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
+        
+            #We need to return a json list of all formtype RTYPES that match the provided formtype pk
+            if request.method == "POST":
+                logger.info(request.POST)
+                #Grab the formtype
+                currentFormType = FormType.objects.get(pk=request.POST['formtype_pk'])
+                class_list = json.loads(request.POST['class_list'])
+                issues = []
+                form_list = {}
+                #If the requested formtype isn't the user's project, and flagged as being inaccessible then stop the request
+                if currentFormType.project.pk != request.user.permissions.project.pk and (currentFormType.flagged_for_deletion == True or currentFormType.is_public == False):
+                    ERROR_MESSAGE += "Error: You are attempting to access records that don't exist. This probably occurred because your client attempted altering the POST data before sending"
+                #Otherwise we are in the clear so grab the list and return it
+                else:
+                    #Start looping through our classes and performing the queries, THIS is where the real logic occurs
+                    for aClass in class_list:
+                        class_color = aClass['color']
+                        master_form_set = currentFormType.form_set.all()
+                        #Now let's loop through each of our constraints
+                        #We'll setup a quick counter so we skip the andor of the first constraint(it's disabled and moot)
+                        counter = 0
+                        for constraint in aClass['constraints']:
+                            RTYPE, RTYPE_PK = constraint['RTYPE'].split('-')
+                            QCODE = constraint['QCODE']
+                            ANDOR = constraint['ANDOR']
+                            RVAL  = constraint['RVAL']
+                            forms = currentFormType.form_set.all()
+                            logger.info(RVAL)
+                            if   RTYPE == "FRAT":
+                                if QCODE == "contains":     forms = forms.filter(   formrecordattributevalue__record_attribute_type__pk=RTYPE_PK, formrecordattributevalue__record_value__icontains=RVAL)
+                                if QCODE == "contains(cs)": forms = forms.filter(   formrecordattributevalue__record_attribute_type__pk=RTYPE_PK, formrecordattributevalue__record_value__contains=RVAL)
+                                if QCODE == "exact":        forms = forms.filter(   formrecordattributevalue__record_attribute_type__pk=RTYPE_PK, formrecordattributevalue__record_value__exact=RVAL)
+                                if QCODE == "excludes":     forms = forms.exclude(  formrecordattributevalue__record_attribute_type__pk=RTYPE_PK, formrecordattributevalue__record_value__icontains=RVAL)
+                                if QCODE == "null":         forms = forms.filter(Q( formrecordattributevalue__record_attribute_type__pk=RTYPE_PK), Q(formrecordattributevalue__record_value__exact="") | Q(formrecordattributevalue__record_value__isnull) | Q(formrecordattributevalue__record_value__exact=" ")) #Tests for NULL, "" and " " for more reliable redundancy
+                            elif RTYPE == "FRRT_ID":
+                                if QCODE == "contains":     forms = forms.filter(  ref_to_parent_form__record_reference_type__pk=RTYPE_PK, ref_to_parent_form__record_reference__form_name__icontains=RVAL)
+                                if QCODE == "contains(cs)": forms = forms.filter(  ref_to_parent_form__record_reference_type__pk=RTYPE_PK, ref_to_parent_form__record_reference__form_name__contains=RVAL)
+                                if QCODE == "exact":        forms = forms.filter(  ref_to_parent_form__record_reference_type__pk=RTYPE_PK, ref_to_parent_form__record_reference__form_name__exact=RVAL)
+                                if QCODE == "excludes":     forms = forms.exclude( ref_to_parent_form__record_reference_type__pk=RTYPE_PK, ref_to_parent_form__record_reference__form_name__icontains=RVAL)
+                                if QCODE == "null":         forms = forms.filter(Q(ref_to_parent_form__record_reference_type__pk=RTYPE_PK), Q(ref_to_parent_form__record_reference__form_name__exact="") | Q(ref_to_parent_form__record_reference__form_name__isnull) | Q(ref_to_parent_form__record_reference__form_name__exact=" ")) #Tests for NULL, "" and " " for more reliable redundancy
+                            elif RTYPE == "DEEP_FRAT":
+                                DEEP_PK, PARENT_PK = RTYPE_PK.split(',')
+                                deep_frat = FormRecordAttributeType.objects.get(pk=DEEP_PK)
+                                deep_parent_forms = deep_frat.form_type.form_set.all()
+                                #--So we first look up ALL the forms that have an RVAL that: both matches our provided value && AND &&  have an RTYPE that matches the provided PK(Our Deep PK)
+                                #--We only need a flattened list of the PKS
+                                if QCODE == "contains":     deep_frat_matches = list(deep_parent_forms.filter(  formrecordattributevalue__record_attribute_type__pk=DEEP_PK, formrecordattributevalue__record_value__icontains=RVAL, ).values_list('pk', flat=True))
+                                if QCODE == "contains(cs)": deep_frat_matches = list(deep_parent_forms.filter(  formrecordattributevalue__record_attribute_type__pk=DEEP_PK, formrecordattributevalue__record_value__contains=RVAL, ).values_list('pk', flat=True))
+                                if QCODE == "exact":        deep_frat_matches = list(deep_parent_forms.filter(  formrecordattributevalue__record_attribute_type__pk=DEEP_PK, formrecordattributevalue__record_value__xact=RVAL, ).values_list('pk', flat=True))
+                                if QCODE == "excludes":     deep_frat_matches = list(deep_parent_forms.exclude( formrecordattributevalue__record_attribute_type__pk=DEEP_PK, formrecordattributevalue__record_value__icontains=RVAL).values_list('pk', flat=True))
+                                if QCODE == "null":         deep_frat_matches = list(deep_parent_forms.filter(Q(formrecordattributevalue__record_attribute_type__pk=DEEP_PK), Q(formrecordattributevalue__record_value__isnull) | Q(formrecordattributevalue__record_value__exact="") | Q(formrecordattributevalue__record_value__exact=" ")).values_list('pk', flat=True))
+                                #NOW we get all of our parent formtype's forms, and check to see which ones have FRRVs with matching PK references and that match our parent FRRT
+                                #   **If we don't check for the original FRRT, then forms that have two different FRRTs referencing the same FormType in question, will falsely be queried.
+                                #   **We ONLY want the FRRT of the Parent FormType to look for cross matches--not ANY FRRT
+                                forms = forms.filter(ref_to_parent_form__record_reference__pk__in=deep_frat_matches, ref_to_parent_form__record_reference_type__pk=PARENT_PK)
+                            elif RTYPE == "DEEP_FRRT":
+                                DEEP_PK, PARENT_PK = RTYPE_PK.split(',')
+                                #This is kind of ingenious--compared to how I handled it originally with the master query engine
+                                #--So we first look up ALL the forms that have an RVAL that: both matches our provided value && AND &&  have an RTYPE that matches the provided PK(Our Deep PK)
+                                #--We only need a flattened list of the PKS
+                                if QCODE == "contains":     deep_frrt_matches = list(Form.objects.all().filter(  ref_to_parent_form__record_reference_type__pk=DEEP_PK, ref_to_parent_form__record_reference__form_name__icontains=RVAL, ).values_list('pk', flat=True))
+                                if QCODE == "contains(cs)": deep_frrt_matches = list(Form.objects.all().filter(  ref_to_parent_form__record_reference_type__pk=DEEP_PK, ref_to_parent_form__record_reference__form_name__contains=RVAL, ).values_list('pk', flat=True))
+                                if QCODE == "exact":        deep_frrt_matches = list(Form.objects.all().filter(  ref_to_parent_form__record_reference_type__pk=DEEP_PK, ref_to_parent_form__record_reference__form_name__exact=RVAL, ).values_list('pk', flat=True))
+                                if QCODE == "excludes":     deep_frrt_matches = list(Form.objects.all().exclude( ref_to_parent_form__record_reference_type__pk=DEEP_PK, ref_to_parent_form__record_reference__form_name__icontains=RVAL).values_list('pk', flat=True))
+                                if QCODE == "null":         deep_frrt_matches = list(Form.objects.all().filter(Q(ref_to_parent_form__record_reference_type__pk=DEEP_PK), Q(ref_to_parent_form__record_reference__form_name__isnull) | Q(ref_to_parent_form__record_reference__form_name__exact="") | Q(ref_to_parent_form__record_reference__form_name__exact=" ")).values_list('pk', flat=True))
+                                #NOW we get all of our parent formtype's forms, and check to see which ones have FRRVs with matching PK references and that match our parent FRRT
+                                #   **If we don't check for the original FRRT, then forms that have two different FRRTs referencing the same FormType in question, will falsely be queried.
+                                #   **We ONLY want the FRRT of the Parent FormType to look for cross matches--not ANY FRRT
+                                forms = forms.filter(ref_to_parent_form__record_reference__pk__in=deep_frrt_matches, ref_to_parent_form__record_reference_type__pk=PARENT_PK)
+                            elif RTYPE == "FORM_ID":
+                                if QCODE == "contains":     forms = forms.filter(  form_name__icontains=RVAL)
+                                if QCODE == "contains(cs)": forms = forms.filter(  form_name__contains=RVAL)
+                                if QCODE == "exact":        forms = forms.filter(  form_name__exact=RVAL)
+                                if QCODE == "excludes":     forms = forms.exclude( form_name__icontains=RVAL)
+                                if QCODE == "null":         forms = forms.filter(Q(form_name__contains="") | Q(form_name__isnull) | Q(form_name__contains=" ")) #Tests for NULL, "" and " " for more reliable redundancy                                 
+                            elif RTYPE == "BACK_FRRT": #(Or Form IDs that reference this formtype)
+                                back_frrt = FormRecordReferenceType.objects.get(pk=RTYPE_PK)
+                                back_parent_forms = back_frrt.form_type_parent.form_set.all()
+                                if QCODE == "contains":     back_frrt_matches = list( back_parent_forms.filter(  form_name__icontains=RVAL).values_list('pk', flat=True))
+                                if QCODE == "contains(cs)": back_frrt_matches = list( back_parent_forms.filter(  form_name__contains=RVAL).values_list('pk', flat=True))
+                                if QCODE == "exact":        back_frrt_matches = list( back_parent_forms.filter(  form_name__exact=RVAL).values_list('pk', flat=True))
+                                if QCODE == "excludes":     back_frrt_matches = list( back_parent_forms.exclude( form_name__icontains=RVAL).values_list('pk', flat=True))
+                                if QCODE == "null":         back_frrt_matches = list( back_parent_forms.filter(Q(form_name__contains="") | Q(form_name__isnull) | Q(form_name__contains=" ")).values_list('pk', flat=True)) #Tests for NULL, "" and " " for more reliable redundancy   
+                                forms = forms.filter(ref_to_value_form__form_parent__pk__in=back_frrt_matches, ref_to_value_form__record_reference_type__pk=RTYPE_PK)              
+                            elif RTYPE == "BACK_DEEP_FRAT":
+                                BACK_FRAT_PK, FRRT_PK = RTYPE_PK.split(',')
+                                back_frat = FormRecordAttributeType.objects.get(pk=BACK_FRAT_PK)
+                                back_parent_forms = back_frat.form_type.form_set.all()
+                                #Get our list of form PKs that have matches to our submitted value
+                                if QCODE == "contains":     back_frat_matches = list(back_parent_forms.filter(  formrecordattributevalue__record_attribute_type__pk=BACK_FRAT_PK, formrecordattributevalue__record_value__icontains=RVAL).values_list('pk', flat=True))
+                                if QCODE == "contains(cs)": back_frat_matches = list(back_parent_forms.filter(  formrecordattributevalue__record_attribute_type__pk=BACK_FRAT_PK, formrecordattributevalue__record_value__contains=RVAL).values_list('pk', flat=True))
+                                if QCODE == "exact":        back_frat_matches = list(back_parent_forms.filter(  formrecordattributevalue__record_attribute_type__pk=BACK_FRAT_PK, formrecordattributevalue__record_value__exact=RVAL).values_list('pk', flat=True))
+                                if QCODE == "excludes":     back_frat_matches = list(back_parent_forms.exclude( formrecordattributevalue__record_attribute_type__pk=BACK_FRAT_PK, formrecordattributevalue__record_value__icontains=RVAL).values_list('pk', flat=True))
+                                if QCODE == "null":         back_frat_matches = list(back_parent_forms.filter(Q(formrecordattributevalue__record_attribute_type__pk=BACK_FRAT_PK), Q(formrecordattributevalue__record_value__isnull) | Q(formrecordattributevalue__record_value__exact="") | Q(formrecordattributevalue__record_value__exact=" ")).values_list('pk', flat=True))
+                                #Now we have to go backwards through the parent formtype form set and similarly to deep frats do the same thing--but through the alternate 'ref_to_value_form' table rather than the 'ref_to_parent_form' table
+                                #!!!!!TODO!!!!!  I'm doing this slightly different from past BACK queries--before I looped through each of the above forms, and stored their list of PKs in the FRRT linking back to our parent formtype
+                                #******I'm not sure if this way is fast or not--but it does look cleaner at least. 
+                                forms = forms.filter(ref_to_value_form__form_parent__pk__in=back_frat_matches, ref_to_value_form__record_reference_type__pk=FRRT_PK)
+                            elif RTYPE == "BACK_DEEP_FRRT":  
+                                BACK_FRRT_PK, FRRT_PK = RTYPE_PK.split(',')
+                                back_frrt = FormRecordReferenceType.objects.get(pk=BACK_FRRT_PK)
+                                back_parent_forms = back_frrt.form_type_parent.form_set.all()
+                                #Get our list of form PKs that have matches to our submitted value                            
+                                if QCODE == "contains":     back_frrt_matches = list(Form.objects.all().filter(  ref_to_parent_form__record_reference_type__pk=BACK_FRRT_PK, ref_to_parent_form__record_reference__form_name__icontains=RVAL, ).values_list('pk', flat=True))
+                                if QCODE == "contains(cs)": back_frrt_matches = list(Form.objects.all().filter(  ref_to_parent_form__record_reference_type__pk=BACK_FRRT_PK, ref_to_parent_form__record_reference__form_name__contains=RVAL, ).values_list('pk', flat=True))
+                                if QCODE == "exact":        back_frrt_matches = list(Form.objects.all().filter(  ref_to_parent_form__record_reference_type__pk=BACK_FRRT_PK, ref_to_parent_form__record_reference__form_name__exact=RVAL, ).values_list('pk', flat=True))
+                                if QCODE == "excludes":     back_frrt_matches = list(Form.objects.all().exclude( ref_to_parent_form__record_reference_type__pk=BACK_FRRT_PK, ref_to_parent_form__record_reference__form_name__icontains=RVAL).values_list('pk', flat=True))
+                                if QCODE == "null":         back_frrt_matches = list(Form.objects.all().filter(Q(ref_to_parent_form__record_reference_type__pk=BACK_FRRT_PK), Q(ref_to_parent_form__record_reference__form_name__isnull) | Q(ref_to_parent_form__record_reference__form_name__exact="") | Q(ref_to_parent_form__record_reference__form_name__exact=" ")).values_list('pk', flat=True))
+                                #Now we have to go backwards through the parent formtype form set and similarly to deep frrts do the same thing--but through the alternate 'ref_to_value_form' table rather than the 'ref_to_parent_form' table
+                                #!!!!!TODO!!!!!  I'm doing this slightly different from past BACK queries--before I looped through each of the above forms, and stored their list of PKs in the FRRT linking back to our parent formtype
+                                #******I'm not sure if this way is fast or not--but it does look cleaner at least. 
+                                logger.info(back_frrt_matches)
+                                forms = forms.filter(ref_to_value_form__form_parent__pk__in=back_frrt_matches, ref_to_value_form__record_reference_type__pk=FRRT_PK)                            
+                            logger.info(forms)
+                            
+                            #Now figure out if we're in the first loop or not--if we are, there is no AND/OR qualifier, otherwise add it
+                            if counter == 0: master_form_set = forms
+                            else:
+                                if   ANDOR == "AND": master_form_set = master_form_set.intersection(forms)
+                                elif ANDOR == "OR" : master_form_set = master_form_set.union(forms)
+                            counter += 1
+                        #Once we've fininshed building our master list of queried forms--let's see if it exists
+                        #If there are hits in the database, then let's get a flattened list of those Form PKs and add them to our dictionary
+                        #--with the corresponding class color, otherwise do nothing
+                        if master_form_set.exists():
+                            form_pks = master_form_set.values_list('pk',flat=True)
+                            for pk in form_pks: form_list[pk] = {"color":class_color, "value":""}
+                    #Send off our completed query
+                    finalJSON = {}
+                    finalJSON['issues'] = issues
+                    finalJSON['form_list'] = form_list                    
+                    finalJSON = json.dumps(finalJSON)
+                    return HttpResponse(finalJSON, content_type="application/json" )                        
+            else: ERROR_MESSAGE += "Error: You have not submitted through POST"
+            
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying user information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")    
+
+
+
+
+
+
+
+
+
+
+
+        
     ##==========================================================================================================================    
     #  ADMIN DJANGO VIEWS   ****************************************************************************************************
     ##==========================================================================================================================    
@@ -7345,16 +7863,16 @@ class MyAdminSite(AdminSite):
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
         
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/view_form_type.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/view_form_type.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request)))            
+        return render(request, 'maqluengine/admin_error.html', kwargs)            
  
     #=====================================================================================#
     #   ACCESS LEVEL :  1    TEMPLATE_ACCESS_LEVEL : 3   QUERY_FORM_TYPE() *RECYCLING
@@ -7404,16 +7922,16 @@ class MyAdminSite(AdminSite):
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
         
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/query_form_type.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/query_form_type.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request)))            
+        return render(request, 'maqluengine/admin_error.html', kwargs)            
 
      #=====================================================================================#
     #   ACCESS LEVEL :  1    TEMPLATE_ACCESS_LEVEL : 3   MASTER_QUERY_ENGINE() *RECYCLING
@@ -7459,16 +7977,16 @@ class MyAdminSite(AdminSite):
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
         
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/master_query_engine.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/master_query_engine.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request)))            
+        return render(request, 'maqluengine/admin_error.html', kwargs)            
 
 
     #=====================================================================================#  
@@ -7510,16 +8028,16 @@ class MyAdminSite(AdminSite):
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
             
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/geojson_importer.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/geojson_importer.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request)))     
+        return render(request, 'maqluengine/admin_error.html', kwargs)     
         
     #=====================================================================================#  
     #   ACCESS LEVEL :  4   TEMPLATE_ACCESS_LEVEL : 4    FORM_TYPE_IMPORTER()
@@ -7560,16 +8078,16 @@ class MyAdminSite(AdminSite):
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
             
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/new_formtype_importer.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/new_formtype_importer.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request)))        
+        return render(request, 'maqluengine/admin_error.html', kwargs)        
         
     #=====================================================================================#  
     #   ACCESS LEVEL :  4   TEMPLATE_ACCESS_LEVEL : 4    FORMTYPE_FORM_IMPORTER()
@@ -7611,16 +8129,16 @@ class MyAdminSite(AdminSite):
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
             
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/formtype_form_importer.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/formtype_form_importer.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request)))        
+        return render(request, 'maqluengine/admin_error.html', kwargs)        
                   
     #=====================================================================================#  
     #   ACCESS LEVEL :  4   TEMPLATE_ACCESS_LEVEL : 4    RTYPE_TYPE_IMPORTER()
@@ -7660,16 +8178,16 @@ class MyAdminSite(AdminSite):
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
             
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/new_rtype_importer.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/new_rtype_importer.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request)))                
+        return render(request, 'maqluengine/admin_error.html', kwargs)                
 
         
     #=====================================================================================#  
@@ -7712,16 +8230,16 @@ class MyAdminSite(AdminSite):
         else: 
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
             
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/project_control_panel.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/project_control_panel.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request)))     
+        return render(request, 'maqluengine/admin_error.html', kwargs)     
         
     #=====================================================================================#
     #   ACCESS LEVEL :  3    TEMPLATE_ACCESS_LEVEL : 3   EDIT_FORM_TYPE() *RECYCLING
@@ -7765,16 +8283,16 @@ class MyAdminSite(AdminSite):
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
         
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/edit_form_type.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/edit_form_type.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request))) 
+        return render(request, 'maqluengine/admin_error.html', kwargs) 
 
         
     #=====================================================================================#
@@ -7812,16 +8330,16 @@ class MyAdminSite(AdminSite):
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
 
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/new_form_type.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/new_form_type.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"        
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request))) 
+        return render(request, 'maqluengine/admin_error.html', kwargs) 
 
     #=====================================================================================#
     #   ACCESS LEVEL :  1    TEMPLATE_ACCESS_LEVEL : 2   EDIT_FORM() *RECYCLING
@@ -7883,16 +8401,16 @@ class MyAdminSite(AdminSite):
             kwargs.update({'deletable': 'True'})
         else:
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
 
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/edit_form.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/edit_form.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"        
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request))) 
+        return render(request, 'maqluengine/admin_error.html', kwargs) 
 
         
     #=====================================================================================#
@@ -7935,16 +8453,16 @@ class MyAdminSite(AdminSite):
             kwargs.update({'deletable': 'False'})
         else:
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
 
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/new_form.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/new_form.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"        
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request))) 
+        return render(request, 'maqluengine/admin_error.html', kwargs) 
 
     #=====================================================================================#
     #   ACCESS LEVEL :  2    TEMPLATE_ACCESS_LEVEL : 2  EDIT_FORM_TYPE_TEMPLATE()  *RECYCLING
@@ -7984,16 +8502,16 @@ class MyAdminSite(AdminSite):
             kwargs.update({'deletable': 'False'})
         else:
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
 
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/edit_formtype_template.html', kwargs, RequestContext(request)))    
+            return render(request,'maqluengine/edit_formtype_template.html', kwargs)   
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"        
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request))) 
+        return render(request, 'maqluengine/admin_error.html', kwargs) 
 
     #=====================================================================================#
     #   ACCESS LEVEL :  5    TEMPLATE_ACCESS_LEVEL : 5  RECYCLING_BIN()  
@@ -8028,16 +8546,16 @@ class MyAdminSite(AdminSite):
             kwargs.update({'deletable': 'False'})   
         else:
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
 
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/recycling_bin.html', kwargs, RequestContext(request)))    
+            return render(request, 'maqluengine/recycling_bin.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"        
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request))) 
+        return render(request, 'maqluengine/admin_error.html', kwargs) 
 
         
     #=====================================================================================#
@@ -8084,16 +8602,16 @@ class MyAdminSite(AdminSite):
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
-            return HttpResponse(render_to_response('maqluengine/admin_warning.html', kwargs, RequestContext(request)))
+            return render(request, 'maqluengine/admin_warning.html', kwargs)
         
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):        
-            return HttpResponse(render_to_response('maqluengine/geospatial_engine.html', kwargs, RequestContext(request)))    
+            return render(request,'maqluengine/geospatial_engine.html', kwargs)    
         else: ERROR_MESSAGE += "Error: You do not have permission to view this page"
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
-        return HttpResponse(render_to_response('maqluengine/admin_error.html', kwargs, RequestContext(request)))            
+        return render(request, 'maqluengine/admin_error.html', kwargs)            
          
 
     ##==========================================================================================================================    
@@ -8151,7 +8669,10 @@ class MyAdminSite(AdminSite):
             url(r'^get_form_search_list/$', admin.site.admin_view(self.get_form_search_list), name='get_form_search_list'),
             url(r'^get_all_unique_rtype_rvals/$', admin.site.admin_view(self.get_all_unique_rtype_rvals), name='get_all_unique_rtype_rvals'),                
             url(r'^get_geo_category_matches/$', admin.site.admin_view(self.get_geo_category_matches), name='get_geo_category_matches'),
-            
+            url(r'^get_geo_quantity_frat_counter_auto/$', admin.site.admin_view(self.get_geo_quantity_frat_counter_auto), name='get_geo_quantity_frat_counter_auto'),
+            url(r'^get_geo_numeric_rtypes/$', admin.site.admin_view(self.get_geo_numeric_rtypes), name='get_geo_numeric_rtypes'),
+            url(r'^get_geo_graduated_applied_classes/$', admin.site.admin_view(self.get_geo_graduated_applied_classes), name='get_geo_graduated_applied_classes'),
+            url(r'^get_geo_rules_classes/$', admin.site.admin_view(self.get_geo_rules_classes), name='get_geo_rules_classes'),
             # All Endpoints that run tools non-database-modification tools
             url(r'^run_query_engine/$', admin.site.admin_view(self.run_query_engine), name='run_query_engine'),
             url(r'^run_master_query_engine/$', admin.site.admin_view(self.run_master_query_engine), name='run_master_query_engine'),

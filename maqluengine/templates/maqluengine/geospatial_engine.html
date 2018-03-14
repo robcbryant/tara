@@ -6,7 +6,7 @@
 {% block title %}Maqlu Engine&nbsp;&nbsp;-&nbsp;&nbsp;{{project}}&nbsp;&nbsp;:&nbsp;&nbsp;{{formtype}}&nbsp;&nbsp;:&nbsp;&nbsp;{{form}}{% endblock %}
 
 
-{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+{% block branding %}{% endblock %}
 
 {% block breadcrumbs %}
     {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}
@@ -23,7 +23,7 @@
     
         <!-- This panel is the side column for listing available form types -->
         <div id="left-pane" class="col-md-2">
-            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                              
+            {% include "maqluengine/admin_side_bar.html" with csrf_token=csrf_token deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                              
         </div>
          
         <div id="center-pane" class="col-md-10">
@@ -87,13 +87,14 @@
                     
                         <div class="map-footer-stats">
                         </div>
-                    
+                        
+                        <!-- RIGHT SIDE BAR FOR DETAILS ---------------------------------------------------------------------------------------------------->                    
+                        <div class="details-side-pane" style="display:none;">
+                        
+                        </div>
                     </div>
                     
-                    <!-- RIGHT SIDE BAR FOR DETAILS ---------------------------------------------------------------------------------------------------->                    
-                    <div class="details-side-pane">
-                    
-                    </div>
+
                     
                 </div>
             </div>
@@ -171,6 +172,17 @@
     <input type="color" class="class-color"></input>
 </div> 
 
+
+
+<div class="class-entry-graduated TEMPLATE" style="display:none;">
+    <button type="button" class="btn class-remove"><span class="glyphicon glyphicon-remove"></span></button>
+    <div>Min</div>
+    <input class="class-min"></input>
+    <div>Max</div>
+    <input class="class-max"></input>
+    <input type="color" class="class-color"></input>
+</div> 
+
 <div class="layer-symbology-panel TEMPLATE" style="display:none;"> 
     
     <div class="layer-tab"></div>
@@ -178,6 +190,7 @@
     <div class="tab-buttons">
         <div class="single tab-btn btn ACTIVE" onclick="switchClassificationTab(this)">Single Classification</div>
         <div class="category tab-btn btn" onclick="switchClassificationTab(this)">Categorical Classification</div>
+        <div class="graduated tab-btn btn" onclick="switchClassificationTab(this)">Graduated Classification</div>
         <div class="quantity tab-btn btn" onclick="switchClassificationTab(this)">Quantities Classification</div>
     </div>
     
@@ -198,15 +211,15 @@
     
     <div class="tab-panel category" style="display:none;">
 
-        <div class="layer-opacity"><span> Layer Opacity (%)</span><input class="fill-transparency" type="text" value="100"></input></div>
+        <div class="panel-input layer-opacity"><span> Layer Opacity (%)</span><input class="fill-transparency" type="text" value="100"></input></div>
         <div class="rtype-list">
-            <div class="rtype-select-title">Choose a Record Type</div>
-            <select class="rtype-select"><option>Testing</option></select>
+            <div class="rtype-select-title">Record Type</div>
+            <select class="rtype-select non-graduated"><option>Testing</option></select>
         </div>
         <div class="category-buttons">
-            <button class="btn apply-gradient" type="button">Apply Gradient</button>
-            <button class="btn auto-classifications" type="button">Auto-Classify</button>
-            <button class="btn apply-classifications" type="button">Apply Classes</button>
+            <button class="btn btn-left apply-gradient" type="button">Apply Gradient</button>
+            <button class="btn btn-center auto-classifications" type="button">Auto-Classify</button>
+            <button class="btn btn-right apply-classifications" type="button">Apply Classes</button>
         </div>
         
         <div class="classification-options-title">Classification Options<div class="btn add-class"><span class="glyphicon glyphicon-plus"></span></div></div>
@@ -229,12 +242,132 @@
         </div>    
     </div>
     
-    <div class="tab-panel quantity" style="display:none;">
-        QUANTITY
+    <div class="tab-panel graduated" style="display:none;">
+
+        <div class="rtype-list">
+            <div class="rtype-select-title">Record Type</div>
+            <select class="rtype-select graduated"><option>Testing</option></select>
+        </div>
+        <div class="panel-input layer-opacity"><span> Layer Opacity (%)</span><input class="fill-transparency" type="text" value="100"></input></div>
+        <div class="panel-input num-of-classes"><span> # of Classes</span><input class="fill-transparency" type="text" value="10"></input></div>
+        <div class="category-buttons">
+            <button class="btn btn-left apply-gradient" type="button">Apply Gradient</button>
+            <button class="btn btn-center auto-graduated-classification" type="button">Auto-Classify</button>
+            <button class="btn btn-right apply-graduated-classifications" type="button">Apply Classes</button>
+        </div>
+        
+        <div class="classification-options-title">Classification Options<div class="btn add-class"><span class="glyphicon glyphicon-plus"></span></div></div>
+        
+        <div class="classification-options">
+            
+            <div class="classification-color-ramp">
+                <button class="btn random-gradient" type="button" title="Randomize Gradient"><span class="glyphicon glyphicon-random"></span></button>
+                <input type="color" class="color-one" onchange="updateClassGradientBar(this)"></input>
+                <div class="color-gradient A"></div>
+                <input type="color" class="color-two" onchange="updateClassGradientBar(this)"></input>
+                <div class="color-gradient B"></div>
+                <input type="color" class="color-three" onchange="updateClassGradientBar(this)"></input>
+            </div>
+            
+            <div class="class-list">
+
+            </div>
+        
+        </div>    
     </div>
     
+    <div class="tab-panel rules" style="display:none;">
+        <div class="panel-input layer-opacity"><span> Layer Opacity (%)</span><input class="fill-transparency" type="text" value="100"></input></div>
+        <div class="panel-input layer-opacity"><span> # of Classes</span><input class="fill-transparency" type="text" value="100"></input></div>
+        <div class="category-buttons">
+            <button class="btn btn-left apply-gradient" type="button">Apply Gradient</button>
+            <button class="btn btn-right apply-rules-classifications" type="button">Apply Classes</button>
+        </div>
+        
+        <div class="classification-options-title">Classification Options<div class="btn add-class"><span class="glyphicon glyphicon-plus"></span></div></div>
+        
+        <div class="classification-options">
+            
+            <div class="classification-color-ramp">
+                <button class="btn random-gradient" type="button" title="Randomize Gradient"><span class="glyphicon glyphicon-random"></span></button>
+                <input type="color" class="color-one" onchange="updateClassGradientBar(this)"></input>
+                <div class="color-gradient A"></div>
+                <input type="color" class="color-two" onchange="updateClassGradientBar(this)"></input>
+                <div class="color-gradient B"></div>
+                <input type="color" class="color-three" onchange="updateClassGradientBar(this)"></input>
+            </div>
+            
+
+            <div class="class-list">
+                <div class="single-rule">
+                    <div class="btn delete-rule" style="visibility:hidden;"><span class="glyphicon glyphicon-remove"></span></div>
+                    <div class="constraint-list">
+                        <div class="constraints">
+                            <div class="single-constraint">
+                                <div class="btn delete-constraint" disabled><span class="glyphicon glyphicon-remove"></span></div>
+                                <select class="btn andor" disabled><option value="AND">AND</option><option value="OR">OR</option></select>
+                                <select class="rtype"></select>
+                                <select class="rtype-code"><option value="contains">Contains</option><option value="contains(cs)">Contains(Case Sensitive)</option><option value="exact">Exactly</option><option value="excludes">Excludes</option><option value="null">Is Null</option></select>
+                                <input class="constraint-value"/>
+                            </div>
+                        </div>
+                        <div class="btn add-constraint"><span class="glyphicon glyphicon-plus"></span></div>
+                    </div>
+                    <input type="color" class="rule-color"/>
+                </div>
+            </div>
+        
+        </div>    
+    </div>
+    
+</div>
+
+
+
+
+<div class="single-rule TEMPLATE" style="display:none">
+    <div class="btn delete-rule" style="visibility:hidden;"><span class="glyphicon glyphicon-remove"></span></div>
+    <div class="constraint-list">
+        <div class="constraints">
+            <div class="single-constraint">
+                <div class="btn delete-constraint" disabled><span class="glyphicon glyphicon-remove"></span></div>
+                <select class="btn andor" disabled><option value="AND">AND</option><option value="OR">OR</option></select>
+                <select class="rtype"></select>
+                <select class="rtype-code"><option value="contains">Contains</option><option value="contains(cs)">Contains(Case Sensitive)</option><option value="exact">Exactly</option><option value="excludes">Excludes</option><option value="null">Is Null</option></select>
+                <input class="constraint-value"/>
+            </div>
+        </div>
+        <div class="btn add-constraint"><span class="glyphicon glyphicon-plus"></span></div>
+    </div>
+    <input type="color" class="rule-color"/>
+</div>
+
+
+<div class="single-constraint TEMPLATE" style="display:none;">
+    <div class="btn delete-constraint enabled"><span class="glyphicon glyphicon-remove"></span></div>
+    <select class="andor enabled"><option value="AND">AND</option><option value="OR">OR</option></select>
+    <select class="rtype"></select>
+    <select class="rtype-code"><option value="contains">Contains</option><option value="contains(cs)">Contains(Case Sensitive)</option><option value="exact">Exactly</option><option value="excludes">Excludes</option><option value="null">Is Null</option></select>
+    <input class="constraint-value"/>
+</div>
+
+
+
+
+
+<div class="details-frrt TEMPLATE" style="display:none;">
+    <div class="header"></div>
+    <div class="frrt-list">
+        
+    </div>
 
 </div>
+
+
+
+
+
+
 
 
 {% endblock %}
@@ -267,7 +400,7 @@
     //GLOBALS VARIABLES//
     var RTYPE_LIST;
     var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
-    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORM_PK = '{{form.pk}}';
     var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
     var CURRENT_PROJECT_PK = '{{project.pk}}';
     var INITIALIZATION_CODE = 0;
@@ -329,10 +462,305 @@
     $toolbutton_selectMode = $('#toolbutton_selectMode');
     $toolbutton_testScript = $('#toolbutton_testScript');
 
+    
+    //------------------------------------------------------------------------------------------------------------------
+    //  This reads all the rules entered into the class list, converts it into a json object, makes it a string and then
+    //  --and then passes it to an API endpoint for processing. The returned data will be a normal form_list dictionary
+    //  --like used elsewhere that PK keys provide a color value to style the feature in openlayers.
+    
+    $('.apply-rules-classifications').click( function() {
+        $parentPanel = $(this).parent().parent();
+        var formtype_pk = $parentPanel.parent().attr('pk');
+        class_list = [];
+        
+        
+        //Let's loop through our data now!
+        $parentPanel.find('.class-list').children().each( function (index) {
+            var new_class = {};
+            var color = $(this).find('.rule-color').val();
+            class_list.push(new_class);
+            //Now we need to create a list for all of our constraints
+            var constraints = [];
+            new_class['color'] = color;
+            new_class['constraints'] = constraints;
+            $(this).find('.constraints').children().each( function(index) {
+                var new_constraint = {};
+                new_constraint['RTYPE'] = $(this).find('.rtype').val();
+                new_constraint['QCODE'] = $(this).find('.rtype-code').val();
+                new_constraint['ANDOR'] = $(this).find('.andor').val();
+                new_constraint['RVAL']  = $(this).find('.constraint-value').val();
+                constraints.push(new_constraint);
+            });
+            
+        });
+        //set up our transparency
+        var transparency = $parentPanel.find('.fill-transparency').val();
+        if (transparency < 0) transparency = 0;
+        if (transparency > 100) transparency = 100;
+        transparency = transparency / 100.0;    
+        
+        //Hit the server'ss API with our query
+        console.log(class_list);
+        class_list = JSON.stringify(class_list);
+        $.ajax({ url   : API_URLS.get_geo_rules_classes, type  : "POST", 
+            data : [{name:'formtype_pk', value:formtype_pk},{name:'class_list', value:class_list}], // data to be submitted
+            success : function(returnedQuery){
+                console.log(returnedQuery);     
+                //Now loop through our formtypes features in its openlayers layer and adjust the style based on their attributed classes
+                var valueKey = returnedQuery.form_list;
+                MAP.getLayers().getArray().forEach(function(layer,i){                    
+                    if( formtype_pk == layer.get('pk')){
+                      console.log('WE MADE IT');
+                      console.log($(this));
+                      console.log(layer);
+                      var allFeatures = layer.getSource().getFeatures();
+                      for (i = 0; i < allFeatures.length; i++){
+                        var currentFeature = allFeatures[i];
+                        var fillColor = 'rgba(0,0,0,0)';
+                        var labelText = "";
+                        if (valueKey[currentFeature.get('pk')]) {
+                            labelText = valueKey[currentFeature.get('pk')].value;
+                            fillColor = valueKey[currentFeature.get('pk')].color;
+                        }
+
+                        var borderColor = 'rgba(0,0,0,1)';
+                        var newStyle = new ol.style.Style({
+                            
+                            fill: new ol.style.Fill({ color: fillColor }),
+                            stroke: new ol.style.Stroke({ color: borderColor, width: 1 }),
+                            text: new ol.style.Text({
+                                text: labelText,
+                                font: '12px Calibri,sans-serif',
+                                fill: new ol.style.Fill({ color: '#000' }),
+                                stroke: new ol.style.Stroke({
+                                    color: '#fff', width: 2
+                                })
+                            })
+                        });
+                        currentFeature.setStyle(newStyle);
+                        currentFeature.set('default_style', newStyle);
+                      }
+                        layer.setOpacity(transparency);
+                    }                
+                });
+            
+            }
+        });
+    });
+    
+    
+    
+    
+    //------------------------------------------------------------------------------------------------------------------
+    //
+    //  This function reads the class list(min/max/color) from the GUI, and sends it to the Server with the provided form type/ and rtype
+    //  --Server will return a dictionary of forms, with their value and corresponding color based on the classification
+    //  --This will then loop through each feature in the current FormType's layer and style it accordingly
+    
+    $('.apply-graduated-classifications').click( function(){
+    
+        $parentPanel = $(this).parent().parent();
+        var formtype_pk = $parentPanel.parent().attr('pk');
+        var rtype_code = $parentPanel.find('.rtype-select').val();
+        class_list = [];
+        
+        //-----------------------
+        //While Looping through our class list, let's go ahead and authenticate the data.
+        //  --We Need to check, in this order:
+        //      *Min and Max CANNOT be blank
+        //      *Min and Max MUST be numberic
+        //      *Min MUST be lower then Max
+        alert_message = "";
+        $parentPanel.find('.class-list').children().each( function(index) {
+            var color = $(this).find('.class-color').val();
+            var min = $(this).find('.class-min').val();
+            var max = $(this).find('.class-max').val();
+            console.log(parseFloat(min));
+            console.log(parseFloat(max));
+            if (min != "" && max != "")
+                if(parseFloat(min) && parseFloat(max))
+                    if(parseFloat(min) < parseFloat(max)) 
+                        class_list.push({'min':min, 'max':max, 'query_type':'contains', 'color':color});
+                    else alert_message += "One of your class inputs has a larger 'min' value than its corresponding 'max' value. Min MUST be smaller!\n";
+                else alert_message += "One of your 'min' or 'max' values in your classes is NOT a numeric value. Please make sure all input is numeric!\n";
+            else alert_message += "One of your class inputs is blank--they must all have a value!\n";
+        });
+        
+        //If we have alert messsages, then show a JS alert popup, otherwise continue with the rest of the function
+        if (alert_message != ""){
+            alert(alert_message);
+        } else {
+                class_list = JSON.stringify(class_list);
+                
+                var transparency = $parentPanel.find('.fill-transparency').val();
+                if (transparency < 0) transparency = 0;
+                if (transparency > 100) transparency = 100;
+                transparency = transparency / 100.0;    
+                
+
+                
+                 $.ajax({ url   : API_URLS.get_geo_graduated_applied_classes, type  : "POST", 
+                    data : [{name:'formtype_pk', value:formtype_pk},{name:'rtype_code', value:rtype_code},{name:'class_list', value:class_list}], // data to be submitted
+                    success : function(returnedQuery){
+                        console.log(returnedQuery);
+
+                        //Now loop through our formtypes features in its openlayers layer and adjust the style based on their attributed classes
+                            valueKey = returnedQuery.form_list;
+                            MAP.getLayers().getArray().forEach(function(layer,i){                    
+                            if( formtype_pk == layer.get('pk')){
+                                console.log('WE MADE IT');
+                                console.log($(this));
+                                console.log(layer);
+                                var allFeatures = layer.getSource().getFeatures();
+                                console.log(allFeatures); 
+                                for (i = 0; i < allFeatures.length; i++){
+                                    var currentFeature = allFeatures[i];
+                                    var fillColor = 'rgba(0,0,0,0)';
+                                    var labelText = "";
+                                    var currentForm = valueKey[currentFeature.get('pk')];
+                                    console.log(currentForm);
+                                    if (currentForm) {
+                                        labelText = currentForm.value;
+                                        fillColor = currentForm.color;
+                                    }
+
+                                    var borderColor = 'rgba(0,0,0,1)';
+                                    var newStyle = new ol.style.Style({
+                                        
+                                        fill: new ol.style.Fill({ color: fillColor }),
+                                        stroke: new ol.style.Stroke({ color: borderColor, width: 1 }),
+                                        text: new ol.style.Text({
+                                            text: labelText,
+                                            font: '12px Calibri,sans-serif',
+                                            fill: new ol.style.Fill({ color: '#000' }),
+                                            stroke: new ol.style.Stroke({
+                                                color: '#fff', width: 2
+                                            })
+                                        })
+
+                                    });
+                                    currentFeature.setStyle(newStyle);
+                                    currentFeature.set('default_style', newStyle);
+                                }
+                                layer.setOpacity(transparency);
+                            }
+                            
+                        });  
+                    }                
+                    
+                });
+        }
+        
+    });
+    
+    
+    
+    //-----------------------------------------------------------------------------------------------------------------
+    //
+    //  This function Runs a Graduated Classification on a given FormType. The interface will only allow the querying
+    //  --of FRAT RTYPES that are flagged as "numeric".  I can later add a flag to Forms that determines whether or not
+    //  --there 'form_name' is a numeric value. This would also allow the ranging of of FRRT RTYPES. Until then, just
+    //  --FRATs are allowed of the specific FormType given
+    //
+    //  The server will take in the color_list, num_of_classes, rtype_code(right now only FRAT), and formtype_pk
+    //      --It will return a JSON object that can do a lookup based on form_pk. Each form_pk object will have an attached 'value' and 'color'
+    //      --This function will then fill out the list of classes in the UX and loop through the formtype objects and show them in the Openlayers
+    //      --map screen.
+    //
+
+    $('.auto-graduated-classification').click(function(){
+        $parentPanel = $(this).parent().parent();
+        var formtype_pk = $parentPanel.parent().attr('pk');
+        var rtype_code = $parentPanel.find('.rtype-select').val();
+        var num_of_classes = $parentPanel.find('.num-of-classes input').val();
+        var transparency = $parentPanel.find('.fill-transparency').val();
+        if (transparency < 0) transparency = 0;
+        if (transparency > 100) transparency = 100;
+        transparency = transparency / 100.0;
+        var color_list = [];
+                //Going to be sticking with an 'equal' interval gramp. Find total number of colors, divide by 2.
+                //  --each half represents one of the colors on the two ramps.
+                var numOfClassGroups = 2;
+                var numOfTotalClasses = num_of_classes;
+                var numOfStepsPerGroup = Math.round(numOfTotalClasses / numOfClassGroups);
+                var colorA = convertHexToRGB($parentPanel.find('.color-one').val());
+                var colorB = convertHexToRGB($parentPanel.find('.color-two').val());
+                var colorC = convertHexToRGB($parentPanel.find('.color-three').val());
+                console.log(colorA +  "  "  + colorB + "   " + colorC);
+                var setA = getSteppedRGBColor(colorA, colorB, numOfTotalClasses - numOfStepsPerGroup);
+                var setB = getSteppedRGBColor(colorB, colorC, numOfStepsPerGroup);
+                //Combine both arrays into a single one
+                setA.push(...setB);
+                color_list = setA;
+
+        console.log("it's working?");
+         $.ajax({ url   : API_URLS.get_geo_quantity_frat_counter_auto, type  : "POST", 
+            data : [{name:'formtype_pk', value:formtype_pk},{name:'rtype_code', value:rtype_code},{name:'color_list', value:color_list},{name:'num_of_classes', value:num_of_classes}], // data to be submitted
+            success : function(returnedQuery){
+                console.log(returnedQuery);
 
 
+                //Populate our list of classes in the GUI
+                var $classList = $parentPanel.find('.class-list');
+                $classList.empty();
+                for (i=0; i < returnedQuery.class_list.length; i++){
+                    var currentClass = returnedQuery.class_list[i];
+                    $newClass = $('.class-entry-graduated.TEMPLATE').clone(true);
+                    $newClass.removeClass('TEMPLATE');
+                    $newClass.find('.class-min').val(currentClass.min);
+                    $newClass.find('.class-max').val(currentClass.max);
+                    $newClass.find('.class-color').val(currentClass.color);
+                    $classList.append($newClass);
+                    $newClass.show();
+                }   
+                
+                //Now loop through our formtypes features in its openlayers layer and adjust the style based on their attributed classes
+                    valueKey = returnedQuery.form_dict;
+                    MAP.getLayers().getArray().forEach(function(layer,i){                    
+                    if( formtype_pk == layer.get('pk')){
+                      console.log('WE MADE IT');
+                      console.log($(this));
+                      console.log(layer);
+                      var allFeatures = layer.getSource().getFeatures();
+                          for (i = 0; i < allFeatures.length; i++){
+                            var currentFeature = allFeatures[i];
+                            var fillColor = 'rgba(0,0,0,0)';
+                            var labelText = "";
+                            if (valueKey[currentFeature.get('pk')]) {
+                                labelText = valueKey[currentFeature.get('pk')].frat_value;
+                                fillColor = valueKey[currentFeature.get('pk')].color;
+                            }
+                            var borderColor = 'rgba(0,0,0,1)';
+                            var newStyle = new ol.style.Style({
+                                
+                                fill: new ol.style.Fill({ color: fillColor }),
+                                stroke: new ol.style.Stroke({ color: borderColor, width: 1 }),
+                                text: new ol.style.Text({
+                                    text: labelText,
+                                    font: '12px Calibri,sans-serif',
+                                    fill: new ol.style.Fill({ color: '#000' }),
+                                    stroke: new ol.style.Stroke({
+                                        color: '#fff', width: 2
+                                    })
+                                })
 
+                            });
+                            currentFeature.setStyle(newStyle);
+                            currentFeature.set('default_style', newStyle);
+                          }
+                        layer.setOpacity(transparency);
+                    }
+                    
+                });    
+            }
 
+        });
+    
+    
+    });
+    
+    
+    
 
     //---------------------------------------------------------------------------------------------------------
     //  This function loads the provided classes in the class_list in the classification options box
@@ -348,6 +776,7 @@
 
         $parentPanel = $(this).parent().parent();
         var pk = $parentPanel.parent().attr('pk');
+        var rtype_code = $parentPanel.find('.rtype-select').val();
         class_value_list = [];
         $parentPanel.find('.class-list').children().each( function(index) {
             var color = $(this).find('.class-color').val();
@@ -361,7 +790,7 @@
         console.log($parentPanel);
         console.log($parentPanel.find('.rtype-select').val());
          $.ajax({ url   : API_URLS['get_geo_category_matches'], type  : "POST", 
-            data : [{name:'formtype_pk',value:pk},{name:'rtype_code', value:$parentPanel.find('.rtype-select').val()},{name:'class_list', value:JSON.stringify(class_value_list)}], // data to be submitted
+            data : [{name:'formtype_pk',value:pk},{name:'rtype_code', value:rtype_code},{name:'class_list', value:JSON.stringify(class_value_list)}], // data to be submitted
             success : function(returnedQuery){
                 console.log("finished");
                 console.log(returnedQuery);
@@ -369,6 +798,7 @@
                 var colorKey = returnedQuery.form_color_key;
                 var valueKey = returnedQuery.form_value_key;
                 
+
                 MAP.getLayers().getArray().forEach(function(layer,i){
                 
                     if( pk == layer.get('pk')){
@@ -422,20 +852,52 @@
 
     $('.class-remove').click(removeClass);
 
+    function deleteRule(){
+        $(this).parent().remove();
+    }
+
+    $('.delete-rule').click(deleteRule);
+
 
 
     function addClass(){
-        $newEntry = $('.class-entry.TEMPLATE').clone(true);
+    $parentPanel = $(this).parent().parent()
+             if($parentPanel.hasClass('graduated')){$newEntry = $('.class-entry-graduated.TEMPLATE').clone(true);} 
+        else if($parentPanel.hasClass('rules')){    
+
+            $newEntry = $parentPanel.find('.class-list').children().first().clone(true);
+            //Setup the random color
+            var randomColor = getRandomHexColor();
+            $newEntry.find('.rule-color').val(randomColor);
+            $newEntry.find('.constraint-list').css('border-color', randomColor);
+            $newEntry.find('.constraint-value').val("");
+            $newEntry.find('.delete-rule').css('visibility', 'visible');
+        }
+        else { $newEntry = $('.class-entry.TEMPLATE').clone(true);}
         $newEntry.removeClass('TEMPLATE');
         $newEntry.show();
         console.log( $(this).parent().parent().find('.class-list') );
-        $(this).parent().parent().find('.class-list').append($newEntry);
+        $parentPanel.find('.class-list').append($newEntry);
     }
 
     $('.add-class').click(addClass);
+    
+    function addConstraint(){
+        $rulesList = $(this).parent().find('.constraints');
+        $newRule = $rulesList.children().first().clone(true);
+        $newRule.find('.constraint-value').val("");
+        $newRule.find('.andor').atrr('disabled', 'enabled');
+        $newRule.find('.delete-constraint').atrr('disabled', 'enabled');
+        $rulesList.append($newRule);
 
-
-
+    }
+    function deleteConstraint(){
+        $(this).parent().remove();
+    }
+     $('.add-constraint').click(addConstraint);
+     $('.delete-constraint.enabled').click(deleteConstraint);
+     
+     
     function applySingleClassSymbology(){
         var borderColor = $(this).parent().find('.vector-preview').css('border-color');
         var fillColor = $(this).parent().find('.vector-preview').css('background-color');
@@ -474,6 +936,10 @@
         });    
     }
 
+    $('.rule-color').change( function() {
+        $(this).parent().find('.constraint-list').css( 'border-color', $(this).val() );
+    });
+    
     $('.border-color').change( function() {
         console.log("Is it working?");
         $(this).parent().parent().parent().find('.vector-preview').css('border-color', $(this).val());
@@ -507,8 +973,8 @@
         if (transparency > 100) transparency = 100;
         
         transparency = transparency / 100.0;
-        $parentPanel = $(this).parent().parent().parent();
-        var pk = $parentPanel.attr('pk');
+        $parentPanel = $(this).parent().parent();
+        var pk = $parentPanel.parent().attr('pk');
         $.ajax({ url   : API_URLS['get_geo_unique_rtype_rvals'], type  : "POST", data  : [{name:'formtype_pk',value:pk},{name: 'entity_tag', value:rtype_tag}], // data to be submitted
             success : function(returnedQuery){
                 console.log(returnedQuery);
@@ -527,7 +993,7 @@
                 colorKey = updateClassificationColorsFromGradientRamp($parentPanel);
                 console.log(colorKey);
                 MAP.getLayers().getArray().forEach(function(layer,i){
-                    if( $parentPanel.attr('pk') == layer.get('pk') ){
+                    if( pk == layer.get('pk') ){
                       console.log('WE MADE IT');
                       console.log(layer);
                       console.log(layer.getSource());
@@ -539,7 +1005,6 @@
                                 //console.log(allFeatures[i].get('pk'));
                                 var currentFeature = allFeatures[i];
                                 var currentColor = colorKey[  returnedQuery.form_rval_list[currentFeature.get('pk')]  ];
-                                console.log(currentColor);
                                 if (!currentColor) currentColor = 'rgba(0, 0, 0, 0.25)'; 
                                 var newStyle = new ol.style.Style({
                                     
@@ -628,6 +1093,9 @@
         colorKey = {};
         $parentPanel.find('.class-list').children().each( function(index) {
             $(this).find('.class-color').val(setA[index]);
+            //Knockout our rule color changes as well
+            $(this).find('.rule-color').val(setA[index]);
+            $(this).find('.constraint-list').css('border-color', setA[index]);
             //Add our new key value to the dictionary
             colorKey[$(this).find('.class-value').val()] = setA[index];
             
@@ -854,33 +1322,61 @@
                             updateClassGradientBar($(this));
                         });
                         
-
-                            $.ajax({ url   : API_URLS['get_deep_rtypes'], type  : "POST", data  : [{name: 'formtype_pk', value:layerPK}], // data to be submitted
+                        var color = getRandomHexColor();
+                        //Add a random color to our first rule in the rules list
+                        $newPanel.find('.rules .rule-color').val(color);
+                        $newPanel.find('.rules .constraint-list').css('border-color', color);
+                        
+                            //Load our Graduated RTYPE list
+                            $.ajax({ url   : API_URLS.get_geo_numeric_rtypes, type  : "POST", data  : [{name: 'formtype_pk', value:layerPK}], // data to be submitted
                                 success : function(returnedQuery){
-                                    $rtypeList = $newPanel.find('.rtype-select');
-                                    //clear list and add first option--the formtype's ID field
+                                    $rtypeList = $newPanel.find('.rtype-select.graduated');
+                                    //clear list and 
+                                    $rtypeList.empty();                                
+                                    for(i=0; i < returnedQuery.rtype_list.length; i ++){
+                                        var currentRTYPE = returnedQuery.rtype_list[i];
+                                        $rtypeList.append( $('<option value="FRAT-'+currentRTYPE.pk+'">'+currentRTYPE.label+'</option>') ); 
+                                    }
+                                }
+                            });
+                            //Load our non graduated RTYPE lists
+                            $.ajax({ url   : API_URLS.get_deep_rtypes, type  : "POST", data  : [{name: 'formtype_pk', value:layerPK}], // data to be submitted
+                                success : function(returnedQuery){
+                                    $rtypeList = $newPanel.find('.rtype-select.non-graduated');
+                                    $rulesRTYPES = $newPanel.find('.class-list .rtype');
+                                    var options = "";
+                                    var additionalOptions = "";
+                                    console.log("LOOK HERE ROBERT!!");
+                                    console.log(returnedQuery);
+                                    //clear list and 
                                     $rtypeList.empty();
-                                    $rtypeList.append('<option value="FORMID-'+layerPK+'">'+layerName+' ID</option>');
+                                    options += '<option value="FORMID-'+layerPK+'">'+layerName+' ID</option>';
+                                    
                                     //For reach returned RTYPE, make an option for the rtype select element
                                     //If it's a FRRT, then requery for another set of rtypes
                                     for(i=0; i < returnedQuery.rtype_list.length; i ++){
                                         var currentRTYPE = returnedQuery.rtype_list[i];
                                         //If it's a FRAT, then just add the option
                                         if(currentRTYPE.rtype == "FRAT"){
-                                            $rtypeList.append( $('<option value="FRAT-'+currentRTYPE.pk+'">'+currentRTYPE.label+'</option>') );                            
+                                            options += '<option value="FRAT-'+currentRTYPE.pk+'">'+currentRTYPE.label+'</option>';                 
                                         //Otherwise we have an FRRT and need to perform a new action
                                         } else if(currentRTYPE.rtype == "FRRT"){
-                                            $rtypeList.append('<option value="FRRT_ID-'+currentRTYPE.pk+'">'+currentRTYPE.label+' ID</option>');
+                                            options += '<option value="FRRT_ID-'+currentRTYPE.pk+'">'+currentRTYPE.label+' ID</option>';
                                         } else if(currentRTYPE.rtype == "DEEP-FRAT"){
-                                            $rtypeList.append('<option value="DEEP_FRAT-'+currentRTYPE.pk+'">'+currentRTYPE.label+'</option>');
+                                            options += '<option value="DEEP_FRAT-'+currentRTYPE.pk+','+ currentRTYPE.parent_pk+'">'+currentRTYPE.label+'</option>';
                                         } else if(currentRTYPE.rtype == "DEEP-FRRT"){
-                                            $rtypeList.append('<option value="DEEP_FRRT-'+currentRTYPE.pk+'">'+currentRTYPE.label+' ID</option>');
+                                            options += '<option value="DEEP_FRRT-'+currentRTYPE.pk+','+ currentRTYPE.parent_pk+'">'+currentRTYPE.label+' ID</option>';
                                         } else if(currentRTYPE.rtype == "BACK-FRRT"){
-                                            $rtypeList.append('<option value="BACK_FRRT-'+currentRTYPE.pk+'">REVERSE<< '+currentRTYPE.label+' ID</option>');
+                                            options += '<option value="BACK_FRRT-'+currentRTYPE.pk+'">REVERSE<< '+currentRTYPE.label+' ID</option>';
                                         } else if(currentRTYPE.rtype == "BACK-DEEP-FRAT"){
-                                            $rtypeList.append('<option value="BACK_DEEP_FRAT-'+currentRTYPE.pk+'">REVERSE<< '+currentRTYPE.label+'</option>');
+                                            options += '<option value="BACK_DEEP_FRAT-'+currentRTYPE.pk+'">REVERSE<< '+currentRTYPE.label+'</option>';
+                                        } else if(currentRTYPE.rtype == "BACK-DEEP-FRRT" ){
+                                            additionalOptions += '<option value="BACK_DEEP_FRRT-'+currentRTYPE.pk+'">REVERSE<< '+currentRTYPE.label+'</option>';
                                         }
                                     }
+                                    $rtypeList.append(options);
+                                    $rulesRTYPES.append(options + additionalOptions);
+                                   
                                    
                                 }
                              });
@@ -915,7 +1411,7 @@
             $newLayer.attr('layer_id', layer.id);
             var name = layer.get('name');
             var title = layer.get('name');
-            if (name.length > 10) name = name.substring(0,10) + "...";
+            if (name.length > 18) name = name.substring(0,18) + "...";
             
             $newLayer.find('.layer-title').html(name);
             $newLayer.find('.layer-title').prop('title', title);
@@ -1206,25 +1702,44 @@
                 console.log(selected_style);
 
                 
-                var info = $('.details-side-pane')[0];
+                $detailsPane = $('.details-side-pane');
+                $detailsPane.empty();
+                $detailsPane.show();
                 if (feature) {
                     $.ajax({ url   : API_URLS['get_form_rtypes'],type  : "POST", data  : {"form_pk":feature.get('pk')}, // data to be submitted
                         success : function(returnedQuery){
-                            var newString = ""
+                            
+                            $detailsPane.append('<div class="form-header">'+returnedQuery.formtype_name + ': ' +returnedQuery.form_name+'</div>');
                             returnedQuery.rtype_list.forEach(function(rtype){
-                                //console.log(rtype);
-                                if (rtype.rtype == "FRAT")      newString += "<div><span>"+rtype.rtype_label+"</span>::<span>"+rtype.rval.value+"</span></div>";
-                                else if (rtype.rtype == "FRRT"){ 
-                                    newString += "<div><span>"+rtype.rtype_label+"</span>::";
-                                    for (var rval in rtype.rval){newString += "<span>"+rtype.rval.name+"</span>,";}
-                                    newString += "</div>";
+                                console.log(rtype);
+                                if (rtype.rtype == "FRAT"){
+                                    $detailsPane.append('<div class="frat-entry"><div class="frat-label">'+rtype.rtype_label+'</div><div class="frat-value">'+rtype.rval.value+'</div></div>');
+                                } else if (rtype.rtype == "FRRT"){ 
+                                    $newFRRT = $('.details-frrt.TEMPLATE').clone(true);
+                                    $newFRRT.removeClass('TEMPLATE');
+                                    $newFRRT.show();
+                                    $newFRRT.find('.header').html(rtype.rtype_label);
+                                    for (var i in rtype.rval){
+                                        var rval = rtype.rval[i];
+                                        $newFRRT.find('.frrt-list').append("<div class='frrt-entry'><img src='"+rval.thumbnail+"'></img><a href='"+rval.url+"'><span>"+rval.name+"</span></a></div>");
+                                    }
+                                    $detailsPane.append($newFRRT);
+                                } else if (rtype.rtype == "BACK_FRRT"){ 
+                                    $newFRRT = $('.details-frrt.TEMPLATE').clone(true);
+                                    $newFRRT.removeClass('TEMPLATE');
+                                    $newFRRT.show();
+                                    $newFRRT.find('.header').html("References By: " + rtype.formtype_name);
+                                    for (var i in rtype.rval){
+                                        var rval = rtype.rval[i];
+                                        $newFRRT.find('.frrt-list').append("<div class='frrt-entry'><img src='"+rval.thumbnail+"'></img><a href='"+rval.url+"'><span>"+rval.form_name+"</span></a></div>");
+                                    }
+                                    $detailsPane.append($newFRRT);
                                 }
                             });
-                          info.innerHTML = newString;
                         }
                     });
                 } else {
-                  info.innerHTML = '&nbsp;';
+
                 }
             });
             
@@ -1235,7 +1750,10 @@
             });
             
         } else {
-            deselected.forEach(function(feature){
+                $detailsPane = $('.details-side-pane');
+                $detailsPane.empty();
+                $detailsPane.hide();
+                deselected.forEach(function(feature){
                 console.info(feature);
                 console.log(feature.get('default_style'));
                 feature.setStyle(feature.get('default_style'));

@@ -439,7 +439,7 @@
         var formData = {"formtype_id":CURRENT_FORMTYPE_PK,"template_json":JSON.stringify(jsondata)};
         console.log(formData);
         $.ajax({ 
-             url   : API_URLS.create_new_template,
+             url   : API_URLS.create_template,
              type  : "POST",
              data  : formData, // data to be submitted
              success : function(returnedQuery)
@@ -1107,7 +1107,7 @@
                     if(INITIALIZATION_CODE == 2){
                         var jsonData = {"form_pk" : CURRENT_FORM_PK};
                         $.ajax({ 
-                                 url   : API_URLS.get_rtypes_rvals,
+                                 url   : API_URLS.get_form_rtypes,
                                  type  : "POST",
                                  data  : jsonData, // data to be submitted
                                  success : function(returnedQuery) {console.log(returnedQuery);loadForm(returnedQuery);}

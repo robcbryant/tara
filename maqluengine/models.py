@@ -315,7 +315,7 @@ class Form(models.Model):
            return self.get_thumbnail_type()
         else:
            #offer a default to "NO PREVIEW" if not found
-           return staticfiles_storage.url("/static/site-images/no-thumb-missing.png")
+           return staticfiles_storage.url("/site-images/no-thumb-missing.png")
         
     
     def get_hierarchy_label(self):
@@ -395,8 +395,8 @@ class FormRecordAttributeValue(models.Model):
         
 class FormRecordReferenceValue(models.Model):
     #----------------------------
-    # Model Relation Variables
     #This foreignKey stores the reference to another Form e.g. the Lot Sheet Number that this Lithic Object is attached to
+    # Model Relation Variables
     record_reference = models.ManyToManyField(Form, related_name='ref_to_value_form', blank=True, null=True)
     #This ID is for the external number reference to another form. E.g. if I'm importing data from an old project that has its
     #--own set of foreign keys, those foreign keys are stored here and used to find the references, because this database will have it's own

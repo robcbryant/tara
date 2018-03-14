@@ -669,10 +669,10 @@ var attributeTermUniqueID = 1;
 $("#add-query").click( function(){
     
     //Clone the entire hidden Query Element
-    $newQuery = $($("#search-form").children().first().children()[3].children[0].children[0]).clone();
+    $newQuery = $("#search-form").find('.all-queries').children().first().clone();
     console.log($newQuery);
     //Add it to the DOM
-    $($("#search-form").children()[0].children[3].children[0]).append( $newQuery );
+    $("#search-form").find('.all-queries').append( $newQuery );
     
     //Turn on its visibility
     if ($newQuery.css('display') == 'none' ) {$newQuery.show();} 

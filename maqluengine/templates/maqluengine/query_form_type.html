@@ -6,10 +6,10 @@
 {% block title %}Maqlu Engine{% endblock %}
 
 
-{% block branding %}<a href="{% url 'admin:index' %}"><span class="glyphicon glyphicon-certificate"></span>M<small>aqlu</small> D<small>atabase</small> E<small>ngine</small></a>{% endblock %}
+{% block branding %}{% endblock %}
 
 {% block breadcrumbs %}                      
-    {% include "maqluengine/admin_header.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form access_level=access_level user_access=user_access%}
+    {% include "maqluengine/admin_header.html" with csrf_token=csrf_token deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form access_level=access_level user_access=user_access%}
 {% endblock %}
 
 {% block content %} 
@@ -21,7 +21,7 @@
     
         <!-- This panel is the side column for listing available form types -->
         <div id="left-pane" class="col-md-2">
-            {% include "maqluengine/admin_side_bar.html" with deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                           
+            {% include "maqluengine/admin_side_bar.html" with csrf_token=csrf_token deletable=deletable toolbar_title_code=toolbar_title_code project=project formtype=formtype form=form %}                           
         </div>
         
          
@@ -284,7 +284,7 @@
     //GLOBALS VARIABLES//
     var RTYPE_LIST;
     var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
-    var CURRENT_FORM_PK = 'None';
+    var CURRENT_FORM_PK = '{{form.pk}}';
     var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
     var CURRENT_PROJECT_PK = '{{project.pk}}';
     var INITIALIZATION_CODE = 0;
