@@ -172,6 +172,17 @@
                     <!-- Image View Item Template -->
                     <div class="frrv-container image-view-item"><input name="" value="" hidden></input><div class="frrv-label"><a href="">Label</a></div><img class="enki-img-popup" src=""></img><button class="btn btn-danger" type="button" onclick="removeReferenceFromFRRV(this)"><span class="glyphicon glyphicon-remove"></span></button></div>
     </div>
+    
+        <select id="geo-bglayer-select" style="display:none; width: 40%; float:right;">
+        <option value="none">No Background Layer</option>
+        {% for formtype in project.formtype_set.all %}
+            
+            {% if formtype.is_geospatial %}
+            <option value="{{formtype.pk}}">{{formtype.form_type_name}}</option>
+            {% endif %}
+        {% endfor %}
+    
+    </select>
     <!--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-->    
     <!--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-->
     <!--^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-->   
@@ -210,6 +221,9 @@
     var CURRENT_PROJECT_PK = '{{project.pk}}';
     var INITIALIZATION_CODE = 0;
     var API_URLS = getAPIEndpoints();
+    
+    var DEFAULT_GEOJSON = '{{project.geojson_string}}';
+    
     </script>
     {% endif %}   
     <!-- ======================================================================================================== -->
@@ -223,6 +237,7 @@
      
     {% if user_access >= access_level %}
     <script>
+    
         $('#new-form').submit(function(e){
              e.preventDefault();
             var formData = $("#new-form").serializeArray();

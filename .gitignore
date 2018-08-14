@@ -21,3 +21,4 @@ tara/wsgi.py
 settings.py
 __pycache__
 *.pyc
+*.sql

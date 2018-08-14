@@ -1,0 +1,129 @@
+{% extends "public_frontend/test.html" %}
+
+{% load static %}
+
+{% block testing %}
+
+
+
+  
+  <body>
+  
+    <div class="login-access"><a href="{% url 'maqlu_admin:index' %}"><img src="{% static 'site-images/login_key.png' %}"/><span>LOGIN</span></a></div>    
+        
+    <div id="main-page">
+        
+
+    <div id="header">
+        
+        <div class="logo-parent">
+            <img class="img-logo" src="{% static 'site-images/tara_logo.png' %}"></img>
+            <span class="main-logo">TARA</span>
+            <span class="sub-logo">TOOLKIT FOR ARCHAEOLOGICAL RESEARCH AND ANALYSIS</span>
+        </div>
+        <div class="menu">
+            <div>Projects</div>
+            <a href="#">Features</a>
+            <a href="#">History</a>
+            <a href="#">Contact</a>
+            <a href="#">Documentation</a>
+            <a href="#">API</a>
+        </div>
+        
+    </div>
+    
+    
+    <div id="main">
+    
+    
+    
+        <div class="info"> 
+            <div class="about">
+                TARA is a research-oriented web-application built on top of Django. It acts as an incredibly generic, but sensible relational framework that allows easy record manipulation/creation with automated tools, auto-publishing of content to a public front-end, research-oriented query tools that overlap projects, secured customized public and private access, and a prototype geospatial query implementation based on OpenLayers Javascript libraries. A dynamic research tool that can be used in the office, in the field, and give multiple projects access to a single, shared, robust database.             
+            </div>
+            <div class="geospatial-engine">
+                <a href="#">
+                    <div class="icon"></div>
+                    <span>
+                        <div>ki</div><div>GIS</div><div> engine</div>
+                    </span>
+                </a>
+            </div>
+            <div class="query-engine">
+                <a href="#"><div class="icon"></div><span><div>QUERY</div><div></div><div>engine</div></span></a>
+            </div>
+            <div class="browse">
+                <a href="#"><div class="icon"></div><span><div>BROWSE</div><div></div><div>data</div></span></a>
+            </div>
+        </div>
+        
+        <div class="news">
+            <div>
+                {{firstpost}}
+                {{firstpost.id}}
+                {{test_post}}
+                <a href="{% url 'maqluengine:blogpost' post_id=test_post|default:'NONE' %}"></a>
+
+
+                <div class="latest-post">
+                    <div class="image" style="background-image:url('{{firstpost.image.url}}')"></div>
+                    <div class="name">{{firstpost.name}}</div>
+                    <div class="date">{{firstpost.date_created}}</div>
+                    <div class="author">{{firstpost.created_by.last_name}}, {{firstpost.created_by.first_name}}</div>
+                    <div class="content">{{firstpost.content|truncatechars:400}}</div>
+                </div>    
+                
+                <div class="post-list">
+                    {% for post in blogpost_list %}
+                    <div class="recent-post">
+                        <div class="name">   <a href="{% url 'maqluengine:blogpost' post_id=post.id %}">{{post.name}}</a></div>
+                        <div class="date">{{post.date_created}}</div>
+                        <div class="author">{{post.created_by.last_name}}, {{post.created_by.first_name}}</div>
+                        <div class="content"><a href="{%url 'maqluengine:blogpost' post_id=post.id %}"><div class="image" style="background-image:url('{{post.image.url}}')"></div></a>{{post.content|truncatechars:300}}</div>
+                    </div>
+                     {% endfor %}
+                     
+                </div>
+            
+            </div>
+        </div>
+        
+        <div class="community">
+            <div class="header"><span class="tara-logo">tara</span> activity</div>
+            <div class="posts">
+                <div class="sub-header"><span>blog</span> activity</div>
+                {% for post in recentposts_list %}
+                    <div class="post"><span class="title">{%if not post.project%} TARA {% else %}{{post.project.name}}{%endif%} posted:</span> <span>{{post.name}}</span><span class="date">{{post.date_created}}</span></div>
+                {% endfor %}
+            </div>
+            
+            <div class="changes">
+                <div class="sub-header"><span>project</span> activity</div>
+                <div class="change"><span class="title">Al-Hiba Changed: </span> <span>Object 123</span> <span class="date">Friday 04/25/08</span></div>
+                <div class="change"><span class="title">Al-Hiba Changed: </span> <span>Object Type</span><span class="date">Thursday 04/24/08</span></div>
+            </div>
+        </div>
+        
+    </div>
+
+    <div id="footer">
+        <div class="footer-logo">
+            <img class="img-logo" src="{% static 'site-images/tara_logo.png' %}"></img>
+            <span class="main-logo">TARA</span>
+        </div>
+        <div class="branding">
+                <span>designed by</span>
+                <a href="#">Robert Bryant</a>
+                <span>powered by</span><a class="logo" href="http://www.djangoproject.com/">               <img class="django" src="{% static 'site-images/django_logo.png' %}" border="0" alt="Powered by Django." title="Powered by Django." /></a>
+                <span>licensed under</span><a class="logo" href="https://www.gnu.org/licenses/gpl-3.0.en.html"><img class="bg gnu" src="{% static 'site-images/gnu_plv3_logo.png' %}" border="0" alt="GNU Public License v3" title="GNU Public License v3" /></a>
+                <span>sourcecode on</span><a class="logo" href="https://github.com/robcbryant/tara/">         <img class="bg taragit" src="{% static 'site-images/GitHub_Logo_White.png' %}" border="0" alt="TARA on GitHub." title="TARA on GitHub" /></a>
+                <span>hosted by</span><a class="logo" href="https://www.penn.museum/">                    <img class="bg upenn" src="{% static 'site-images/upenn_logo_white.png' %}" border="0" alt="UPenn Museum" title="UPenn Museum" /></a>
+
+        </div>
+    </div>
+    
+    </div>
+  </body>
+
+
+{% endblock %}

@@ -29,8 +29,6 @@ import urllib
 from django.conf import settings
 from django.contrib import admin
 from maqluengine.models import *
-from .models import FormProject, Form, FormRecordAttributeType, FormRecordAttributeValue
-from .models import FormRecordReferenceType, FormRecordReferenceValue, FormType
 from django.urls import reverse
 from django.utils.safestring import mark_safe    
 from django.urls import resolve
@@ -41,6 +39,16 @@ from django.http import HttpResponse
 from django.conf.urls import url, include
 from django.views import generic
 from django.http import Http404
+
+from django.core.mail import send_mail, EmailMultiAlternatives
+from django.utils.crypto import get_random_string
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils.html import strip_tags
+
+import copy
+
+from django.contrib.sessions.models import Session
+from django.utils import timezone
 
 from time import sleep
 from django.contrib.staticfiles.storage import staticfiles_storage
@@ -174,6 +182,8 @@ def SECURITY_log_security_issues(userInfo, viewname, errormessage, META):
     try: FLAG += "User: " + str(userInfo.username) + "  - Access Level: " + str(userInfo.permissions.access_level) + "  - in View: " + viewname + "  -- UserIP: " +  str(META.get('HTTP_X_FORWARDED_FOR', '') or META.get('REMOTE_ADDR')) + " - with Message: " + errormessage
     except Exception as inst: FLAG += str(inst) + "  USER INFO NOT FOUND IN SESSION - in View: " + viewname + "  -- UserIP: " +  str(META.get('HTTP_X_FORWARDED_FOR', '') or META.get('REMOTE_ADDR')) +  " - with Message: " + errormessage
     logger.warning(FLAG)
+    new_message = SecurityMessage(content=FLAG)
+    new_message.save()
 
 def SECURITY_check_project_access(user, projectID):
     #This returns a check to make sure the user's project code and the database item in question's project code
@@ -233,6 +243,16 @@ def get_api_endpoints():
     jsonData = {}
 
 
+    # MASTER ADMIN ENDPOINTS
+    jsonData['create_project'] = reverse('maqlu_admin:create_project')
+    jsonData['delete_project'] = reverse('maqlu_admin:delete_project')
+    jsonData['reset_user_password'] = reverse('maqlu_admin:reset_user_password')
+    jsonData['create_project_admin'] = reverse('maqlu_admin:create_project_admin')
+    jsonData['delete_user'] = reverse('maqlu_admin:delete_user')
+    jsonData['edit_security_message'] = reverse('maqlu_admin:edit_security_message')
+    jsonData['create_edit_blogpost'] = reverse('maqlu_admin:create_edit_blogpost')
+    jsonData['get_admin_blog_post'] = reverse('maqlu_admin:get_admin_blog_post')
+    jsonData['delete_admin_post'] = reverse('maqlu_admin:delete_admin_post')
     
     #Recycling Bin Endpoints
     jsonData['load_recycling_bin'] = reverse('maqlu_admin:load_recycling_bin')
@@ -248,11 +268,15 @@ def get_api_endpoints():
     jsonData['restore_frrt'] = reverse('maqlu_admin:restore_frrt')
     jsonData['recycle_frrt'] = reverse('maqlu_admin:recycle_frrt')
     jsonData['delete_frrt'] = reverse('maqlu_admin:delete_frrt')
+    jsonData['recycle_webpage'] = reverse('maqlu_admin:recycle_webpage')
+    jsonData['delete_user_profile_query'] = reverse('maqlu_admin:delete_user_profile_query')
+    
     
     #Create Endpoints
     jsonData['create_form'] = reverse('maqlu_admin:create_new_form')
     jsonData['create_template'] = reverse('maqlu_admin:create_new_form_type_template')
     jsonData['create_formtype'] = reverse('maqlu_admin:create_new_form_type')
+    jsonData['create_new_webpage'] = reverse('maqlu_admin:create_new_webpage')
     
     #Edit Endpoints
     jsonData['save_form'] = reverse('maqlu_admin:save_form_changes')
@@ -262,6 +286,7 @@ def get_api_endpoints():
     jsonData['save_user'] = reverse('maqlu_admin:modify_project_user')
     jsonData['save_query_user'] = reverse('maqlu_admin:save_user_query')
     jsonData['save_forms_bulk'] = reverse('maqlu_admin:bulk_edit_formtype')
+    jsonData['edit_menugroup'] = reverse('maqlu_admin:edit_menugroup')
     
     #Importer/Exporter Tools
     jsonData['import_formtype_forms'] = reverse('maqlu_admin:run_form_type_form_importer')
@@ -292,7 +317,7 @@ def get_api_endpoints():
     
     
     #Run Various Tools Endpoints
-    jsonData['run_formtype_query_engine'] = reverse('maqlu_admin:run_query_engine')
+    jsonData['run_formtype_query_engine'] = ""
     jsonData['run_master_query_engine'] = reverse('maqlu_admin:run_master_query_engine')
     jsonData['run_formtype_query_pagination'] = reverse('maqlu_admin:navigate_query_pagination')
     jsonData['run_master_query_pagination'] = reverse('maqlu_admin:navigate_master_query_pagination')
@@ -300,11 +325,127 @@ def get_api_endpoints():
     jsonData['run_check_progress'] = reverse('maqlu_admin:check_progress')
     jsonData['run_check_progress_query'] = reverse('maqlu_admin:check_progress_query')
   
+    #Public API
+    jsonData['api_webpages'] = reverse('maqluengine:api_webpages')
+    
     
     #convert python dict to a json string and send it back as a response
     jsonData = json.dumps(jsonData)
     return jsonData       
-    
+
+
+
+def get_unique_rtype_val_list(code, entity_pk, parent_formtype):
+    form_rval_list = {}    
+    #parent_formtype = FormType.objects.get(pk=request.POST['formtype_pk'])
+    #Setup out necessary lists etc.
+    new_form_rval_list = {}
+    distinct_value_list = []          
+    logger.info("IN THE UNIQUE VAL FUNCTION")
+    if   code == "DEEP_FRAT":   # We need to get all the unique rvals of the provided related FRAT        
+        #Load our DEEP FRAT
+        entity_type = FormRecordAttributeType.objects.get(pk=entity_pk) 
+        distinct_value_list = entity_type.formrecordattributevalue_set.order_by('record_value').distinct().values_list('record_value', flat=True)
+        distinct_value_list = list(distinct_value_list)
+        logger.info("****** in the main function")
+        logger.info(distinct_value_list)
+        #Do some last minute cleanup here, like sorting the lists etc.
+        distinct_value_list = list(set(distinct_value_list))            
+                  
+  
+    elif code == "DEEP_FRRT":   # We need to get all the unique form IDs of the FRRT's related FRRTs FormType
+        #Load our DEEP FRAT
+        entity_type = FormRecordReferenceType.objects.get(pk=entity_pk) 
+        test_list = entity_type.formrecordreferencevalue_set.values_list('record_reference__form_name', flat=True)
+        test_list = list(set(test_list))
+        logger.info(test_list)
+        #Do some last minute cleanup here, like sorting the lists etc.
+        distinct_value_list = test_list   
+
+    elif code == "DEEP_FORMID":     # We need to get all the unique form IDs of the FRRT's related FormType
+        entity_type = FormRecordReferenceType.objects.get(pk=entity_pk)
+        test_list = entity_type.formrecordreferencevalue_set.values_list('record_reference__form_name', flat=True)
+        test_list = list(set(test_list))
+        logger.info(test_list)
+        #Do some last minute cleanup here, like sorting the lists etc.
+        distinct_value_list = test_list   
+    elif code == "FORMID":      # We need to get all the unique form IDs of this current FormType
+        entity_type = FormType.objects.get(pk=entity_pk)    
+        distinct_value_list = entity_type.form_set.order_by('form_name').distinct().values_list('form_name', flat=True)
+    elif code == "FRAT":        #We need to get all the unique values of the provided FRAT's RVALs
+        entity_type = FormRecordAttributeType.objects.get(pk=entity_pk)    
+        distinct_value_list = entity_type.formrecordattributevalue_set.order_by('record_value').distinct().values_list('record_value', flat=True)
+        distinct_value_list = list(distinct_value_list)
+        logger.info("****** in the main function")
+        logger.info(distinct_value_list)
+        form_rval_list = entity_type.formrecordattributevalue_set.values('form_parent__pk','record_value')   
+                    
+    elif code == "BACK_FRRT":
+        #We need a distinct list of the given frrt's formtype_parent form ids
+        #We then need a form list of the CURRENT formtype's forms that have a match
+        #  So using the same Grid Square Metaphor--we have a reverse lookup to "Object Forms" that are referencing a grid square.
+        #       **First let's get a list of all the Grid Squares
+        #       **Then we need a list of all the Object Forms referencing each grid square in a loop and add them to a list to return
+        entity_type = FormRecordReferenceType.objects.get(pk=entity_pk) 
+        #Load up our grid squares
+        forms = parent_formtype.form_set.all();
+        #activate the query to load it in cache before we loop through it
+        if forms:
+            for parent_form in forms:
+                values = []
+                #Do the reverse query lookup to get all the frrvs referencing the main parent form
+                back_reference_frrvs = parent_form.ref_to_value_form.all()
+                #Now we need to store all these frrv's parent forms' form names in a list and attach it to our current parent form in the loop
+                if back_reference_frrvs:
+                    for back_ref_frrv in back_reference_frrvs:
+                        values.append(back_ref_frrv.form_parent.form_name)
+                    #Make sure we only have distinct values
+                    values = list(set(values))
+                    #Now add our list with injected commas as a string to out value lists
+                    distinct_value_list.append(",".join(values))
+                    new_form_rval_list[parent_form.pk] = ",".join(values)
+                else:
+                    new_form_rval_list[parent_form.pk] = "" 
+        #sort our list and add it to our JSON
+        distinct_value_list = sorted(distinct_value_list)    
+        
+    elif code == "BACK_DEEP_FRAT":
+        back_frat_pk, frrt_pk = entity_pk.split(',')
+        entity_type = FormRecordAttributeType.objects.get(pk=back_frat_pk) 
+        frrt_ref = FormRecordReferenceType.objects.get(pk=frrt_pk) 
+        forms = frrt_ref.form_type_reference.form_set.all()
+        #First we need a distinct list of the back frat's unique values
+       
+        #Now we need a list of all the parent formtype(the formtype that's making the backwards request to the back frat) and their values for this FRAT
+        new_form_rval_list = {}#parent_formtype.formrecordattributevalue_set.values('form_parent__pk','record_value')   
+
+        if forms:
+            for form in forms:
+                try:
+                    #Get all the FRRVs linking to this form 
+                    ref_val = form.ref_to_value_form.filter(record_reference_type__pk=frrt_pk)
+                    #Use the first FRRV from the list (for now)
+                    frat_val = ref_val[0].form_parent.formrecordattributevalue_set.filter(record_attribute_type__pk=back_frat_pk)
+                    logger.info( ref_val)
+                    logger.info( ref_val.count())
+                    if ref_val:
+                        values = []
+                        logger.info( "Working?")
+                        for refval in ref_val:
+                            values.append(refval.form_parent.formrecordattributevalue_set.filter(record_attribute_type__pk=back_frat_pk)[0].record_value)
+                        logger.info( "Working?")
+                        values = list(set(values)) 
+                        teststring =  ",".join(values)
+                        logger.info( teststring)
+                        distinct_value_list.append(teststring)
+                        new_form_rval_list[form.pk] = teststring
+                except:
+                    new_form_rval_list[form.pk] = ""
+        distinct_value_list = list(set(distinct_value_list))                  
+    logger.info("ABOUT TO EXIT THE UNIQUE VAL FUNCTION")    
+    distinct_value_list = filter(None, distinct_value_list)
+    return list(distinct_value_list)
+
     
 #=======================================================================================================================================================================================================================================
 #=======================================================================================================================================================================================================================================
@@ -332,6 +473,314 @@ class MyAdminSite(AdminSite):
     ## AJAX ADMIN API ENDPOINTS ************************************************************************************************
     ##==========================================================================================================================
 
+    
+    
+    #-------------------------------------------------------------------------------------------------------
+    # MASTER ADMIN ENDPOINTS    
+
+    #=======================================================#
+    #   ACCESS LEVEL :  MASTER     RESET_USER_PASSWORD()
+    #=======================================================#        
+    def reset_user_password(self, request):
+        logger.info( request.POST)
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This endpoint generates a random password for the provided user_pk in the POST data and emails that user the new 
+        #   password as well as the admin account. The admin can also provice an optional email addres to send it to in POST
+        ERROR_MESSAGE = ""
+        #Check our user's session and access level  
+        if request.user.permissions.master_admin:
+            if request.method == 'POST':   
+                if 'user_pk' in request.POST:
+                    #Construct our Email
+                    newpassword = get_random_string(24)
+                    theUser = User.objects.get(pk=request.POST['user_pk'])
+                    theUser.set_password(newpassword)
+                    theUser.save()
+                    subject = "TARA Project: " + theUser.first_name + " ("+theUser.username+") Password Reset"
+                    message = "<p><b>Hello " + theUser.first_name + " ("+theUser.username+")! Your password reset was successful! Your new password is:</p></b><p> (>  "+newpassword+"  <)</p><p>Make sure to change your password when you re-login!</p>"
+                    message += "<p>Good luck and thanks for using our system! Sorry for the inconvenience!</p>"
+                    message += "<p>TARA Administrator</p>"
+                    message += "<p><b><h2>THIS IS AN AUTOMATED MESSAGE, PLEASE DO NOT REPLY. TARA DOES NOT RECEIVE INCOMING EMAIL</h2></b></p>"
+                    client = "admin@tara.museum.upenn.edu"
+                    if request.POST['alt_email'] != "": to = request.POST['alt_email']
+                    else: to = theUser.email
+                    msg = EmailMultiAlternatives(subject, strip_tags(message), client, [to])
+                    msg.attach_alternative(message, "text/html")
+                    msg.send()
+                    return HttpResponse('{"MESSAGE":"SUCCESS", "sent":"YES"}',content_type="application/json")  
+                else: ERROR_MESSAGE += "Error: Your POST data is corrupted or incompatible"
+            else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying form type information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")   
+
+    #=======================================================#
+    #   ACCESS LEVEL :  MASTER     GET_ADMIN_BLOG_POST()
+    #=======================================================#        
+    def get_admin_blog_post(self, request):
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This endpoint takes in 
+ 
+        ERROR_MESSAGE = ""
+        #Check our user's session and access level  
+        if request.user.permissions.master_admin:
+            if request.method == 'POST':    
+                post = BlogPost.objects.get(pk=request.POST['post_pk'])
+                postJSON = {}
+                postJSON['name'] = post.name
+                postJSON['content'] = post.content
+                postJSON['image_url'] = post.image.url
+                postJSON = json.dumps(postJSON)
+                #SUCCESS!!
+                return HttpResponse(postJSON, content_type="application/json")         
+            else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying form type information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")   
+        
+        
+    #=======================================================#
+    #   ACCESS LEVEL :  MASTER     EDIT_SECURITY_MESSAGE()
+    #=======================================================#        
+    def edit_security_message(self, request):
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This endpoint takes in 
+ 
+        ERROR_MESSAGE = ""
+        #Check our user's session and access level  
+        if request.user.permissions.master_admin:
+            if request.method == 'POST':    
+                message = SecurityMessage.objects.get(pk=request.POST['message_pk'])
+                if request.POST['is_seen'] == 'true': message.seen_by_admin = True
+                else: message.seen_by_admin = False;
+                message.save()
+                #SUCCESS!!
+                return HttpResponse('{"MESSAGE":"SUCCESS"}',content_type="application/json")         
+            else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying form type information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")   
+
+        
+    #=======================================================#
+    #   ACCESS LEVEL :  MASTER     CREATE_PROJECT()
+    #=======================================================#        
+    def create_project(self, request):
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This endpoint takes in 
+ 
+        ERROR_MESSAGE = ""
+        logger.info( request)
+        logger.info( request.POST)
+        #Check our user's session and access level  
+        if request.user.permissions.master_admin:
+            if request.method == 'POST':    
+                project = FormProject(name=request.POST['project_name'])
+                project.save()
+                #SUCCESS!!
+                return HttpResponse('{"MESSAGE":"SUCCESS", "pk":"'+str(project.pk)+'", "name":"'+str(project.name)+'"}',content_type="application/json")         
+            else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying form type information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")   
+
+    #=======================================================#
+    #   ACCESS LEVEL :  MASTER     DELETE_PROJECT()
+    #=======================================================#        
+    def delete_project(self, request):       
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This endpoint takes in 
+ 
+        ERROR_MESSAGE = ""
+        logger.info( request)
+        logger.info( request.POST)
+        #Check our user's session and access level  
+        if request.user.permissions.master_admin:
+            if request.method == 'POST':   
+                if request.user.check_password(request.POST['password']):
+                    project = FormProject.objects.get(pk=request.POST['project_pk'])
+                    project.delete()
+                    #SUCCESS!!
+                    SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), "This user just deleted this project", request.META)
+                    return HttpResponse('{"MESSAGE":"SUCCESS","accepted":"YES"}',content_type="application/json") 
+                else:
+                    ERROR_MESSAGE += "Error: You gave the incorrect password to delete this project."
+                    SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+                    return HttpResponse('{"MESSAGE":"'+ERROR_MESSAGE+'","accepted":"NO"}',content_type="application/json") 
+            else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying form type information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")   
+
+    #=======================================================#
+    #   ACCESS LEVEL :  MASTER     DELETE_ADMIN_POST()
+    #=======================================================#        
+    def delete_admin_post(self, request):       
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This endpoint takes in 
+ 
+        ERROR_MESSAGE = ""
+        logger.info( request)
+        logger.info( request.POST)
+        #Check our user's session and access level  
+        if request.user.permissions.master_admin:
+            if request.method == 'POST':   
+                if request.user.check_password(request.POST['password']):
+                    post = BlogPost.objects.get(pk=request.POST['post_pk'])
+                    post.delete()
+                    #SUCCESS!!
+                    return HttpResponse('{"MESSAGE":"SUCCESS","accepted":"YES"}',content_type="application/json") 
+                else:
+                    ERROR_MESSAGE += "Error: You gave the incorrect password to delete this project."
+                    SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+                    return HttpResponse('{"MESSAGE":"'+ERROR_MESSAGE+'","accepted":"NO"}',content_type="application/json") 
+            else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying form type information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")   
+
+
+    #=======================================================#
+    #   ACCESS LEVEL :  MASTER     DELETE_USER()
+    #=======================================================#        
+    def delete_user(self, request):       
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This endpoint takes in a user PK and PERMANENTLY deletes it from the database--this tool is reserved for ONLY
+        #   --the Master Admin--not even projects can delete their own users, because all users have relations to the data--users can
+        #   --only be 'switched off' in a sense. As a master admin I can DELETE a user--usually through errors etc.
+        #   Requires the admin to retype their password in order to confirm the deletion
+ 
+        ERROR_MESSAGE = ""
+        logger.info( request)
+        logger.info( request.POST)
+        #Check our user's session and access level  
+        if request.user.permissions.master_admin:
+            if request.method == 'POST':   
+                if request.user.check_password(request.POST['password']):
+                    user = User.objects.get(pk=request.POST['user_pk'])
+                    user.delete()
+                    #SUCCESS!!
+                    SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), "This user just deleted another user", request.META)
+                    return HttpResponse('{"MESSAGE":"SUCCESS","accepted":"YES"}',content_type="application/json") 
+                else:
+                    ERROR_MESSAGE += "Error: You gave the incorrect password to delete this user."
+                    SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+                    return HttpResponse('{"MESSAGE":"'+ERROR_MESSAGE+'","accepted":"NO"}',content_type="application/json") 
+            else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying form type information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")   
+
+     #=======================================================#
+    #   ACCESS LEVEL :  MASTER     CREATE_PROJECT_ADMIN()
+    #=======================================================#        
+    def create_project_admin(self, request):       
+        logger.info( request.POST)
+    #----------------------------------------------------------------------------------------------------------------------------
+    #   This endpoint is for a MASTER admin to initialize a level 5 admin user for a new project(or simply add a new one)
+    #   It also allows the creation of another MASTER Admin
+        ERROR_MESSAGE = ""
+        #Check our user's session and access level  
+        if request.user.permissions.master_admin:
+            if request.method == 'POST':   
+                project = FormProject.objects.get(pk=request.POST['project_pk'])
+                username = request.POST['username']
+                email = request.POST['email']
+                if request.POST['is_master'] == "T": is_master = True
+                else: is_master = False
+                newpassword = get_random_string(24)
+                theUser = User()
+                theUser.username = username
+                theUser.email = email
+                theUser.set_password(newpassword)
+                theUser.is_staff = True
+                theUser.is_active = True
+                theUser.save()
+                theUser.permissions.project = project
+                theUser.permissions.master_admin = is_master
+                theUser.save()
+                
+                #Construct our Email
+                subject = "TARA Project: " + " ("+theUser.username+") New Password"
+                message = "<p><b>Hello "+ " ("+theUser.username+")! Welcome to <b>TARA</b>! Your new password is:</p></b><p> (>  "+newpassword+"  <)</p><p>Make sure to change your password when you re-login!</p>"
+                message += "<p>Good luck and thanks for using our system!</p>"
+                message += "<p>TARA Administrator</p>"
+                message += "<p><b><h2>THIS IS AN AUTOMATED MESSAGE, PLEASE DO NOT REPLY. TARA DOES NOT RECEIVE INCOMING EMAIL</h2></b></p>"
+                client = "admin@tara.museum.upenn.edu"
+                to = theUser.email
+                msg = EmailMultiAlternatives(subject, strip_tags(message), client, [to])
+                msg.attach_alternative(message, "text/html")
+                msg.send()
+                return HttpResponse('{"MESSAGE":"SUCCESS","accepted":"YES",  "user_pk":"'+str(theUser.pk)+'"}',content_type="application/json") 
+            else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying form type information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")   
+
+    #=======================================================#
+    #   ACCESS LEVEL :  MASTER     CREATE_EDIT_BLOGPOST()
+    #=======================================================#        
+    def create_edit_blogpost(self, request):        
+        logger.info(request.POST)
+    #----------------------------------------------------------------------------------------------------------------------------
+    #   This endpoint is for a MASTER admin to initialize a level 5 admin user for a new project(or simply add a new one)
+    #   It also allows the creation of another MASTER Admin
+        ERROR_MESSAGE = ""
+        #Check our user's session and access level  
+        if request.user.permissions.master_admin:
+            if request.method == 'POST':        
+                post_pk = ""
+                #If we're making a new blog post
+                if request.POST['is_new'] == "T":
+                    new_post = BlogPost()
+                    new_post.name = request.POST['name']
+                    new_post.content = request.POST['content']
+                    new_post.created_by = request.user
+                    #Quickly save it here so that when we generate a file name for the blog ID it won't be null
+                    new_post.save()
+                    if len(request.FILES) > 0:
+                        new_post.image = request.FILES['image']
+                    new_post.save()
+                    post_pk = str(new_post.pk)
+                #If we're editing an existing blog post
+                else:
+                    current_post = BlogPost.objects.get(pk=request.POST['post_pk'])
+                    current_post.name = request.POST['name']
+                    current_post.content = request.POST['content']
+                    #Quickly save it here so that when we generate a file name for the blog ID it won't be null
+                    current_post.save()
+                    if len(request.FILES) > 0:
+                        current_post.image = request.FILES['image']
+                    current_post.save()
+                    
+                    post_pk = str(current_post.pk)
+                return HttpResponse('{"MESSAGE":"SUCCESS","accepted":"YES",  "blog_pk":"'+post_pk+'"}',content_type="application/json") 
+            else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying form type information"       
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")           
+
+
+
+
+        
     #-------------------------------------------------------------------------------------------------------
     # EXPORTER ENDPOINTS
 
@@ -922,7 +1371,48 @@ class MyAdminSite(AdminSite):
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")       
+
+
+    #=======================================================#
+    #   ACCESS LEVEL :  3     RECYCLE_WEBPAGE()
+    #=======================================================#        
+    def recycle_webpage(self, request):    
+        #***************#
+        ACCESS_LEVEL = 4
+        #***************#  
+        
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This endpoint takes a Webpage pk value and flags it for the recycling bin so it no longer is shown--hidden from all
+        #   --all queries and access until restored by a level 5 access privilege user. It allows for the temporary deletion of 
+        #   --'deletion' of database items, but allows for them to be restored effectively like an 'undo' button
+        
  
+        ERROR_MESSAGE = ""
+        
+        #Check our user's session and access level  
+        if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
+            if request.method == 'POST':    
+                webpage = Webpage.objects.get(pk=request.POST['webpage_pk'])
+                if webpage.project.pk == request.user.permissions.project.pk:
+                    webpage.flagged_for_deletion = True
+                    webpage.save()
+                    
+                    json_data = {}
+                    json_data['menu_list'] = webpage.project.get_webpage_menu_list();
+                    json_data['successful'] = "T"
+                    json_data = json.dumps(json_data)
+                    #SUCCESS!!
+                    return HttpResponse(json_data, content_type="application/json") 
+                else: ERROR_MESSAGE += "Error: You are attempting to access another project's data!"            
+            else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying form type information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")       
+ 
+
+        
     #=======================================================#
     #   ACCESS LEVEL :  4     RESTORE_FORM_TYPE()
     #=======================================================#     
@@ -1061,6 +1551,7 @@ class MyAdminSite(AdminSite):
 
     #-------------------------------------------------------------------------------------------------------
     # MODEL DELETION ENDPOINTS
+
     
     #=======================================================#
     #   ACCESS LEVEL :  5     DELETE_FORM_TYPE()
@@ -1082,6 +1573,8 @@ class MyAdminSite(AdminSite):
                 if formtype.project.pk == request.user.permissions.project.pk:
                     formtype.delete()
                     #SUCCESS!!
+                    ERROR_MESSAGE += "This user just deleted this FormType  " + formtype.form_type_name
+                    SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
                     return HttpResponse('{"MESSAGE":"SUCCESS!"}',content_type="application/json") 
                 else: ERROR_MESSAGE += "Error: You are attempting to access another project's data!"            
             else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
@@ -1112,6 +1605,8 @@ class MyAdminSite(AdminSite):
                 if form.project.pk == request.user.permissions.project.pk:
                     form.delete()
                     #SUCCESS!!
+                    ERROR_MESSAGE += "This user just deleted this Form  " + form.form_name + " of formtype: " + form.form_type.form_type_name
+                    SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
                     return HttpResponse('{"MESSAGE":"SUCCESS!"}',content_type="application/json") 
                 else: ERROR_MESSAGE += "Error: You are attempting to access another project's data!"            
             else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
@@ -1142,6 +1637,8 @@ class MyAdminSite(AdminSite):
                 if frat.project.pk == request.user.permissions.project.pk:
                     frat.delete()
                     #SUCCESS!!
+                    ERROR_MESSAGE += "This user just deleted this FRAT  " + frat.record_type + " of formtype: " + frat.form_type.form_type_name
+                    SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
                     return HttpResponse('{"MESSAGE":"SUCCESS!"}',content_type="application/json") 
                 else: ERROR_MESSAGE += "Error: You are attempting to access another project's data!"
             else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
@@ -1172,6 +1669,8 @@ class MyAdminSite(AdminSite):
                 if frrt.project.pk == request.user.permissions.project.pk:
                     frrt.delete()
                     #SUCCESS!!
+                    ERROR_MESSAGE += "This user just deleted this FRRT  " + frrt.record_type + " of formtype: " + frrt.form_type_parent.form_type_name
+                    SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
                     return HttpResponse('{"MESSAGE":"SUCCESS!"}',content_type="application/json") 
                 else: ERROR_MESSAGE += "Error: You are attempting to access another project's data!"            
             else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
@@ -1206,6 +1705,33 @@ class MyAdminSite(AdminSite):
                 else: ERROR_MESSAGE += "Error: You are attempting to access another project's data!"            
             else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
         else: ERROR_MESSAGE += "Error: You do not have permission to access modifying form type information"
+        
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'","row_index":"0","is_complete":"True", "row_total":"0", "row_timer":"0"}',content_type="application/json")       
+ 
+ 
+    #=======================================================#
+    #   ACCESS LEVEL :  4     DELETE_USER_PROFILE_QUERY()
+    #=======================================================#        
+    def delete_user_profile_query(self, request):    
+        #----------------------------------------------------------------------------------------------------------------------------
+        #   This endpoint deletes a user's saved query. There aren't too many protections needed here--because they can only delete saved queries from
+        #   --their on profile.
+ 
+        ERROR_MESSAGE = ""
+        if request.method == 'POST':    
+            #Get the user's queries and store as a Py Dictionary
+            user_queries = request.user.permissions.saved_queries
+            user_queries = json.loads(user_queries)
+            for query in user_queries:
+                if query['label'] == request.POST['label']:
+                    user_queries.remove(query)
+                    break
+            request.user.permissions.saved_queries = json.dumps(user_queries)
+            request.user.permissions.save()
+            return HttpResponse('{"MESSAGE":"SUCCESS!"}',content_type="application/json") 
+        else: ERROR_MESSAGE += "Error: You are trying to access the API without using a POST request."
         
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
@@ -1336,7 +1862,7 @@ class MyAdminSite(AdminSite):
                     if 'is_hierarchical' in post_data:
                         newFormType.is_hierarchical = True
                     else:
-                        newFormType.is_hierarchical = True
+                        newFormType.is_hierarchical = False
                     
                 newFormType.save()
                 
@@ -1447,6 +1973,9 @@ class MyAdminSite(AdminSite):
                         remove_all_form_hierarchy_parent_references(formTypeToEdit)
                     else:
                         formTypeToEdit.type = 0 #standard formtype
+                        formTypeToEdit.media_type = -1
+                        formTypeToEdit.file_extension = ""
+                        formTypeToEdit.uri_prefix = ""
                         #Update the form type's group
                         #If it's a new group
                         if post_data.get('ft_group') == 'NEW':
@@ -1885,7 +2414,7 @@ class MyAdminSite(AdminSite):
                     logger.info( str(newForm.form_geojson_string))
                     newForm.form_type = newFormtype
                     newForm.save()
-                    for att_label, att_value in aFeature['properties'].iteritems():
+                    for att_label, att_value in aFeature['properties'].items():
                         #logger.info( str(att_label) + "  : "  + str(att_value))
                         #check if the current attribute is our specified form ID
                         if att_label in request.POST:
@@ -1962,8 +2491,9 @@ class MyAdminSite(AdminSite):
                 #logger.info( "Starting Clock: " + str(timerA))
                 #Make sure we escape the newline characters from the json string--jscript didn't do it automatically when concatenating the rows together in the clinet-side script
                 #We also have to replace all \t 's  in the json strings before loading them because JSON doesn't allow literal TABS --we need to escape them with a "\\"
-                logger.info( post_data.get('csv_json').encode('utf-8').replace('\t', '\\t').replace('\r', '\\r').replace('\n', '\\n'))
-                csv_json = json.loads(post_data.get('csv_json').encode('utf-8').replace('\t', '\\t').replace('\r', '\\r').replace('\n', '\\n'))
+                #logger.info( post_data.get('csv_json').encode('utf-8').replace('\t', '\\t').replace('\r', '\\r').replace('\n', '\\n'))
+                encoded_str = post_data.get('csv_json').replace('\t', '\\t').replace('\r', '\\r').replace('\n', '\\n').encode('utf-8').decode('utf-8')
+                csv_json = json.loads(encoded_str)
                 
                 logger.info( post_data)
                
@@ -2002,7 +2532,7 @@ class MyAdminSite(AdminSite):
                     
                     #Let's get the main ID 
                     if row_index == 0:
-                        for key, value in row.iteritems():
+                        for key, value in row.items():
                             if 'record__'+key+'__ismainID' in post_data:
                                 main_ID_Field = key
                                 break
@@ -2016,7 +2546,7 @@ class MyAdminSite(AdminSite):
                         logger.info( str(currentFormType.pk) + "   " + str(row[main_ID_Field]))
                         continue
       
-                    for key, value in row.iteritems():
+                    for key, value in row.items():
                         logger.info( key)
 
                         if key != main_ID_Field:
@@ -2030,27 +2560,32 @@ class MyAdminSite(AdminSite):
                                 #unecessary copies and relations that muddy everything. So if we're past the first row/iteration of the JSON, the reference types are
                                 #already created and stored in a list to reference after
                                 if row_index < 1:
-                                    #create a new FormRecordReferenceType and set "record_type" variable to the header column user-given name value
-                                    newFormRecordReferenceType = FormRecordReferenceType()
-                                    newFormRecordReferenceType.project = PROJECT
-                                    newFormRecordReferenceType.is_public = False
-                                    newFormRecordReferenceType.record_type = post_data.get('record__'+str(key)+'__name')
-                                    #also set "form_type_parent" to the current formType we are importing
-                                    newFormRecordReferenceType.form_type_parent = currentFormType
-                                    #now set "form_type_reference" to the selected FormTypeReference value in the current importer Column
-                                    #if the value == 'default' then set reference to this same FormType
-                                    if post_data.get('record__'+str(key)+'__reftype') == 'default':
-                                        newFormRecordReferenceType.form_type_reference = currentFormType
-                                    #otherwise set it to the given pk value of a FormType object
-                                    else:
-                                        newFormRecordReferenceType.form_type_reference = FormType.objects.get(pk=post_data.get('record__'+str(key)+'__reftype'))
-                                    #Set an arbitrary initial order for the type
-                                    newFormRecordReferenceType.order_number = order_counter
-                                    order_counter += 1
-                                    #save the Record Reference Type
-                                    newFormRecordReferenceType.save()
-                                    #add it to the list so that the reference value can reference it
-                                    typeList[key] = newFormRecordReferenceType
+                                    #First let's check if the Header Matches an existing RTYPE, If it does--let's use that FRAT instead of making a new one and replace its value with the
+                                    #   --one provided in the new data
+                                    if FormRecordReferenceType.objects.filter(record_type=post_data.get('record__'+str(key)+'__name'), flagged_for_deletion=False).exists():
+                                        #add the attributeType to the typeList so that the attribute value can reference it
+                                        typeList[key] = FormRecordReferenceType.objects.get(record_type=post_data.get('record__'+str(key)+'__name'), flagged_for_deletion=False)
+                                    else: #create a new FormRecordReferenceType and set "record_type" variable to the header column name
+                                        newFormRecordReferenceType = FormRecordReferenceType()
+                                        newFormRecordReferenceType.project = PROJECT
+                                        newFormRecordReferenceType.is_public = False
+                                        newFormRecordReferenceType.record_type = post_data.get('record__'+str(key)+'__name')
+                                        #also set "form_type_parent" to the current formType we are importing
+                                        newFormRecordReferenceType.form_type_parent = currentFormType
+                                        #now set "form_type_reference" to the selected FormTypeReference value in the current importer Column
+                                        #if the value == 'default' then set reference to this same FormType
+                                        if post_data.get('record__'+str(key)+'__reftype') == 'default':
+                                            newFormRecordReferenceType.form_type_reference = currentFormType
+                                        #otherwise set it to the given pk value of a FormType object
+                                        else:
+                                            newFormRecordReferenceType.form_type_reference = FormType.objects.get(pk=post_data.get('record__'+str(key)+'__reftype'))
+                                        #Set an arbitrary initial order for the type
+                                        newFormRecordReferenceType.order_number = order_counter
+                                        order_counter += 1
+                                        #save the Record Reference Type
+                                        newFormRecordReferenceType.save()
+                                        #add it to the list so that the reference value can reference it
+                                        typeList[key] = newFormRecordReferenceType
                                 #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  ADD A RECORD REFERENCE VALUE @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                                 #-------------------------------------------------------------------------------------------------------------------------
                                 
@@ -2059,7 +2594,10 @@ class MyAdminSite(AdminSite):
                                 possibleFRRV =  currentForm.ref_to_parent_form.all().filter(record_reference_type=typeList[key])
                                 if possibleFRRV.exists():
                                     newFormRecordReferenceValue = possibleFRRV[0]
-                                    newFormRecordReferenceValue.external_key_reference += "," + value
+                                    if newFormRecordReferenceValue.external_key_reference == "" or newFormRecordReferenceValue.external_key_reference == None:
+                                        newFormRecordReferenceValue.external_key_reference = value
+                                    else:
+                                        newFormRecordReferenceValue.external_key_reference += "," + value
                                     newFormRecordReferenceValue.save()
                                 else:
                                     #Create a new RecordReferenceValue
@@ -2122,28 +2660,32 @@ class MyAdminSite(AdminSite):
                                 #unecessary copies and relations that muddy everything. So if we're past the first row, the attribute types are
                                 #already created and stored in a list to reference after
                                 if row_index < 1:
-                                    #create a new FormRecordAttributeType and set "record_type" variable to the header column name
-                                    newFormRecordAttributeType = FormRecordAttributeType()
-                                    newFormRecordAttributeType.record_type = post_data.get('record__'+str(key)+'__name')
-                                    newFormRecordAttributeType.project = PROJECT
-                                    newFormRecordAttributeType.is_public = False
-                                    #also set "form_type" to the current formType we are importing
-                                    newFormRecordAttributeType.form_type = currentFormType
-                                    #Set an arbitrary initial order for the type
-                                    newFormRecordAttributeType.order_number = order_counter
-                                    order_counter += 1
-                                    #save the RecordAttributeType
-                                    newFormRecordAttributeType.save()
-                                    #add the attributeType to the typeList so that the attribute value can reference it
-                                    typeList[key] = newFormRecordAttributeType
+                                    #First let's check if the Header Matches an existing RTYPE, If it does--let's use that FRAT instead of making a new one and replace its value with the
+                                    #   --one provided in the new data
+                                    if FormRecordAttributeType.objects.filter(record_type=post_data.get('record__'+str(key)+'__name'), flagged_for_deletion=False).exists():
+                                        #add the attributeType to the typeList so that the attribute value can reference it
+                                        typeList[key] = FormRecordAttributeType.objects.get(record_type=post_data.get('record__'+str(key)+'__name'), flagged_for_deletion=False)
+                                    else: #create a new FormRecordAttributeType and set "record_type" variable to the header column name
+                                        newFormRecordAttributeType = FormRecordAttributeType()
+                                        newFormRecordAttributeType.record_type = post_data.get('record__'+str(key)+'__name')
+                                        newFormRecordAttributeType.project = PROJECT
+                                        newFormRecordAttributeType.is_public = False
+                                        #also set "form_type" to the current formType we are importing
+                                        newFormRecordAttributeType.form_type = currentFormType
+                                        #Set an arbitrary initial order for the type
+                                        newFormRecordAttributeType.order_number = order_counter
+                                        order_counter += 1
+                                        #save the RecordAttributeType
+                                        newFormRecordAttributeType.save()
+                                        #add the attributeType to the typeList so that the attribute value can reference it
+                                        typeList[key] = newFormRecordAttributeType
                                 #@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  ADD A RECORD Attribute VALUE @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
                                 #-------------------------------------------------------------------------------------------------------------------------
-                                #If this form already has a FRRV for this importer(e.g. we are running multiple rows with the same ID) then just reference
-                                #   --that existing FRRV and add the new reference, as well as the ext_key
+                                #If this form already has a FRAV then override it
                                 possibleFRAV =  currentForm.formrecordattributevalue_set.all().filter(record_attribute_type=typeList[key])
                                 if possibleFRAV.exists():
                                     newFormRecordAttributeValue = possibleFRAV[0]
-                                    newFormRecordAttributeValue.record_value = newFormRecordAttributeValue.record_value + "," + value
+                                    newFormRecordAttributeValue.record_value = value
                                     newFormRecordAttributeValue.save()
                                 else:                                
                                     #Create a new RecordAttributeValue
@@ -2192,7 +2734,7 @@ class MyAdminSite(AdminSite):
                     progressData.save()
                 #Now Update the hierchical references if they exist
                 #This forloop will only run if the hierarchyDict has been appended to already
-                for key, value in hierarchyDict.iteritems():
+                for key, value in hierarchyDict.items():
                     formToModify  =  Form.objects.get(pk=key)
                     try:#Essentially we are trying to grab the form with the given form_name. If no match is found--the TRY statement will leave it as NoneType
                         formToModify.hierarchy_parent = Form.objects.all().filter(form_name=value)[0]
@@ -2286,8 +2828,8 @@ class MyAdminSite(AdminSite):
                 #logger.info( "Starting Clock: " + str(timerA))
                 #Make sure we escape the newline characters from the json string--jscript didn't do it automatically when concatenating the rows together in the clinet-side script
                 #We also have to replace all \t 's  in the json strings before loading them because JSON doesn't allow literal TABS --we need to escape them with a "\\"
-                logger.info( post_data.get('csv_json').encode('utf-8').replace('\t', '\\t').replace('\r', '\\r').replace('\n', '\\n'))
-                csv_json = json.loads(post_data.get('csv_json').encode('utf-8').replace('\t', '\\t').replace('\r', '\\r').replace('\n', '\\n'))
+                encoded_str = post_data.get('csv_json').replace('\t', '\\t').replace('\r', '\\r').replace('\n', '\\n').encode('utf-8').decode('utf-8')
+                csv_json = json.loads(encoded_str)
                 
                 logger.info( post_data)
                
@@ -2375,7 +2917,7 @@ class MyAdminSite(AdminSite):
                     #We setup a bool test to determine if we find a primary id that is selected or not.
                     #--if we don't find a primary id by the time we end the list, set the form's name to the current row counter number
                     foundAMainID = False
-                    for key, value in row.iteritems():
+                    for key, value in row.items():
                         #timerJ = time.clock()
                         #logger.info( "Starting col loop: " + str(timerJ))
                         #First check if this column is the unique ID for this form
@@ -2563,7 +3105,7 @@ class MyAdminSite(AdminSite):
                     progressData.save()
                 #Now Update the hierchical references if they exist
                 #This forloop will only run if the hierarchyDict has been appended to already
-                for key, value in hierarchyDict.iteritems():
+                for key, value in hierarchyDict.items():
                     formToModify  =  Form.objects.get(pk=key)
                     try:#Essentially we are trying to grab the form with the given form_name. If no match is found--the TRY statement will leave it as NoneType
                         formToModify.hierarchy_parent = Form.objects.all().filter(form_name=value)[0]
@@ -2734,7 +3276,7 @@ class MyAdminSite(AdminSite):
                             #For each column in the CSV Row and the column headers (essentially all the dict/JSON key values
                             #We setup a bool test to determine if we find a primary id that is selected or not.
                             foundAMainID = False
-                            for key, value in row.iteritems():
+                            for key, value in row.items():
                                 col_index += 1
                                 #timerJ = time.clock()
                                 #logger.info( "Starting col loop: " + str(key) + " : " + str(value))
@@ -2890,18 +3432,23 @@ class MyAdminSite(AdminSite):
                 if request.method == 'POST':
                     counter = 0
                     logger.info( request.POST)
-                    for key in request.POST:
+                    key_list = request.POST['form_data']
+                    key_list = json.loads(key_list)
+                    logger.info(key_list)
+                    for key in key_list:
                         logger.info( key)
                         splitkey = key.split('__')
-                        
+                        logger.info( "POST SPLIT")
                         if len(splitkey) > 1:
                             if splitkey[0] == 'frav':
+                                logger.info( "POST SPLIT FRAV")
                                 currentFRAV = FormRecordAttributeValue.objects.get(pk=splitkey[1])
-                                currentFRAV.record_value = request.POST[key]
+                                currentFRAV.record_value = key_list[key]
                                 #Add the user information
                                 currentFRAV.modified_by = request.user
                                 currentFRAV.save()
                             else:
+                                logger.info( "POST SPLIT ELSE")
                                 #Sometimes, if 
                                 currentFRRV = FormRecordReferenceValue.objects.get(pk=key.splitkey[1])
                                 #set our external key to this key value
@@ -3262,6 +3809,128 @@ class MyAdminSite(AdminSite):
         return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")      
 
         
+        
+        
+    #=======================================================#
+    #   ACCESS LEVEL :  4       CREATE_NEW_WEBPAGE()
+    #=======================================================#      
+    def create_new_webpage(self, request):
+        #***************#
+        ACCESS_LEVEL = 4
+        #***************#
+        #------------------------------------------------------------------------------------------------------------------------------------
+        #:::This function creates a new webpage
+        #------------------------------------------------------------------------------------------------------------------------------------
+        
+        ERROR_MESSAGE = ""
+        
+        #Check our user's session and access level
+        if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
+            #Make sure we only take POST requests
+            if request.method == 'POST':      
+                logger.info(request.POST)
+                if request.POST['NEW'] == "T":
+    
+                    webpage = Webpage()
+                    webpage.name = request.POST['name']
+                    webpage.content = request.POST['content']
+                    if request.POST['menugroup'] != "NONE" and request.POST['menugroup'] == "NEW": 
+                        new_menu = Menugroup()
+                        new_menu.name = request.POST['menu_name']
+                        new_menu.project = request.user.permissions.project
+                        new_menu.save()
+                        webpage.menugroup = new_menu
+                        logger.info("We did it?")
+                        logger.info(new_menu)
+                    elif request.POST['menugroup'] != "NONE" and request.POST['menugroup'] != "NEW": 
+                        webpage.menugroup = Menugroup.objects.get(pk=request.POST['menugroup'])
+                    webpage.created_by = request.user
+                    webpage.modified_by = request.user
+                    webpage.project = request.user.permissions.project
+                    webpage.save()
+                    
+                else:
+                    webpage = Webpage.objects.get(pk=request.POST['webpage_pk'], project__pk=request.user.permissions.project.pk)
+                    webpage.name = request.POST['name']
+                    webpage.content = request.POST['content']
+                    if request.POST['menugroup'] != "NONE" and request.POST['menugroup'] == "NEW": 
+                        new_menu = Menugroup()
+                        new_menu.name = request.POST['menu_name']
+                        new_menu.project = request.user.permissions.project
+                        new_menu.save()
+                        webpage.menugroup = new_menu
+                        logger.info("We did it BBBBB?")
+                        logger.info(new_menu)
+                    elif request.POST['menugroup'] != "NONE" and request.POST['menugroup'] != "NEW": 
+                        webpage.menugroup = Menugroup.objects.get(pk=request.POST['menugroup'])
+                    else: webpage.menugroup = None
+                    webpage.modified_by = request.user
+                    webpage.save()
+
+                json_data = {}
+                json_data['success'] = "T"
+                json_data['menu_pk'] = webpage.menugroup.pk
+                json_data['menu_list'] = request.user.permissions.project.get_webpage_menu_list()
+                json_data = json.dumps(json_data)
+                #SUCCESS!!
+                return HttpResponse(json_data, content_type="application/json")   
+                
+            else: ERROR_MESSAGE += "Error: You have not submitted through POST"
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying user information"
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")      
+    
+
+
+    #=======================================================#
+    #   ACCESS LEVEL :  4       EDIT_MENUGROUP()
+    #=======================================================#      
+    def edit_menugroup(self, request):
+        #***************#
+        ACCESS_LEVEL = 4
+        #***************#
+        #------------------------------------------------------------------------------------------------------------------------------------
+        #:::This function creates a new webpage
+        #------------------------------------------------------------------------------------------------------------------------------------
+        
+        ERROR_MESSAGE = ""
+        
+        #Check our user's session and access level
+        if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
+            #Make sure we only take POST requests
+            if request.method == 'POST':      
+                logger.info(request.POST)
+
+                menugroup = Menugroup.objects.get(pk=request.POST['menugroup_pk'], project__pk=request.user.permissions.project.pk)
+                if request.POST['code'] == "NAME":
+                    menugroup.name = request.POST['name']
+                    menugroup.save()
+                elif request.POST['code'] == "DEL":
+                    menugroup.delete()
+                else:    
+                    if request.POST['code'] != "NONE": 
+                        menugroup.parentmenu = Menugroup.objects.get(pk=request.POST['code'])#code is the pk value in this case
+                    else: 
+                        menugroup.parentmenu = None
+                    #remove references from old menus, e.g. if it has submenus, they are now main menus
+                    for submenu in menugroup.menugroup_set.all():
+                        submenu.parentmenu = None
+                        submenu.save();
+                    menugroup.save()
+                #Now create a list of menu's and pages to return
+                new_list = request.user.permissions.project.get_webpage_menu_list()
+                #SUCCESS!!
+                return HttpResponse('{"SUCCESS":"T", "menu_list":"'+new_list+'", "menu_pk":"'+str(menugroup.pk)+'"}',content_type="application/json")   
+                
+            else: ERROR_MESSAGE += "Error: You have not submitted through POST"
+        else: ERROR_MESSAGE += "Error: You do not have permission to access modifying user information"
+        #If anything goes wrong in the process, return an error in the json HTTP Response
+        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")      
+    
+
+    
     #=======================================================#
     #   ACCESS LEVEL :  2       CREATE_NEW_FORM()
     #=======================================================#      
@@ -3440,18 +4109,21 @@ class MyAdminSite(AdminSite):
                 logger.info( currentQueries)
                 if currentQueries != "" and currentQueries != None:
                     currentQuery = json.loads(currentQueries)
-                    currentQuery[request.POST['new_query_label']] = request.POST['new_query'] 
+                    newQuery = {'label':request.POST['new_query_label'], 'query': json.loads(request.POST['new_query']) }
+                    currentQuery.append(newQuery)
                     finishedQueryList = json.dumps(currentQuery)
                     request.user.permissions.saved_queries = finishedQueryList     
                     request.user.permissions.save()                    
                     return HttpResponse(finishedQueryList, content_type="application/json" )
                 else:
-                    newQuery = {}
-                    newQuery[request.POST['new_query_label']] = request.POST['new_query'] 
-                    newQuery = json.dumps(newQuery)
-                    request.user.permissions.saved_queries = newQuery
+                    
+                    allQueries = []
+                    newQuery = {'label':request.POST['new_query_label'], 'query': json.loads(request.POST['new_query']) }
+                    allQueries.append(newQuery)
+                    allQueries = json.dumps(allQueries)
+                    request.user.permissions.saved_queries = allQueries
                     request.user.permissions.save()
-                    return HttpResponse(newQuery, content_type="application/json" )
+                    return HttpResponse(allQueries, content_type="application/json" )
             ERROR_MESSAGE += "Error: You have not submitted through POST"
             
         else: ERROR_MESSAGE += "Error: You do not have permission to access modifying user information"
@@ -3692,7 +4364,7 @@ class MyAdminSite(AdminSite):
                 logger.info(request.POST)
                 #Grab the formtype
                 if 'formtype_pk' in request.POST:   currentFormType = FormType.objects.get(pk=request.POST['formtype_pk'])
-                else:                               currentFormType = FormRecordReferenceType.objects.get(pk=request.POST['frrt-pk']).form_type_parent
+                else:                               currentFormType = FormRecordReferenceType.objects.get(pk=request.POST['frrt-pk']).form_type_reference
                 #If the requested formtype isn't the user's project, and flagged as being inaccessible then stop the request
                 if currentFormType.project.pk != request.user.permissions.project.pk and (currentFormType.flagged_for_deletion == True or currentFormType.is_public == False):
                     ERROR_MESSAGE += "Error: You are attempting to access records that don't exist. This probably occurred because your client attempted altering the POST data before sending"
@@ -4028,11 +4700,15 @@ class MyAdminSite(AdminSite):
                 currentProcessObject = AJAXRequestData.objects.filter(uuid=request.GET['uuid'])[0]
                 currentProcessObject.keep_alive = True
                 currentProcessObject.save()
+                currentJson = currentProcessObject.jsonString
                 #If finished, then delete the process object
                 if currentProcessObject.is_finished:
                     logger.info( "DELETING OBJECT I GUESS?")
                     currentProcessObject.delete()
-                currentJson = currentProcessObject.jsonString
+                    currentJson = json.loads(currentJson)
+                    currentJson['is_complete'] = "True"
+                    if 'server_error' in currentJson: currentJson['message'] = "There was an error server side: " + currentJson['server_error'] + " ------------ Last Message received: " +  currentJson['message']
+                    currentJson = json.dumps(currentJson)
                 #return the json response      
                 return HttpResponse(currentJson, content_type="application/json")  
             except Exception as e:
@@ -4316,11 +4992,12 @@ class MyAdminSite(AdminSite):
                     #Setup a list to hold the attribute types from the query. We want to show the record types that are part of the search terms,
                     #   --rather than the default types that are in order. If there are less than 5 query record types, use the ordered record type list
                     #   --until 5 are met.
-                    queryRTYPElist = []
-                    uniqueRTYPES = []
-                    rtypeCounter = 1
+                    logger.info(request.POST['pagination_rtype_header'])
+                    queryRTYPElist = json.loads(request.POST['pagination_rtype_header'])
 
 
+                    
+                    
                     #We need to check the # of rtypes in our header list now--if it's less than 5, then let's add from the ordered list
                     #We also need to make sure we aren't adding duplicates of the RTYPES, e.g. if we're looking for a match under "Object Number" and Object Number is already
                     #--in our sorted order-num list--let's not re-add it.
@@ -4338,8 +5015,7 @@ class MyAdminSite(AdminSite):
                         logger.info( "QTypeList:  " + str(q))
 
 
-                    logger.info( request.POST)
-                    #serializeTest = serializers.serialize("json", masterQuery)         
+                    logger.info( request.POST)        
                     queryCounter = 0
                     logging.info("TEST A")
                     logging.info("TEST A END")
@@ -4413,17 +5089,19 @@ class MyAdminSite(AdminSite):
                                     #Store the external key value instead and change it to a frrv-null for the AJAX callable
                                     rowList.append((rtype[0],'frrv-null',"", ""))
 
-                        logger.info( "TIMER Z"+ " : " + str(time.clock()))
+                                    
                         #sort the new combined reference ad attribute type list combined
                         rowList = sorted(rowList, key=lambda att: att[0])
-                        # logger.info( str(rowList))
+                        #logger.info( str(rowList))
                         #Now let's handle the thumbnail bit of business for the query
                         #--If the current form IS a media type already, then use itself to grab the thumbnail URI
+                        logger.info('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ ABOUT TO GET THUMBNAILS')
                         if aForm.form_type.type == 1:
                             thumbnailURI = aForm.get_thumbnail_type()
                         else:
+                            logger.info("LOOKING FOR A FRRT")
                             #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
-                            thumbnailURI = staticfiles_storage.url("/static/site-images/no-thumb-missing.png")
+                            thumbnailURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
                             for record in rowList:            
                                 #if it's a reference
                                 if record[1] == 'frrv' or record[1] == 'frrv-ext':
@@ -4441,13 +5119,20 @@ class MyAdminSite(AdminSite):
                                             if currentRTYPE.record_reference.all().count() > 0:
                                                 thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
                                             break
-                                    
-                        #we only want the first 5 values from the final ordered list of attributes
-                        rowList = rowList[0:5]
+                            #Finally--if there aren't any relevant media types in our frrts, let's do a last second check for ANY frrts that are media types
+                            #--that AREN'T in our RTYPE list
+                            if thumbnailURI == staticfiles_storage.url("/site-images/no-thumb-missing.png"):
+                                logger.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    We're TRYING TO GET A THUMBNAIL")
+                                currentRVAL = aForm.ref_to_parent_form.filter(record_reference_type__form_type_reference__type=1)
+                                logger.info(currentRVAL)
+                                if currentRVAL.exists():
+                                    #Just get the first one out of the list
+                                    if len(currentRVAL[0].record_reference.all()) > 0:
+                                        logger.info(currentRVAL[0].record_reference.all()[0].form_name)
+                                        thumbnailURI = currentRVAL[0].record_reference.all()[0].get_thumbnail_type()
+                                        
 
-
-                        formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])   
-                        logger.info( "TIMER ZZ"+ " : " + str(time.clock()))
+                        formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])                                       
                         
                     form_att_type_list, form_list = form_att_type_list, formList
 
@@ -4484,7 +5169,7 @@ class MyAdminSite(AdminSite):
                         formDict["rvals"] = formRVALS
                         allFormList.append(formDict)
 
-                    
+                    finishedJSONquery["pagination_rtype_header"] = queryRTYPElist
                     finishedJSONquery["form_list"] = allFormList
                     finishedJSONquery["formtype"] = formtype.form_type_name
                     finishedJSONquery["formtype_pk"] = formtype.pk
@@ -4909,7 +5594,7 @@ class MyAdminSite(AdminSite):
                         requestedPageNumber = "ALL"
                         resultsPerPage = request.POST['numberOfResults']
                         startIndex = 0
-                        endIndex = request.POST['numberOfResults']
+                        endIndex = int(request.POST['numberOfResults'])
                     
                     logger.info( startIndex)
                     logger.info( endIndex)
@@ -4948,7 +5633,10 @@ class MyAdminSite(AdminSite):
                     else:             
                         logger.info( "TIMER R"+ " : " + str(time.clock()))
                         #sort the formlist by their sort_index
-                        masterQuery = masterQuery.order_by('sort_index')[startIndex:endIndex]
+                        logger.info(startIndex)
+                        logger.info(endIndex)
+                        masterQuery = masterQuery.order_by('sort_index')
+                        masterQuery = masterQuery[startIndex:endIndex]
                     logger.info( "TIMER RR"+ " : " + str(time.clock()))
                     #count the query so we only make one database hit before looping(otherwise each loop would be another hit)
                     if masterQuery:
@@ -5024,7 +5712,7 @@ class MyAdminSite(AdminSite):
                                 thumbnailURI = aForm.get_thumbnail_type()
                             else:
                                 #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
-                                thumbnailURI = staticfiles_storage.url("/static/site-images/no-thumb-missing.png")
+                                thumbnailURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
                                 for record in rowList:            
                                     #if it's a reference
                                     if record[1] == 'frrv' or record[1] == 'frrv-ext':
@@ -5121,7 +5809,17 @@ class MyAdminSite(AdminSite):
         #If anything goes wrong in the process, return an error in the json HTTP Response
         SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")   
-    
+ 
+
+
+
+
+    #############################################################################################################################################################################################################################
+    #############################################################################################################################################################################################################################
+    #############################################################################################################################################################################################################################
+    #############################################################################################################################################################################################################################
+
+ 
     #=======================================================#
     #   ACCESS LEVEL :  1       RUN_MASTER_QUERY_ENGINE() *Recycling
     #=======================================================#   
@@ -5164,6 +5862,13 @@ class MyAdminSite(AdminSite):
 
         ERROR_MESSAGE = ""
         
+        CS_CONTAINS = '0';
+        CONTAINS = '1';
+        EXACT_MATCH = '2';
+        EXCLUDES = '3';
+        IS_NULL = '4';
+        ALL_UNIQUE_TERMS = '5';
+        
         #Check our user's session and access level
         if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
         
@@ -5171,650 +5876,967 @@ class MyAdminSite(AdminSite):
                     
                 logger.info( request.POST)
                 #Make the AJAX Request Data Model for subsequent AJAX calls
-                progressData = AJAXRequestData(uuid=request.POST.get('uuid'), jsonString='{"message":"Loading Json","current_query":"","current_term":"","percent_done":"0","is_complete":"False"}')
+                progressDataMessage = {}
+                progressDataMessage['message'] = "Loading Query from POST"
+                progressDataMessage['current_query'] = ""
+                progressDataMessage['current_term'] = ""
+                progressDataMessage['percent_done'] = "0"
+                progressDataMessage['current_constraint'] = ""
+                progressDataMessage['is_complete'] = "False"
+                #!!!!!!!!!!!!!!PROGRESS UPDATE
+                progressData = AJAXRequestData(uuid=request.POST.get('uuid'), jsonString=json.dumps(progressDataMessage) )
+                progressData.is_finished = False
                 progressData.save()
                 
-                #We need to loop through EACH project query in the JSON header and create a separate results box for each one
-                masterProjectQuery = json.loads(request.POST['master_query'])
+                try:
                 
-                masterQueryResults = {}
-                all_project_queries = []
-                masterQueryResults['final_query_set'] = all_project_queries
-                
-                query_set = masterProjectQuery['query_list']
-                
-                globalPercentage = 0
-                queryPercentage = 0
-                queryPercentageIncrement = 100 / len(query_set)
-                queryPercentageCounter = 0
-                for query in query_set:
-                    logger.info( "Starting a query?")
-                    # PROGRESS REPORT *****************************************
-                    #Setup our percentage monitors for the AJAX progress report
-                    queryPercentage = (queryPercentageCounter * queryPercentageIncrement)
-                    queryPercentageCounter += 1
-                    globalPercentage = queryPercentage
-                    progressData.jsonString = '{"message":"Performing Query","current_query":"'+query['project_label']+' : '+query['formtype_label']+'","current_term":"","percent_done":"'+str(globalPercentage)+'","is_complete":"False"}'
-                    progressData.save() 
-                    #**********************************************************
+                    #We need to loop through EACH project query in the JSON header and create a separate results box for each one
+                    masterProjectQuery = json.loads(request.POST['master_query'])
                     
-                    queryProject = FormProject.objects.get(pk=query['project_pk']) 
-                    queryFormtype = FormType.objects.get(pk=query['formtype_pk'])
-                    #If we are querying a project different than the user and it is NOT set to public, then throw an error because it should be private
-                    if (queryProject.pk != request.user.permissions.project.pk and queryProject.is_public == False) or (queryFormtype.project.pk != request.user.permissions.project.pk and queryFormtype.is_public == False):
-                        ERROR_MESSAGE += "Error: You are trying to access a project or formtype that doesn't exist or access is not allowed. This has been logged to the network administrator"
-                        #Delete Our progress object
-                        logger.info( "Hmmm are we exiting here?")
-                        progressData.delete()
-                        #break the loop and return the security message
-                        break
-                    #Otherwise continue
-                    else:
-  
-                        #create a dictionary to store the query statistics
-                        queryStats = {}
-                        queryStats['formtype'] = query['formtype_label']
-                        queryStats['formtype_pk'] = query['formtype_pk']
-                        queryStats['project'] = query['project_label']
-                        queryStats['project_pk'] = query['project_pk']
-                        queryList = []
-                        queryStats['query_list'] = queryList
-                        primaryConstraintList = []
-                        
-                        logger.info(  queryStats['project_pk']  + "  :  "  + query['project_pk'])
-                        
-                        #First let's setup our header field of ordered labels 
-                        logger.info(  "Timer Start"                )
-                        form_att_type_list = []
-                        #***RECYCLING BIN*** Make sure our RTYPES are filtered by their deletion flags
-                        for attType in queryFormtype.formrecordattributetype_set.all().filter(flagged_for_deletion=False).order_by('order_number'):
-                            form_att_type_list.append((attType.order_number,'frat',attType.pk,attType.record_type)) 
-                 
-                        #***RECYCLING BIN*** Make sure our RTYPES are filtered by their deletion flags
-                        for refType in queryFormtype.ref_to_parent_formtype.all().filter(flagged_for_deletion=False).order_by('order_number'):
-                            form_att_type_list.append((refType.order_number,'frrt',refType.pk,refType.record_type)) 
+                    masterQueryResults = {}
+                    all_project_queries = []
+                    masterQueryResults['final_query_set'] = all_project_queries
+                    query_set = masterProjectQuery['query_list']
 
-                        #sort the new combined reference ad attribute type list combined
-                        form_att_type_list = sorted(form_att_type_list, key=lambda att: att[0])
-                        #we only want the first 5 types
-                        #form_att_type_list = form_att_type_list[0:5]
+                   
+                    progressDataParentQueryCounter = 0;
+                    for query in query_set:
+                        logger.info( "Starting a query?")
+                        # PROGRESS REPORT *****************************************
+                        #!!!!!!!!!!!!!!PROGRESS UPDATE
+                        progressDataBasePercentage = (80.0/len(query_set)) * progressDataParentQueryCounter
+                        progressDataMessage['message'] = "Performing Database Query"
+                        progressDataMessage['current_query'] = query['project_label'] + " : " + query['formtype_label']
+                        progressDataMessage['current_term'] = ""
+                        progressDataMessage['percent_done'] = progressDataBasePercentage
+                        progressData.jsonString = json.dumps(progressDataMessage) 
+                        progressData.save()
                         
-                        #Finally let's organize all of our reference and attribute values to match their provided order number
-                        formList = []                
-                       
-                        #Setup our inital queryset that includes all forms
-                        masterQuery = queryFormtype.form_set.all().filter(flagged_for_deletion=False) 
-                        
-                        
-                        #Setup a list to hold the attribute types from the query. We want to show the record types that are part of the search terms,
-                        #   --rather than the default types that are in order. If there are less than 5 query record types, use the ordered record type list
-                        #   --until 5 are met.
-                        queryRTYPElist = []
-                        uniqueRTYPES = []
-                        rtypeCounter = 1
-                        #Load the JSON query from POST
-                        
-                        
-
-                        for term in query['terms']:
-            
-                            logger.info( query)
-                            #setup a dictionary of key values of the query stats to add to the main querystas dictionary later
-                            singleQueryStats = {} 
+                        queryProject = FormProject.objects.get(pk=query['project_pk']) 
+                        queryFormtype = FormType.objects.get(pk=query['formtype_pk'])
+                        #If we are querying a project different than the user and it is NOT set to public, then throw an error because it should be private
+                        if (queryProject.pk != request.user.permissions.project.pk and queryProject.is_public == False) or (queryFormtype.project.pk != request.user.permissions.project.pk and queryFormtype.is_public == False):
+                            ERROR_MESSAGE += "Error: You are trying to access a project or formtype that doesn't exist or access is not allowed. This has been logged to the network administrator"
+                            #Delete Our progress object
+                            logger.info( "Hmmm are we exiting here?")
+                            progressData.is_finished = True;
+                            progressDataMesssage['server_error'] = ERROR_MESSAGE
+                            progressData.jsonString = json.dumps(progressDataMessage) 
+                            progressData.save()
+                            #break the loop and return the security message
+                            break
+                        #Otherwise continue
+                        else:
+                            #create a dictionary to store the query statistics
+                            queryStats = {}
+                            queryStats['all_forms_count'] = 0
+                            queryStats['formtype'] = query['formtype_label']
+                            queryStats['formtype_pk'] = query['formtype_pk']
+                            queryStats['project'] = query['project_label']
+                            queryStats['project_pk'] = query['project_pk']
+                            queryStats['primary_constraints'] = []
+                            queryStats['secondary_constraints'] = []
+                            queryStats['secondary_constraints_test'] = []
+                            queryList = []
+                            queryStats['query_list'] = queryList
+                            primaryConstraintList = []
                             
-                            queriedForms = masterQuery
-                            #***RECYCLING BIN*** Make sure our Forms are filtered by their deletion flag
-    
-                            uniqueQuery = False
-                            #Let's not allow any duplicate rtypes in the query rtype list header e.g. we don't want "Object ID" to show up 4 times 
-                            #--if the user makes a query that compares it 4 times in 4 separate queries
-                            if (term['pk']+ '_' +term['RTYPE']) not in uniqueRTYPES: 
-                                uniqueRTYPES.append((term['pk']+ '_' +term['RTYPE']))
-                                uniqueQuery = True
+                            logger.info(  queryStats['project_pk']  + "  :  "  + query['project_pk'])
                             
-                            #We need to check whether or not this query is an AND/OR  or a null,e.g. the first one(so there is no and/or)
-                            rtype = term['RTYPE']
-                            rtypePK = term['pk']
                             
-                            logger.info( rtype + " :    <!----------------------------------------------------------------")
-                            #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-                            # (FRAT) FormRecordAttributeType Lookups
-                            #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-                            if rtype == 'FRAT':
-                                #store the record type in a new rtype list if unique
-                                if uniqueQuery: queryRTYPElist.append((rtypeCounter,'frat',rtypePK,term['LABEL'])) 
-                                rtypeCounter += 1
-                                tCounter = 0
-                                
-                                #store stats
-                                singleQueryStats['rtype_name'] = term['LABEL']
-                                singleQueryStats['rtype_pk'] = rtypePK
-                                singleQueryStats['rtype'] = rtype
-                                termStats = []
-                                singleQueryStats['all_terms'] = termStats
-                                logging.info("TimerA"+ " : " + str(time.clock()))
-                                
-                                #Now begin modifying the SQL query which each term of each individual query
-                                #skip the term if the field was left blank
-                                if term['TVAL'] != "" or term['QCODE'] == '4':
-                                    newQuery = None
-                                    if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
-                                        #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                        if   term['QCODE'] == '0': newQuery = queriedForms.filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#CONTAINS    
-                                        elif term['QCODE'] == '1': newQuery = queriedForms.filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
-                                        elif term['QCODE'] == '2': newQuery = queriedForms.filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
-                                        elif term['QCODE'] == '3': newQuery = queriedForms.exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
-                                        elif term['QCODE'] == '4': newQuery = queriedForms.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL        
-                                        #save stats and query
-                                        term['count'] =  newQuery.count()
-                                        termStats.append(term)
-                                        queriedForms = newQuery
-                                    else:#Otherwise it's an OR statement
-                                        #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                        if   term['QCODE'] == '0': newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#CONTAINS    
-                                        elif term['QCODE'] == '1': newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#ICONTAINS                                   
-                                        elif term['QCODE'] == '2': newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#MATCHES EXACT                                    
-                                        elif term['QCODE'] == '3': newQuery = (queryFormtype.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#EXCLUDES                                   
-                                        elif term['QCODE'] == '4': newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK))#IS_NULL 
-                                        #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                        newQuery = newQuery.filter(flagged_for_deletion=False)
-                                        #save stats and query
-                                        term['count'] =  newQuery.count()
-                                        termStats.append(term)
-                                        queriedForms = (newQuery | queriedForms)
-                                    logging.info("TimerB"+ " : " + str(time.clock()))
+                            #First let's setup our header field of ordered labels            )
+                            form_att_type_list = []
+                            #***RECYCLING BIN*** Make sure our RTYPES are filtered by their deletion flags
+                            for attType in queryFormtype.formrecordattributetype_set.all().filter(flagged_for_deletion=False).order_by('order_number'):
+                                form_att_type_list.append((attType.order_number,'frat',attType.pk,attType.record_type)) 
+                     
+                            #***RECYCLING BIN*** Make sure our RTYPES are filtered by their deletion flags
+                            for refType in queryFormtype.ref_to_parent_formtype.all().filter(flagged_for_deletion=False).order_by('order_number'):
+                                form_att_type_list.append((refType.order_number,'frrt',refType.pk,refType.record_type)) 
 
-                                    logging.info("TimerC"+ " : " + str(time.clock()))
-                            #########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     
-                            # (FRRT) FormRecordReferenceType Lookups            
-                            # This is where things can get complicated. I've added a 'deep' search -- or the ability to search fields from a related model
-                            # --Right now, this just looks at the form IDs of the related field and looks for matches--it will still need to do that, but
-                            # --it also needs to be able to look up FRAT or FRRTs in the same field--that will essentially double the code for this blocks
-                            # --to do all of this, and will also cause the time of the query to significantly increase because we are doing another JOIN in the
-                            # --SQL lookup to span this relationship. This won't affect the list of queried forms directly--they will be limited by what the
-                            # --query finds obviously--but the user will only see the column for the related FRRT that had a match--not specifically the field that matched
-                            # ----It WILL affect the counts for the graphs etc.
-                            #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-                            elif rtype == 'FRRT':
-                                #store the record type in a new rtype list if unique
-                                if uniqueQuery: queryRTYPElist.append((rtypeCounter,'frrt',rtypePK,term['LABEL'])) 
-                                rtypeCounter += 1
-                                tCounter = 0
-                                
-                                #store stats
-                                singleQueryStats['rtype_name'] = term['LABEL']
-                                singleQueryStats['rtype_pk'] = rtypePK
-                                singleQueryStats['rtype'] = rtype
-                                termStats = []
-                                singleQueryStats['all_terms'] = termStats
-                                #get the deep values
-                                deepPK, deepRTYPE = term['RTYPE-DEEP'].split('__')
-                                logger.info( deepPK + "  :  " + deepRTYPE + " <!-------------------------------------------")
-                                #==========================================================================================================================================================================================
-                                # IF WE ARE JUST LOOKING UP THE RTYPE FORM ID
-                                #==========================================================================================================================================================================================
-                                #TODO: This also needs to check external reference values if no match is found
-                                if deepRTYPE == 'FORMID':
-                                    logger.info( "WTF")
-                                    #Now begin modifying the SQL query which each term of each individual query
-                                    #skip the term if the field was left blank
-                                    if term['TVAL'] != "" or term['QCODE'] == '4':
-                                        newQuery = None
-                                        if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            if   term['QCODE'] == '0': newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK) #CONTAINS    
-                                            elif term['QCODE'] == '1': newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__icontains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK) #ICONTAINS                                   
-                                            elif term['QCODE'] == '2': newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__exact=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
-                                            elif term['QCODE'] == '3': newQuery = queriedForms.exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
-                                            elif term['QCODE'] == '4': newQuery = queriedForms.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK) #IS_NULL        
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = newQuery
-                                        else:#Otherwise it's an OR statement
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            if   term['QCODE'] == '0': newQuery = (queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#CONTAINS    
-                                            elif term['QCODE'] == '1': newQuery = (queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__form_name__icontains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#ICONTAINS                                   
-                                            elif term['QCODE'] == '2': newQuery = (queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__form_name__exact=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#MATCHES EXACT                                    
-                                            elif term['QCODE'] == '3': newQuery = (queryFormtype.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#EXCLUDES                                   
-                                            elif term['QCODE'] == '4': newQuery = (queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK))#IS_NULL 
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = (newQuery | queriedForms)
-                                #==========================================================================================================================================================================================
-                                # IF WE ARE LOOKING UP THE RELATIONS FRAT
-                                #==========================================================================================================================================================================================
-                                elif deepRTYPE == 'FRAT':
-                                    logger.info( "We should be here")
-                                    #grab the formtype in question
-                                    deepFormType = FormType.objects.filter(pk=FormRecordAttributeType.objects.get(pk=deepPK).form_type.pk)
-                                    #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
-                                    deepFormType = deepFormType.filter(flagged_for_deletion=False)
-                                    deepFormType = deepFormType[0]
-                                    #Now begin modifying the SQL query which each term of each individual query
-                                    #skip the term if the field was left blank
-                                    if term['TVAL'] != "" or term['QCODE'] == '4':
-                                        newQuery = None
-                                        #----------------------------------------------------------
-                                        # AND STATEMENT FOR A --TERM--
-                                        if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            #First we Get a flattened list of form pk values from the deepFormType
-                                            #Then we filter our current formtype queryset's frrt manytomany pks by the pk value list just created 
-                                            if   term['QCODE'] == '0': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '1': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '2': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '3': 
-                                                flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '4': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = newQuery
-                                        #--------------------------------------------------------
-                                        # OR STATEMENT FOR a --TERM--
-                                        else:
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            if   term['QCODE'] == '0': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '1': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '2': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '3': 
-                                                flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '4': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)    
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = (newQuery | queriedForms)                            
-                                #==========================================================================================================================================================================================
-                                # IF WE ARE LOOKING UP THE RELATION'S FRRT(Only form ID allowed)
-                                #==========================================================================================================================================================================================
-                                elif deepRTYPE == 'FRRT':
-                                    logger.info( "We should be here 3")
-                                    #grab the formtype in question
-                                    deepFormType = FormType.objects.get(pk=FormRecordReferenceType.objects.get(pk=deepPK).form_type_parent.pk)
-                                    #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
-                                    deepFormType = deepFormType.filter(flagged_for_deletion=False)
-                                    
-                                    #Now begin modifying the SQL query which each term of each individual query
-                                    #skip the term if the field was left blank
-                                    if term['TVAL'] != "" or term['QCODE'] == '4':
-                                        newQuery = None
-                                        #----------------------------------------------------------
-                                        # AND STATEMENT FOR A --TERM--
-                                        if term['T-ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            #First we Get a flattened list of form pk values from the deepFormType
-                                            #Then we filter our current formtype queryset's frrt manytomany pks by the pk value list just created 
-                                            if   term['QCODE'] == '0': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #CONTAINS 
-                                                logger.info( "LOOK HERE ROBERT")
-                                                logger.info( flattenedSet)
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '1': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '2': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #EXACT MATCH
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '3': 
-                                                flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #EXCLUDES   
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '4': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True).values_list('pk', flat=True)) #IS NULL  
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                                   
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = newQuery
-                                        #--------------------------------------------------------
-                                        # OR STATEMENT FOR a --TERM--
-                                        else:
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            if   term['QCODE'] == '0': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '1': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                                newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '2': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #EXACT MATCH
-                                                newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '3': 
-                                                flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #EXCLUDES 
-                                                newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '4': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True).values_list('pk', flat=True)) #IS NULL
-                                                newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)    
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = (newQuery | queriedForms)            
+                            #sort the new combined reference ad attribute type list combined
+                            form_att_type_list = sorted(form_att_type_list, key=lambda att: att[0])
+                            #we only want the first 5 types
+                            form_att_type_list = form_att_type_list[0:5]
+                            
+                            #Finally let's organize all of our reference and attribute values to match their provided order number
+                            formList = []                
+                           
+                            #Setup our inital queryset that includes all forms
+                            masterQuery = queryFormtype.form_set.all().filter(flagged_for_deletion=False)  
+                            queryStats['all_forms_count'] = masterQuery.count()
+                            
+                            #Setup a list to hold the attribute types from the query. We want to show the record types that are part of the search terms,
+                            #   --rather than the default types that are in order. If there are less than 5 query record types, use the ordered record type list
+                            #   --until 5 are met.
+                            queryRTYPElist = []
+                            uniqueRTYPES = []
+                            rtypeCounter = 1
+                            
+                            #Some progress data report variables
+                            termCounter = 0.0
+                            termTotalPercent = 60.0
+                            termCount = len(query['terms'])
+                            termMinPercent = 10.0
+                            for index,term in enumerate(query['terms']):
+                                progressDataMessage['current_term'] = term['TVAL']
+                               
+                                currentTermPercent = termMinPercent + ((termTotalPercent/termCount) * termCounter)
+                                logger.info("<!------------------------------------------  " + str(currentTermPercent))
+                                progressDataMessage['percent_done'] = str(int(currentTermPercent))
+                                progressData.jsonString = json.dumps(progressDataMessage) 
+                                progressData.save()
 
-                            #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-                            # (Form ID) Lookups
-                            #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-                            elif rtype == "FORMID":
+
+                                #setup a dictionary of key values of the query stats to add to the main querystas dictionary later
+                                singleQueryStats = {} 
+                                singleQueryStats['original_query'] = {}
+                                singleQueryStats['original_query']['query_list'] = []
+                                singleQueryStats['original_query']['query_list'].append( copy.deepcopy(query))
+                                logger.info(singleQueryStats['original_query']['query_list'])
+                                logger.info(singleQueryStats['original_query']['query_list'][0])
+                                singleQueryStats['original_query']['query_list'][0]['terms'] = singleQueryStats['original_query']['query_list'][0]['terms'][index:index+1]
+                                singleQueryStats['original_query']['query_list'][0]['terms'][0]['ANDOR'] = "INITIAL"
+                                queriedForms = queryFormtype.form_set.all().filter(flagged_for_deletion=False) 
+
+                                uniqueQuery = False
+                                #Let's not allow any duplicate rtypes in the query rtype list header e.g. we don't want "Object ID" to show up 4 times 
+                                #--if the user makes a query that compares it 4 times in 4 separate queries
+                                if (term['pk']+ '_' +term['RTYPE']) not in uniqueRTYPES: 
+                                    uniqueRTYPES.append((term['pk']+ '_' +term['RTYPE']))
+                                    uniqueQuery = True
+                                
+                                #We need to check whether or not this query is an AND/OR  or a null,e.g. the first one(so there is no and/or)
+                                rtype = term['RTYPE']
+                                rtypePK = term['pk']
+                                
+                                logger.info( rtype + " :    <!----------------------------------------------------------------")
+                                #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+                                # (FRAT) FormRecordAttributeType Lookups
+                                #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+                                if rtype == 'FRAT':
+                                    #store the record type in a new rtype list if unique
+                                    if uniqueQuery: queryRTYPElist.append((rtypeCounter,'frat',rtypePK,term['LABEL'])) 
+                                    rtypeCounter += 1
                                     tCounter = 0
+                                    
                                     #store stats
                                     singleQueryStats['rtype_name'] = term['LABEL']
                                     singleQueryStats['rtype_pk'] = rtypePK
                                     singleQueryStats['rtype'] = rtype
                                     termStats = []
                                     singleQueryStats['all_terms'] = termStats
-                                    logging.info("TimerD"+ " : " + str(time.clock()))
-
                                     #Now begin modifying the SQL query which each term of each individual query
                                     #skip the term if the field was left blank
                                     if term['TVAL'] != "" or term['QCODE'] == '4':
+                                        logger.info("WE MADE IT!!!!   => QCODE = " + term['QCODE'])
                                         newQuery = None
-                                        logger.info( str(queryFormtype.form_set.all().filter(form_name__contains=term['TVAL'])))
-                                        if term['T-ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
-                                            logger.info( "Is it working?")
+                                        if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
                                             #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            if   term['QCODE'] == '0': newQuery = queriedForms.filter(form_name__contains=term['TVAL']) #CONTAINS    
-                                            elif term['QCODE'] == '1': newQuery = queriedForms.filter(form_name__icontains=term['TVAL']) #ICONTAINS                                   
-                                            elif term['QCODE'] == '2': newQuery = queriedForms.filter(form_name__exact=term['TVAL'])#MATCHES EXACT                                    
-                                            elif term['QCODE'] == '3': newQuery = queriedForms.exclude(form_name__contains=term['TVAL'])#EXCLUDES                                   
-                                            elif term['QCODE'] == '4': newQuery = queriedForms.filter(form_name__isnull=True) #IS_NULL        
+                                            if   term['QCODE'] == CONTAINS: newQuery = queriedForms.filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#CONTAINS    
+                                            elif term['QCODE'] == CS_CONTAINS: newQuery = queriedForms.filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
+                                            elif term['QCODE'] == EXACT_MATCH: newQuery = queriedForms.filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
+                                            elif term['QCODE'] == EXCLUDES: newQuery = queriedForms.exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
+                                            elif term['QCODE'] == IS_NULL: newQuery = queriedForms.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK) | (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=rtypePK))#IS_NULL        
+                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
+                                            newQuery = newQuery.filter(flagged_for_deletion=False)
                                             #save stats and query
                                             term['count'] =  newQuery.count()
                                             termStats.append(term)
-                                            queriedForms = newQuery
+                                            masterQuery = (newQuery & masterQuery)
+                                            singleQueryStats['intersections'] = masterQuery.count()
                                         else:#Otherwise it's an OR statement
                                             #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            if   term['QCODE'] == '0': newQuery = (queryFormtype.form_set.all().filter(form_name__contains=term['TVAL']))#CONTAINS    
-                                            elif term['QCODE'] == '1': newQuery = (queryFormtype.form_set.all().filter(form_name__icontains=term['TVAL']))#ICONTAINS                                   
-                                            elif term['QCODE'] == '2': newQuery = (queryFormtype.form_set.all().filter(form_name__exact=term['TVAL']))#MATCHES EXACT                                    
-                                            elif term['QCODE'] == '3': newQuery = (queryFormtype.form_set.all().exclude(form_name__contains=term['TVAL']))#EXCLUDES                                   
-                                            elif term['QCODE'] == '4': newQuery = (queryFormtype.form_set.all().filter(form_name__isnull=True))#IS_NULL 
+                                            if   term['QCODE'] == CONTAINS: newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#CONTAINS    
+                                            elif term['QCODE'] == CS_CONTAINS: newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#ICONTAINS                                   
+                                            elif term['QCODE'] == EXACT_MATCH: newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#MATCHES EXACT                                    
+                                            elif term['QCODE'] == EXCLUDES: newQuery = (queryFormtype.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#EXCLUDES                                   
+                                            elif term['QCODE'] == IS_NULL: newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)) | (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=rtypePK))#IS_NULL 
                                             #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)    
+                                            newQuery = newQuery.filter(flagged_for_deletion=False)
                                             #save stats and query
                                             term['count'] =  newQuery.count()
                                             termStats.append(term)
-                                            queriedForms = (newQuery | queriedForms)
-                    
-                            queryList.append(singleQueryStats)    
-                            masterQuery = queriedForms 
-
-                            singleQueryStats['ANDOR'] = term['ANDOR']
-                            singleQueryStats['count'] = masterQuery.count()
-
-                            queryStats['count'] = singleQueryStats['count']
-
-
-
-                        
-                        #Send a message to our AJAX request object
-                        progressData.jsonString = '{"message":"Running raw SQL","current_query":"","current_term":"''","percent_done":"50","is_complete":"False"}'
-                        progressData.save()                 
-                       
-                       
-                        jsonStats = json.dumps(queryStats)
-                        #Send a message to our AJAX request object
-                        progressData.jsonString = '{"message":"Loading Queried Forms & Sending generated stats now...","current_query":"","current_term":"''","percent_done":"60","is_complete":"False","stats":'+jsonStats+'}'
-                        progressData.save()                    
-
-                        #Now make sure our final queried list has distint values--merging querysets has a tendency to create duplicates
-                        masterQuery = masterQuery.distinct()
-                        #***RECYCLING BIN*** A Final redundant recycling bin filter--just to be safe
-                        masterQuery = masterQuery.filter(flagged_for_deletion=False)                      
-
-                        #We need to check the # of rtypes in our header list now--if it's less than 5, then let's add from the ordered list
-                        #We also need to make sure we aren't adding duplicates of the RTYPES, e.g. if we're looking for a match under "Object Number" and Object Number is already
-                        #--in our sorted order-num list--let's not re-add it.
-                        for attType in form_att_type_list:
-                            logger.info( "AttTypeList:  " + str(attType))
-                            matchfound = False
-                            for queryAttType in queryRTYPElist:
-                                if attType[2] == queryAttType[2]:
-                                    matchfound = True
-                            if matchfound == False:    
-                                #let's arbitrarily add '100' to the order number so that our queries are definitely in front of these
-                                queryRTYPElist.append((attType[0] + 100,attType[1],attType[2],attType[3]))
-                                
-                        for q in queryRTYPElist:
-                            logger.info( "QTypeList:  " + str(q))
-
-
-                        
-                        #serializeTest = serializers.serialize("json", masterQuery)         
-                        queryCounter = 0
-                        logging.info("TEST A")
-                        total = queryStats['count']
-                        paginationTotal = total
-                        logging.info("TEST A END")
-                        
-                        logger.info( "TIMER HOHOHOHOOHOHOHO  START")
-                        #We need to grab ALL the form pk values in a similarly sorted list 
-                        paginationQuery = masterQuery.order_by('sort_index')
-                        paginationFormList = []
-                        if paginationQuery:
-                            for form in paginationQuery:
-                                paginationFormList.append(form.pk)
-                        #logger.info( paginationFormList)
-                        logger.info( "TIMER HOHOHOHOOHOHOHO  END")
-                        
-                        #-----------------------------------------------------------------------------------------------------------
-                        # Here we need to determine whether or not the form type being queried is hierchical.
-                        #   --If it is hierachical, then we just organize the masterQuery and sort it with the hierachy in mind
-                        #   --as well as with its hierchical labels--otherwise just perform a normal sort by its label
-                        if queryFormtype.is_hierarchical:
-                            global hierarchyFormList
-                            hierarchyFormList = []
-                            #Finally let's organize all of our reference and attribute values to match their provided order number
-                            #We want to find all the forms that have no parent element first--these are the top of the nodes
-                            #Then we'll organize the forms by hierarchy--which can then be put through the normal ordered query
-                            masterQuery =  masterQuery.filter(hierarchy_parent=None).exclude(form_number=None, form_name=None)[:25]
-                            #CACHE -- this caches the query for the loop
-                            if masterQuery:
-                                for aForm in masterQuery: 
+                                            masterQuery = (newQuery | masterQuery)
+                                            singleQueryStats['additions'] = masterQuery.count()
+                                            logging.info("TimerB"+ " : " + str(time.clock()))
+                                #########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     
+                                # (FRRT) FormRecordReferenceType Lookups            
+                                # This is where things can get complicated. I've added a 'deep' search -- or the ability to search fields from a related model
+                                # --Right now, this just looks at the form IDs of the related field and looks for matches--it will still need to do that, but
+                                # --it also needs to be able to look up FRAT or FRRTs in the same field--that will essentially double the code for this blocks
+                                # --to do all of this, and will also cause the time of the query to significantly increase because we are doing another JOIN in the
+                                # --SQL lookup to span this relationship. This won't affect the list of queried forms directly--they will be limited by what the
+                                # --query finds obviously--but the user will only see the column for the related FRRT that had a match--not specifically the field that matched
+                                # ----It WILL affect the counts for the graphs etc.
+                                #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+                                elif rtype == 'FRRT':
+                                    #store the record type in a new rtype list if unique
+                                    if uniqueQuery: queryRTYPElist.append((rtypeCounter,'frrt',rtypePK,term['LABEL'])) 
+                                    rtypeCounter += 1
+                                    tCounter = 0
                                     
-                                    queryCounter += 1
-                                    Qpercent = ( queryCounter * (30/(total*1.0)))
-                                    finalPercent = (60 + int(Qpercent))
-                                    progressData.jsonString = '{"SQL":"True","message":"Loading Queried Forms!","current_query":"'+ str(queryCounter) +'","current_term":"'+ str(total) +'","percent_done":"' + str(finalPercent) + '","is_complete":"False","stats":'+jsonStats+'}'
-                                    progressData.save()
-                                    logging.info(aForm.form_name)
-                                    hierarchyFormList.append(aForm)
-                                    #Make a recursive function to search through all children
-                                    def find_children(currentParentForm):          
-                                        global hierarchyFormList
-                                        for currentChild in currentParentForm.form_set.all(): 
-                                            hierarchyFormList.append(currentChild)
-                                            find_children(currentChild)
-                                    find_children(aForm)
-                            #reset our masterQuery to our new hierachical list!
-                            masterQuery = hierarchyFormList
-                        else:             
-                            #sort the formlist by their sort_index
-                            masterQuery = masterQuery.order_by('sort_index')[:25]
-                            
-                            
-                        #logger.info( masterQuery  )
-                        #CACHE -- This cache's the query before looping through it
-                        if masterQuery:
-                            for aForm in masterQuery:
-                                queryCounter += 1
-                                Qpercent = ( queryCounter * (30/(total*1.0)))
-                                finalPercent = (60 + int(Qpercent))
-                                progressData.jsonString = '{"SQL":"True","message":"Loading Queried Forms!","current_query":"'+ str(queryCounter) +'","current_term":"'+ str(total) +'","percent_done":"' + str(finalPercent) + '","is_complete":"False","stats":'+jsonStats+'}'
-                                progressData.save()
-                                logger.info( str(aForm.pk) + ":  <!-- Current Form Pk")
-                                rowList = []
-                                #Let's loop through each item in the queryRTYPE list and match up the frav's in each queried form so the headers match the form attribute values
-                                for rtype in queryRTYPElist:
-                                    if rtype[1] == 'frat':
-                                        logger.info( str(rtype[2]) + '  ' + str(aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2]).count()))
-                                        formRVAL = aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2])
-                                        #We need to check for NULL FRAV's here. When a user manually creates new forms, they don't always have FRAVS created for them if they leave it blank
-                                        if formRVAL.exists():
-                                            rowList.append((rtype[0],'frav',formRVAL[0].record_value, formRVAL[0].pk))
-                                        else:
-                                            logger.info( "Whoops--something happened. There are no RVALS for 'frats' using: " + str(rtype[2]))
-                                            #If there isn't an RVAL for this RTYPE then make a new one and return it instead
-                                            newFRAV = FormRecordAttributeValue()
-                                            newFRAV.record_attribute_type = FormRecordAttributeType.objects.get(pk=rtype[2])
-                                            newFRAV.form_parent = aForm
-                                            newFRAV.project = aForm.project
-                                            newFRAV.record_value = ""
-                                            newFRAV.save()
-                                            rowList.append((rtype[0],'frav',newFRAV.record_value, newFRAV.pk))
-                                    else:
-                                        logger.info( aForm.ref_to_parent_form.all().count())
-                                        logger.info( aForm.pk)
-                                        for frrt in aForm.ref_to_parent_form.all():
-                                            logger.info( "" + str(frrt.pk))
-                                        formRVAL = aForm.ref_to_parent_form.all().filter(record_reference_type__pk=rtype[2])
-                                        if formRVAL.exists():
-                                            formRVAL = formRVAL[0]
-                                            #First check to see if there are any relations stored in the many to many relationship
-                                            #   --if there are, then load them normally, and if not change the value to a frrv-ext tag and store the external ID for the
-                                            #   --ajax request to process properly
-                                            if formRVAL.record_reference.all().count() > 0:
-                                                #we need to store a list of its references--it's a manytomany relationship
-                                                #A comma should be sufficient to separate them, but to be safe--we'll make our delimeter a ^,^
-                                                #-- we also need to provide the formtype pk value for the link
-                                                listOfRefs = ""
-                                                for rec in formRVAL.record_reference.all():
-                                                    listOfRefs += str(rec) + '|^|' + str(rec.form_type.pk) + '|^|' + str(rec.pk) + "^,^"
-                                                #remove the last delimeter
-                                                listOfRefs = listOfRefs[0:-3]
-                                                rowList.append((rtype[0],'frrv',listOfRefs, formRVAL.pk))
+                                    #store stats
+                                    singleQueryStats['rtype_name'] = term['LABEL']
+                                    singleQueryStats['rtype_pk'] = rtypePK
+                                    singleQueryStats['rtype'] = rtype
+                                    termStats = []
+                                    singleQueryStats['all_terms'] = termStats
+                                    #get the deep values
+                                    deepPK, deepRTYPE = term['RTYPE-DEEP'].split('__')
+                                    logger.info( deepPK + "  :  " + deepRTYPE + " <!-------------------------------------------")
+                                    #==========================================================================================================================================================================================
+                                    # IF WE ARE JUST LOOKING UP THE RTYPE FORM ID
+                                    #==========================================================================================================================================================================================
+                                    #TODO: This also needs to check external reference values if no match is found
+                                    if deepRTYPE == 'FORMID':
+                                        logger.info( "WTF")
+                                        #Now begin modifying the SQL query which each term of each individual query
+                                        #skip the term if the field was left blank
+                                        if term['TVAL'] != "" or term['QCODE'] == '4':
+                                            newQuery = None
+                                            if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
+                                                #Now let's figure out the QCODE, e.g. contains, match exact etc.
+                                                if   term['QCODE'] == CONTAINS: newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__icontains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK) #CONTAINS    
+                                                elif term['QCODE'] == CS_CONTAINS: newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK) #ICONTAINS                                   
+                                                elif term['QCODE'] == EXACT_MATCH: newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__exact=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
+                                                elif term['QCODE'] == EXCLUDES: newQuery = queriedForms.exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
+                                                elif term['QCODE'] == IS_NULL: newQuery = queriedForms.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK)#IS_NULL        
+                                                #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
+                                                newQuery = newQuery.filter(flagged_for_deletion=False)
+                                                #save stats and query
+                                                term['count'] =  newQuery.count()
+                                                termStats.append(term)
+                                                masterQuery = (newQuery & masterQuery)
+                                                singleQueryStats['intersections'] = masterQuery.count()
+                                            else:#Otherwise it's an OR statement
+                                                #Now let's figure out the QCODE, e.g. contains, match exact etc.
+                                                if   term['QCODE'] == CONTAINS: newQuery = (queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__form_name__icontains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#CONTAINS    
+                                                elif term['QCODE'] == CS_CONTAINS: newQuery = (queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#ICONTAINS                                   
+                                                elif term['QCODE'] == EXACT_MATCH: newQuery = (queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__form_name__exact=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#MATCHES EXACT                                    
+                                                elif term['QCODE'] == EXCLUDES: newQuery = (queryFormtype.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#EXCLUDES                                   
+                                                elif term['QCODE'] == IS_NULL: newQuery = (queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK))#IS_NULL 
+                                                #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
+                                                newQuery = newQuery.filter(flagged_for_deletion=False)
+                                                #save stats and query
+                                                term['count'] =  newQuery.count()
+                                                termStats.append(term)
+                                                masterQuery = (newQuery | masterQuery)
+                                                singleQueryStats['additions'] = masterQuery.count()
+                                    #==========================================================================================================================================================================================
+                                    # IF WE ARE LOOKING UP THE RELATIONS FRAT
+                                    #==========================================================================================================================================================================================
+                                    elif deepRTYPE == 'FRAT':
+                                        logger.info( "We should be here")
+                                        #grab the formtype in question
+                                        deepFormType = FormType.objects.filter(pk=FormRecordAttributeType.objects.get(pk=deepPK).form_type.pk)
+                                        #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
+                                        deepFormType = deepFormType.filter(flagged_for_deletion=False)
+                                        deepFormType = deepFormType[0]
+                                        #Now begin modifying the SQL query which each term of each individual query
+                                        #skip the term if the field was left blank
+                                        if term['TVAL'] != "" or term['QCODE'] == '4':
+                                            newQuery = None
+                                            #----------------------------------------------------------
+                                            # AND STATEMENT FOR A --TERM--
+                                            if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
+                                                #Now let's figure out the QCODE, e.g. contains, match exact etc.
+                                                #First we Get a flattened list of form pk values from the deepFormType
+                                                #Then we filter our current formtype queryset's frrt manytomany pks by the pk value list just created 
+                                                if   term['QCODE'] == CONTAINS: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                    newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == CS_CONTAINS: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                    newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == EXACT_MATCH: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                    newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == EXCLUDES: 
+                                                    flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                    newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == IS_NULL: 
+                                                    flattenedSet = list(   (deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK) | deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=deepPK) ).values_list('pk', flat=True)) #IS EMPTY    
+                                                    newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
+                                                newQuery = newQuery.filter(flagged_for_deletion=False)
+                                                #save stats and query
+                                                term['count'] =  newQuery.count()
+                                                termStats.append(term)
+                                                masterQuery = (newQuery & masterQuery)
+                                                singleQueryStats['intersections'] = masterQuery.count()
+                                            #--------------------------------------------------------
+                                            # OR STATEMENT FOR a --TERM--
                                             else:
-                                                #Store the external key value instead and change it to a frrv-ext for the AJAX callable
-                                                rowList.append((rtype[0],'frrv-ext',formRVAL.external_key_reference, formRVAL.pk))
-                                        else:
-                                            #Store the external key value instead and change it to a frrv-null for the AJAX callable
-                                            rowList.append((rtype[0],'frrv-null',"", ""))
+                                                #Now let's figure out the QCODE, e.g. contains, match exact etc.
+                                                if   term['QCODE'] == CONTAINS: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                    newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == CS_CONTAINS: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                    newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == EXACT_MATCH: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                    newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == EXCLUDES: 
+                                                    flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                    newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == IS_NULL: 
+                                                    flattenedSet = list(   (deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK) | deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=deepPK) ).values_list('pk', flat=True)) #IS EMPTY  
+                                                    newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
+                                                newQuery = newQuery.filter(flagged_for_deletion=False)
+                                                #save stats and query
+                                                term['count'] =  newQuery.count()
+                                                termStats.append(term)
+                                                masterQuery = (newQuery | masterQuery)
+                                                singleQueryStats['additions'] = masterQuery.count()                    
+                                    #==========================================================================================================================================================================================
+                                    # IF WE ARE LOOKING UP THE RELATION'S FRRT(Only form ID allowed)
+                                    #==========================================================================================================================================================================================
+                                    elif deepRTYPE == 'FRRT':
+                                        logger.info( "We should be here 3")
+                                        #grab the formtype in question
+                                        try:
+                                            deepFormType = FormType.objects.get(pk=FormRecordReferenceType.objects.get(pk=deepPK).form_type_parent.pk, flagged_for_deletion=False)
+                                        except:
+                                            ERROR_MESSAGE += "Error: You've attempted to access a Deep Form Type that is either non-existent, or is flagged for deletion"
+                                            break
+                                        #Now begin modifying the SQL query which each term of each individual query
+                                        #skip the term if the field was left blank
+                                        if term['TVAL'] != "" or term['QCODE'] == '4':
+                                            newQuery = None
+                                            #----------------------------------------------------------
+                                            # AND STATEMENT FOR A --TERM--
+                                            if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
+                                                #Now let's figure out the QCODE, e.g. contains, match exact etc.
+                                                #First we Get a flattened list of form pk values from the deepFormType
+                                                #Then we filter our current formtype queryset's frrt manytomany pks by the pk value list just created 
+                                                if   term['QCODE'] == CONTAINS: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__icontains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS 
+                                                    newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == CS_CONTAINS: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=deepPK).values_list('pk', flat=True)) #ICONTAINS    
+                                                    newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == EXACT_MATCH: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__exact=term['TVAL'], ref_to_parent_form__record_reference_type__pk=deepPK).values_list('pk', flat=True)) #EXACT MATCH
+                                                    newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == EXCLUDES: 
+                                                    flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=deepPK).values_list('pk', flat=True)) #EXCLUDES   
+                                                    newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == IS_NULL: 
+                                                    flattenedSet = list(   (  deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True, ref_to_parent_form__record_reference_type__pk=deepPK) |  deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__iexact="", ref_to_parent_form__record_reference_type__pk=deepPK)    ).values_list('pk', flat=True)    ) #IS NULL  
+                                                    newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
+                                                newQuery = newQuery.filter(flagged_for_deletion=False)
+                                                #save stats and query
+                                                term['count'] =  newQuery.count()
+                                                termStats.append(term)
+                                                masterQuery = (newQuery & masterQuery)
+                                                singleQueryStats['intersections'] = masterQuery.count()
+                                            #--------------------------------------------------------
+                                            # OR STATEMENT FOR a --TERM--
+                                            else:
+                                                #Now let's figure out the QCODE, e.g. contains, match exact etc.
+                                                if   term['QCODE'] == CONTAINS: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__icontains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                    newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == CS_CONTAINS: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=deepPK).values_list('pk', flat=True)) #ICONTAINS    
+                                                    newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == EXACT_MATCH: 
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__exact=term['TVAL'], ref_to_parent_form__record_reference_type__pk=deepPK).values_list('pk', flat=True)) #EXACT MATCH
+                                                    newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == EXCLUDES: 
+                                                    flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=deepPK).values_list('pk', flat=True)) #EXCLUDES 
+                                                    newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                elif term['QCODE'] == IS_NULL: 
+                                                    flattenedSet = list(   (  deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True, ref_to_parent_form__record_reference_type__pk=deepPK) |  deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__iexact="", ref_to_parent_form__record_reference_type__pk=deepPK)    ).values_list('pk', flat=True)    ) #IS NULL  
+                                                    newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
+                                                newQuery = newQuery.filter(flagged_for_deletion=False)
+                                                #save stats and query
+                                                term['count'] =  newQuery.count()
+                                                termStats.append(term)
+                                                masterQuery = (newQuery | masterQuery)
+                                                singleQueryStats['additions'] = masterQuery.count()          
 
+                                #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+                                # (Form ID) Lookups
+                                #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
+                                elif rtype == "FORMID":
+                                        tCounter = 0
+                                        #store stats
+                                        singleQueryStats['rtype_name'] = term['LABEL']
+                                        singleQueryStats['rtype_pk'] = rtypePK
+                                        singleQueryStats['rtype'] = rtype
+                                        termStats = []
+                                        singleQueryStats['all_terms'] = termStats
+                                        logging.info("TimerD"+ " : " + str(time.clock()))
+
+                                        #Now begin modifying the SQL query which each term of each individual query
+                                        #skip the term if the field was left blank
+                                        if term['TVAL'] != "" or term['QCODE'] == '4':
+                                            newQuery = None
+                                            logger.info( str(queryFormtype.form_set.all().filter(form_name__contains=term['TVAL'])))
+                                            if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
+                                                logger.info( "Is it working?")
+                                                #Now let's figure out the QCODE, e.g. contains, match exact etc.
+                                                if   term['QCODE'] == CONTAINS: newQuery = queriedForms.filter(form_name__icontains=term['TVAL']) #CONTAINS    
+                                                elif term['QCODE'] == CS_CONTAINS: newQuery = queriedForms.filter(form_name__contains=term['TVAL']) #ICONTAINS                                   
+                                                elif term['QCODE'] == EXACT_MATCH: newQuery = queriedForms.filter(form_name__exact=term['TVAL'])#MATCHES EXACT                                    
+                                                elif term['QCODE'] == EXCLUDES: newQuery = queriedForms.exclude(form_name__contains=term['TVAL'])#EXCLUDES                                   
+                                                elif term['QCODE'] == IS_NULL: newQuery = queriedForms.filter(form_name__isnull=True) #IS_NULL        
+                                                #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
+                                                newQuery = newQuery.filter(flagged_for_deletion=False)
+                                                #save stats and query
+                                                term['count'] =  newQuery.count()
+                                                termStats.append(term)
+                                                masterQuery = (newQuery & masterQuery)
+                                                singleQueryStats['intersections'] = masterQuery.count()
+                                            else:#Otherwise it's an OR statement
+                                                #Now let's figure out the QCODE, e.g. contains, match exact etc.
+                                                if   term['QCODE'] == CONTAINS: newQuery = (queryFormtype.form_set.all().filter(form_name__icontains=term['TVAL']))#CONTAINS    
+                                                elif term['QCODE'] == CS_CONTAINS: newQuery = (queryFormtype.form_set.all().filter(form_name__contains=term['TVAL']))#ICONTAINS                                   
+                                                elif term['QCODE'] == EXACT_MATCH: newQuery = (queryFormtype.form_set.all().filter(form_name__exact=term['TVAL']))#MATCHES EXACT                                    
+                                                elif term['QCODE'] == EXCLUDES: newQuery = (queryFormtype.form_set.all().exclude(form_name__contains=term['TVAL']))#EXCLUDES                                   
+                                                elif term['QCODE'] == IS_NULL: newQuery = (queryFormtype.form_set.all().filter(form_name__isnull=True))#IS_NULL 
+                                                #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
+                                                newQuery = newQuery.filter(flagged_for_deletion=False)    
+                                                #save stats and query
+                                                term['count'] =  newQuery.count()
+                                                termStats.append(term)
+                                                queriedForms = (newQuery | queriedForms)
+                        
+                                queryList.append(singleQueryStats)  
+                                singleQueryStats['ANDOR'] = term['ANDOR']
+                                singleQueryStats['count'] = masterQuery.count()
+                                queryStats['count'] = singleQueryStats['count']
                                
-                                #sort the new combined reference ad attribute type list combined
-                                rowList = sorted(rowList, key=lambda att: att[0])
-                                logger.info( str(rowList))
-                                #Now let's handle the thumbnail bit of business for the query
-                                #--If the current form IS a media type already, then use itself to grab the thumbnail URI
-                                if aForm.form_type.type == 1:
-                                    thumbnailURI = aForm.get_thumbnail_type()
-                                else:
-                                    #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
-                                    thumbnailURI = staticfiles_storage.url("/static/site-images/no-thumb-missing.png")
-                                    for record in rowList:            
-                                        #if it's a reference
-                                        if record[1] == 'frrv' or record[1] == 'frrv-ext':
-                                            currentRTYPE = FormRecordReferenceValue.objects.get(pk=int(record[3]))
-                                            #if it's not a NoneType reference:
-                                            if currentRTYPE.record_reference_type.form_type_reference != None:
-                                                #If its a reference to a media type
-                                                if currentRTYPE.record_reference_type.form_type_reference.type == 1:
-                                                    logger.info( "WE GOT A MATCH")
-                                                    #Because a form record reference value is a ManyToMany relationship, we just grab the first one in the list
-                                                    #TODO this may need to be edited later--because you can't order the selections. I may add another ForeignKey called
-                                                    #"Thumbnail Reference" which links to a single relation to a form of a media type--this would also
-                                                    #probably solve the complexity of looping through to grab it as it stands right now
-                                                    #****WE also have to check for NULL references
-                                                    if currentRTYPE.record_reference.all().count() > 0:
-                                                        thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
-                                                    break
-                                            
-                                #we only want the first 5 values from the final ordered list of attributes
-                                #rowList = rowList[0:5]
 
-
-                                formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])   
+                                #--------------------------------------------------------------------------------------------------------------------
+                                #   PRIMARY CONSTRAINTS
+                                #
+                                #Let's add a count for our constraints and some information about the constraints
+                                #These are just used to flesh out more information for graphs, and don't produce queried results
+                                #--Doing it this way will improve the speed of queries significantly, as we don't NEED to get individual database
+                                #--record information for each query--just count()'s  -- These will all essentially be 'AND' statements for the query
+                                #--!!!Make sure we are using this specific query's queryset and not the amalgamated masterQuery--otherwise each constraint will be affected
+                                primary_constraints = []
+                                singleQueryStats['constraints'] = primary_constraints
+                                primaryCount = 0.0
+                                secondaryCount = 1.0
+                                logger.info("COUNTS BELOW WTF")
+                                logger.info(str(primaryCount) + "    :    " + str(secondaryCount))
+                                logger.info(query['primary_constraints']['terms'])
+                                logger.info(len(query['primary_constraints']['terms']) )
+                                if 'primary_constraints' in query: 
+                                    primaryCount = float(len(query['primary_constraints']['terms']) )
+                                    logger.info("PRIMARY COUNT")
+                                    logger.info(primaryCount)
+                                if 'secondary_constraints' in query: secondaryCount = len(query['secondary_constraints']['terms']) + 1 
+                                totalNumberOfAllConstraints = primaryCount * secondaryCount
+                                logger.info("COUNTS BELOW WTF")
+                                logger.info(str(float(primaryCount)) + "    :    " + str(secondaryCount))
+                                currentConstraintCount = 0.0
                                 
-                        form_att_type_list, form_list = form_att_type_list, formList
-                        
-                        #update our progress bar
-                        progressData.jsonString = '{"message":"Packaging Query for User","current_query":"","current_term":"","percent_done":"90","is_complete":"False","stats":'+jsonStats+'}'
-                        progressData.save() 
-                        
-                        finishedJSONquery = {}
-                        
-                        headerList=[]
-                        for rtype in queryRTYPElist:
-                            rtypeDict = {}
-                            rtypeDict["index"] = rtype[0]
-                            rtypeDict["rtype"] = rtype[1]
-                            rtypeDict["pk"] = rtype[2]
-                            rtypeDict["name"] = rtype[3]
-                            headerList.append(rtypeDict)
+                                if 'primary_constraints' in query:
+                                    constraint = query['primary_constraints']
+                                    p_terms = constraint['terms']
+                                    logger.info("OUR TERMS BELOW")
+                                    logger.info(p_terms)
+                                    logger.info(query['primary_constraints']['terms'])
+                                    unique_rtype_code = ""
+                                    unique_pk = constraint['pk']
+                                    if constraint['QCODE'] == ALL_UNIQUE_TERMS: 
+                                        if constraint['RTYPE'] == "FRRT": 
+                                            unique_rtype_code = "DEEP_" + constraint['RTYPE-DEEP'].split('__')[1]
+                                            if unique_rtype_code != "DEEP_FORMID": unique_pk = constraint['RTYPE-DEEP'].split('__')[0]
+                                        else: unique_rtype_code = constraint['RTYPE'] 
+                                        logger.info("STARTING UNIQUE RVAL SEARCH")
+                                        p_terms = get_unique_rtype_val_list(unique_rtype_code, unique_pk, queryFormtype)
+                                        logger.info(p_terms)
+                                        logger.info("IN ALL UNIQUE TERMS-- End of it")
+                                        #We also need to set the QCODE to a NEW QCODE--because we have exact matches, let's now reset it to QCODE EXACT_MATCH
+                                        constraint['QCODE'] = EXACT_MATCH
+                                        constraint['terms'] = p_terms
+                                        query['primary_constraints']['terms'] = p_terms
+                                        primaryCount = len(p_terms)
+                                        totalNumberOfAllConstraints = primaryCount * secondaryCount
+                                    for P_TVAL in p_terms:
+                                        
+                                        progressDataMessage['current_constraint'] = P_TVAL
+                                        logger.info((str(currentTermPercent) + " + "  + "(((" + str(termTotalPercent) + "/" +str(termCount)+ ")/" +str(totalNumberOfAllConstraints)+ ") * " +str(currentConstraintCount)))
+                                        logger.info((currentTermPercent + (((termTotalPercent/termCount)/totalNumberOfAllConstraints) * currentConstraintCount)))
+                                        progressDataMessage['percent_done'] = str(int(currentTermPercent + (((termTotalPercent/termCount)/totalNumberOfAllConstraints) * currentConstraintCount)))
+                                        progressData.jsonString=json.dumps(progressDataMessage)
+                                        progressData.save()
+                                        
+                                        #Only check if the entry box was filled in--if it's blank then do nothing and ignore it
+                                        if P_TVAL != "" and P_TVAL != None or constraint['QCODE'] == IS_NULL:  
+                                            #Check whether or not it's a frat or frrt
+                                            #We don't use an 'else' statement because I want to make sure that if someone edits the json before
+                                            #sending, that it will do nothing if it doesn't get the proper code
+                                            rtype = constraint['RTYPE']
+                                            rtypePK = constraint['pk']
+                                            rtypeLabel = ""
+                                            logger.info(rtype + " :======RTYPE==================>  " + term['TVAL']   + "  using term: " + P_TVAL)
+                                            if rtype == 'FRAT':
+                                                logging.info("TimerZ START" + " : " + str(time.clock()))
+                                                if   constraint['QCODE'] == CONTAINS: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__icontains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK) 
+                                                elif constraint['QCODE'] == CS_CONTAINS: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__contains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
+                                                elif constraint['QCODE'] == EXACT_MATCH: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__exact=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
+                                                elif constraint['QCODE'] == EXCLUDES: constraintQuery = newQuery.exclude(formrecordattributevalue__record_value__contains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
+                                                elif constraint['QCODE'] == IS_NULL: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL       
+                                                logging.info("TimerZ END" + "-- : " + str(time.clock()))  
+                                            elif rtype == 'FORMID':
+                                                if   constraint['QCODE'] == CONTAINS: constraintQuery = newQuery.filter(form_name__icontains=P_TVAL) #CONTAINS    
+                                                elif constraint['QCODE'] == CS_CONTAINS: constraintQuery = newQuery.filter(form_name__contains=P_TVAL) #ICONTAINS                                   
+                                                elif constraint['QCODE'] == EXACT_MATCH: constraintQuery = newQuery.filter(form_name__exact=P_TVAL)#MATCHES EXACT                                    
+                                                elif constraint['QCODE'] == EXCLUDES: constraintQuery = newQuery.exclude(form_name__contains=P_TVAL)#EXCLUDES                                   
+                                                elif constraint['QCODE'] == IS_NULL: constraintQuery = newQuery.filter(form_name__isnull=True) #IS_NULL          
+                                            elif rtype == 'FRRT':
+                                                deepFormType = FormType.objects.filter(pk=FormRecordReferenceType.objects.get(pk=rtypePK).form_type_reference.pk)
+                                                #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
+                                                deepFormType = deepFormType.filter(flagged_for_deletion=False)
+                                                deepFormType = deepFormType[0]
+                                                deepPK, deepRTYPE = constraint['RTYPE-DEEP'].split('__')
+                                                logger.info(deepRTYPE + " <!=========DEEP RTYPE====================  " + P_TVAL)
+                                                if deepRTYPE == 'FORMID':
+                                                    rtypeLabel = "Form ID"
+                                                    if   constraint['QCODE'] == CONTAINS: constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__form_name__icontains=P_TVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#CONTAINS    
+                                                    elif constraint['QCODE'] == CS_CONTAINS: constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__form_name__contains=P_TVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#ICONTAINS                                   
+                                                    elif constraint['QCODE'] == EXACT_MATCH: constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__form_name__exact=P_TVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
+                                                    elif constraint['QCODE'] == EXCLUDES: constraintQuery = newQuery.exclude(ref_to_parent_form__record_reference__form_name__contains=P_TVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
+                                                    elif constraint['QCODE'] == IS_NULL: constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK).count()#IS_NULL                                           
+                                                elif deepRTYPE == 'FRRT':
+                                                    rtypeLabel = FormRecordReferenceType.objects.get(pk=deepPK).record_type
+                                                    if   constraint['QCODE'] == CONTAINS: 
+                                                        flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__icontains=P_TVAL).values_list('pk', flat=True)) #ICONTAINS    
+                                                        constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
+                                                    elif constraint['QCODE'] == CS_CONTAINS:
+                                                        flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=P_TVAL).values_list('pk', flat=True)) #ICONTAINS    
+                                                        constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)                                    
+                                                    elif constraint['QCODE'] == EXACT_MATCH: 
+                                                        flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__exact=P_TVAL).values_list('pk', flat=True)) #ICONTAINS    
+                                                        constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
+                                                    elif constraint['QCODE'] == EXCLUDES:
+                                                        flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=P_TVAL).values_list('pk', flat=True)) #ICONTAINS    
+                                                        constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                    elif constraint['QCODE'] == IS_NULL: 
+                                                        flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True).values_list('pk', flat=True)) #ICONTAINS    
+                                                        constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
+                                                elif deepRTYPE == 'FRAT':
+                                                    rtypeLabel = FormRecordAttributeType.objects.get(pk=deepPK).record_type
+                                                    if   constraint['QCODE'] == CONTAINS:
+                                                        flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS     
+                                                        constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                    elif constraint['QCODE'] == CS_CONTAINS:
+                                                        flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                        constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                    elif constraint['QCODE'] == EXACT_MATCH:
+                                                        flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__exact=P_TVAL, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                        constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                    elif constraint['QCODE'] == EXCLUDES: 
+                                                        flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                        constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                    elif constraint['QCODE'] == IS_NULL: 
+                                                        flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                        constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
 
-                        #update our progress bar
-                        progressData.jsonString = '{"message":"Packaging Query for User","current_query":"","current_term":"","percent_done":"93","is_complete":"False","stats":'+jsonStats+'}'
-                        progressData.save() 
-                        
-                        finishedJSONquery["rtype_header"] = headerList
-                        allFormList = []
-                        counter = 0
-                        total = len(formList)
-                        for form in formList:
-                            #update our progress bar
-                            counter += 1
-                            currentPercent = 93 + int((counter*(5.0/total)))
-                            progressData.jsonString = '{"message":"Packaging Query for User","current_query":"","current_term":"","percent_done":"'+str(currentPercent)+'","is_complete":"False","stats":'+jsonStats+'}'
+                                            #***RECYCLING BIN*** Make sure our NEW Constraints query is always filtered by recycling bin flags
+                                            constraintQuery = constraintQuery.filter(flagged_for_deletion=False)      
+                                            primaryConstraintStat = {}                                        
+                                            primaryConstraintStat['count'] = constraintQuery.count()
+                                            primaryConstraintStat['name'] = constraint['LABEL'] + " : " + rtypeLabel
+                                            primaryConstraintStat['rtype_pk'] = rtypePK
+                                            primaryConstraintStat['rtype'] = rtype
+                                            primaryConstraintStat['qcode'] = constraint['QCODE']
+                                            primaryConstraintStat['tval'] = P_TVAL
+                                            primaryConstraintStat['parent_term'] = term['TVAL']
+                                            primaryConstraintStat['parent_label'] = term['LABEL']
+                                            primary_constraints.append(primaryConstraintStat)
+                                            queryStats['primary_constraints'].append(primaryConstraintStat)
+                                            #--------------------------------------------------------------------------------------------------------------------
+                                            #   SECONDARY CONSTRAINTS
+                                            #
+                                            #Let's add a count for our secnodary constraints and some information about them
+                                            #These are just used to flesh out more information for graphs, and don't produce queried results
+                                            #--Doing it this way will improve the speed of queries significantly, as we don't NEED to get individual database
+                                            #--record information for each query--just count()'s  -- These will all essentially be 'AND' statements for the query
+                                            #--!!!Make sure we are using this specific query's queryset and not the amalgamated masterQuery--otherwise each constraint will be affected
+                                            #--This also differs from a normal constraint in that a secondary constraint is seen as another dimensional control over the results.
+                                            secondary_constraints = []
+                                            if 'secondary_constraints' in query:
+                                                secondaryConstraint = query['secondary_constraints']
+                                                s_terms = secondaryConstraint['terms']
+                                                logger.info("OUR TERMS BELOW SECOND??")
+                                                logger.info(s_terms)
+                                                unique_rtype_code = ""
+                                                unique_pk = secondaryConstraint['pk']
+                                                if secondaryConstraint['QCODE'] == ALL_UNIQUE_TERMS: 
+                                                    if secondaryConstraint['RTYPE'] == "FRRT": 
+                                                        unique_rtype_code = "DEEP_" + secondaryConstraint['RTYPE-DEEP'].split('__')[1]
+                                                        if unique_rtype_code != "DEEP_FORMID": unique_pk = secondaryConstraint['RTYPE-DEEP'].split('__')[0]
+                                                    else: unique_rtype_code = secondaryConstraint['RTYPE'] 
+                                                    logger.info("STARTING UNIQUE RVAL SEARCH")
+                                                    s_terms = get_unique_rtype_val_list(unique_rtype_code, unique_pk, queryFormtype)
+                                                    logger.info(s_terms)
+                                                    logger.info("IN ALL UNIQUE TERMS-- End of it")
+                                                    #We also need to set the QCODE to a NEW QCODE--because we have exact matches, let's now reset it to QCODE EXACT_MATCH
+                                                    secondaryConstraint['QCODE'] = EXACT_MATCH
+                                                    secondaryConstraint['terms'] = s_terms
+                                                    query['secondary_constraints']['terms'] = s_terms
+                                                    secondaryCount = len(s_terms)
+                                                    totalNumberOfAllConstraints = primaryCount * secondaryCount
+                                                
+                                                for secondaryTVAL in s_terms:
+                                                    logger.info("WERE LOOPING THROUGH SECOND VALS??")
+                                                    logger.info(secondaryTVAL)
+                                                    progressDataMessage['current_constraint'] = P_TVAL + " => " + secondaryTVAL
+                                                    progressData.jsonString=json.dumps(progressDataMessage) 
+                                                    progressData.save()                                            
+                                                    #Only check if the entry box was filled in--if it's blank then do nothing and ignore it
+                                                    if secondaryTVAL != "" or secondaryConstraint['QCODE'] == '4': 
+                                                        #Check whether or not it's a frat or frrt
+                                                        #We don't use an 'else' statement because I want to make sure that if someone edits the json before
+                                                        #sending, that it will do nothing if it doesn't get the proper code
+                                                        rtype = secondaryConstraint['RTYPE']
+                                                        rtypePK = secondaryConstraint['pk']
+                                                        rtypeTwoLabel = ""
+                                                        if rtype == 'FRAT':
+                                                            logging.info("TimerKK START" + " : " + str(time.clock()))
+                                                            if   secondaryConstraint['QCODE'] == CONTAINS: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__icontains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)
+                                                            elif secondaryConstraint['QCODE'] == CS_CONTAINS: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__contains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
+                                                            elif secondaryConstraint['QCODE'] == EXACT_MATCH: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__exact=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
+                                                            elif secondaryConstraint['QCODE'] == EXCLUDES: secondaryConstraintQuery = constraintQuery.exclude(formrecordattributevalue__record_value__contains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
+                                                            elif secondaryConstraint['QCODE'] == IS_NULL: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL      
+                                                        elif rtype == 'FORMID':
+                                                            if   secondaryConstraint['QCODE'] == CONTAINS: secondaryConstraintQuery = constraintQuery.filter(form_name__icontains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK) #CONTAINS    
+                                                            elif secondaryConstraint['QCODE'] == CS_CONTAINS: secondaryConstraintQuery = constraintQuery.filter(form_name__contains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK) #ICONTAINS                                   
+                                                            elif secondaryConstraint['QCODE'] == EXACT_MATCH: secondaryConstraintQuery = constraintQuery.filter(form_name__exact=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
+                                                            elif secondaryConstraint['QCODE'] == EXCLUDES: secondaryConstraintQuery = constraintQuery.exclude(form_name__icontains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
+                                                            elif secondaryConstraint['QCODE'] == IS_NULL: secondaryConstraintQuery = constraintQuery.filter(form_name__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK) #IS_NULL       
+                                                        elif rtype == 'FRRT':
+                                                            deepFormType = FormType.objects.filter(pk=FormRecordReferenceType.objects.get(pk=rtypePK).form_type_parent.pk)
+                                                            #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
+                                                            deepFormType = deepFormType.filter(flagged_for_deletion=False)
+                                                            deepFormType = deepFormType[0]
+                                                            deepPK, deepRTYPE = secondaryConstraint['RTYPE-DEEP'].split('__')
+                                                            logger.info(secondaryConstraint)
+                                                            if deepRTYPE == 'FORMID':
+                                                                rtypeTwoLabel = "Form ID"
+                                                                if   secondaryConstraint['QCODE'] == CONTAINS: secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__form_name__icontains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#CONTAINS    
+                                                                elif secondaryConstraint['QCODE'] == CS_CONTAINS: secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__form_name__contains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#ICONTAINS                                   
+                                                                elif secondaryConstraint['QCODE'] == EXACT_MATCH: secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__form_name__exact=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
+                                                                elif secondaryConstraint['QCODE'] == EXCLUDES: secondaryConstraintQuery = constraintQuery.exclude(ref_to_parent_form__record_reference__form_name__contains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
+                                                                elif secondaryConstraint['QCODE'] == IS_NULL: secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK)#IS_NULL                                                
+                                                                logging.info("TimerKK END" + "-- : " + str(time.clock()))   
+                                                            elif deepRTYPE == 'FRRT':  
+                                                                rtypeTwoLabel = FormRecordReferenceType.objects.get(pk=deepPK).record_type
+                                                                if   secondaryConstraint['QCODE'] == CONTAINS: 
+                                                                    flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__icontains=secondaryTVAL).values_list('pk', flat=True)) #ICONTAINS    
+                                                                    secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
+                                                                elif secondaryConstraint['QCODE'] == CS_CONTAINS:
+                                                                    flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=secondaryTVAL).values_list('pk', flat=True)) #ICONTAINS    
+                                                                    secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)                                    
+                                                                elif secondaryConstraint['QCODE'] == EXACT_MATCH: 
+                                                                    flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__exact=secondaryTVAL).values_list('pk', flat=True)) #ICONTAINS    
+                                                                    secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
+                                                                elif secondaryConstraint['QCODE'] == EXCLUDES:
+                                                                    flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=secondaryTVAL).values_list('pk', flat=True)) #ICONTAINS    
+                                                                    secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                                elif secondaryConstraint['QCODE'] == IS_NULL: 
+                                                                    flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True).values_list('pk', flat=True)) #ICONTAINS    
+                                                                    secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
+                                                            elif deepRTYPE == 'FRAT':
+                                                                rtypeTwoLabel = FormRecordAttributeType.objects.get(pk=deepPK).record_type
+                                                                if   secondaryConstraint['QCODE'] == CONTAINS:
+                                                                    flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                                    secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                                elif secondaryConstraint['QCODE'] == CS_CONTAINS:
+                                                                    flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                                    secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                                elif secondaryConstraint['QCODE'] == EXACT_MATCH:
+                                                                    flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__exact=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                                    secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                                elif secondaryConstraint['QCODE'] == EXCLUDES: 
+                                                                    flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                                    secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                                elif secondaryConstraint['QCODE'] == IS_NULL: 
+                                                                    flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                                    secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
+                                                       #***RECYCLING BIN*** Make sure our NEW Constraints query is always filtered by recycling bin flags
+                                                        constraintQuery = constraintQuery.filter(flagged_for_deletion=False)                             
+                                                        secondaryConstraintStat = {}
+                                                        secondaryConstraintStat['count'] = secondaryConstraintQuery.count()
+                                                        secondaryConstraintStat['name'] = secondaryConstraint['LABEL'] + " : " + rtypeTwoLabel
+                                                        secondaryConstraintStat['rtype_pk'] = rtypePK
+                                                        secondaryConstraintStat['rtype'] = rtype
+                                                        secondaryConstraintStat['qcode'] = secondaryConstraint['QCODE']
+                                                        secondaryConstraintStat['tval'] = secondaryTVAL
+                                                        secondaryConstraintStat['parent_term'] = P_TVAL
+                                                        secondaryConstraintStat['parent_label'] = constraint['LABEL']
+                                                        secondaryConstraintStat['big_parent_term'] = term['TVAL']
+                                                        secondaryConstraintStat['big_parent_label'] = term['LABEL']
+                                                        secondaryConstraintStat['data_label'] = secondaryConstraintStat['name'] + ' ' + secondaryConstraintStat['tval'] +' - ' + primaryConstraintStat['name'] + ' ' + primaryConstraintStat['tval'] +' - ' + singleQueryStats['rtype_name'] + ' ' + singleQueryStats['all_terms'][0]['TVAL']
+                                                        secondary_constraints.append(secondaryConstraintStat)
+                                                        queryStats['secondary_constraints'].append(secondaryConstraintStat)
+                                                    currentConstraintCount+=1    
+                                                 
+                                                
+                                                logging.info("TimerG"+ " : " + str(time.clock()))
+                                        currentConstraintCount+=1
+                                #Increment our progressData stats counter for the term
+                                #We've been modifying it in the constraints--so let's round it down before incrementing it a full step
+                                termCounter +=  1
+                            progressDataMessage['message'] = "Loading Queried Forms & Sending generated stats now..."
+                            progressDataMessage['current_query'] = ""
+                            progressDataMessage['current_term'] = ""
+                            progressDataMessage['current_constraint'] = ""
+                            progressDataMessage['percent_done'] = "70"
+                            progressDataMessage['stats'] = queryStats
+                            progressData.jsonString=json.dumps(progressDataMessage)
                             progressData.save() 
-                            
-                            formDict = {}
-                            formDict["thumbnail_URI"] = form[0]
-                            formDict["pk"] = form[1]
-                            if queryFormtype.is_hierarchical: formDict["form_id"] = form[2].get_hierarchy_label()
-                            else: formDict["form_id"] = form[2].form_name
-                            formRVALS = []
-                            for rval in form[3]:
-                                rvalDict = {}
-                                rvalDict["index"] = rval[0]
-                                rvalDict["rtype"] = rval[1]
-                                rvalDict["value"] = rval[2]
-                                rvalDict["pk"] = rval[3]
-                                formRVALS.append(rvalDict)
-                            formDict["rvals"] = formRVALS
-                            allFormList.append(formDict)
+        
+                            #Now make sure our final queried list has distint values--merging querysets has a tendency to create duplicates
+                            masterQuery = masterQuery.distinct()
+                            #***RECYCLING BIN*** A Final redundant recycling bin filter--just to be safe
+                            masterQuery = masterQuery.filter(flagged_for_deletion=False)                      
+                        
 
-                        
-                        finishedJSONquery["form_list"] = allFormList
-                        finishedJSONquery["currentQuery"] = request.POST['master_query']
-                        finishedJSONquery["totalResultCount"] = paginationTotal
-                        finishedJSONquery['formtype'] = query['formtype_label']
-                        finishedJSONquery['formtype_pk'] = query['formtype_pk']
-                        finishedJSONquery['project'] = query['project_label']
-                        finishedJSONquery['project_pk'] = query['project_pk']
-                        finishedJSONquery['pagination_form_list'] = paginationFormList
-                        finishedJSONquery['query_stats'] = queryStats
-                        all_project_queries.append(finishedJSONquery)
-                        
+                            
+                            #We need to check the # of rtypes in our header list now--if it's less than 5, then let's add from the ordered list
+                            #We also need to make sure we aren't adding duplicates of the RTYPES, e.g. if we're looking for a match under "Object Number" and Object Number is already
+                            #--in our sorted order-num list--let's not re-add it.
+                            for attType in form_att_type_list:
+                                logger.info( "AttTypeList:  " + str(attType))
+                                matchfound = False
+                                for queryAttType in queryRTYPElist:
+                                    if attType[2] == queryAttType[2]:
+                                        matchfound = True
+                                if matchfound == False and len(queryRTYPElist) < 5:    
+                                    #let's arbitrarily add '100' to the order number so that our queries are definitely in front of these
+                                    queryRTYPElist.append((attType[0] + 100,attType[1],attType[2],attType[3]))
+                                    
+                            #We need to grab ALL the form pk values in a similarly sorted list 
+                            paginationFormList = masterQuery.order_by('sort_index').values_list('pk', flat=True)
+
+                            
+                            numberOfFormsPerPage = 25
+                            #-----------------------------------------------------------------------------------------------------------
+                            # Here we need to determine whether or not the form type being queried is hierchical.
+                            #   --If it is hierachical, then we just organize the masterQuery and sort it with the hierachy in mind
+                            #   --as well as with its hierchical labels--otherwise just perform a normal sort by its label
+                            if queryFormtype.is_hierarchical:
+                                global hierarchyFormList
+                                hierarchyFormList = []
+                                #Finally let's organize all of our reference and attribute values to match their provided order number
+                                #We want to find all the forms that have no parent element first--these are the top of the nodes
+                                #Then we'll organize the forms by hierarchy--which can then be put through the normal ordered query
+                                masterQuery =  masterQuery.filter(hierarchy_parent=None).exclude(form_number=None, form_name=None)[:numberOfFormsPerPage]
+                                #CACHE -- this caches the query for the loop
+                                if masterQuery:
+                                    for aForm in masterQuery: 
+                                        logging.info(aForm.form_name)
+                                        hierarchyFormList.append(aForm)
+                                        #Make a recursive function to search through all children
+                                        def find_children(currentParentForm):          
+                                            global hierarchyFormList
+                                            for currentChild in currentParentForm.form_set.all(): 
+                                                hierarchyFormList.append(currentChild)
+                                                find_children(currentChild)
+                                        find_children(aForm)
+                                #reset our masterQuery to our new hierachical list!
+                                masterQuery = hierarchyFormList
+                            else:             
+                                #sort the formlist by their sort_index
+                                masterQuery = masterQuery.order_by('sort_index')[:numberOfFormsPerPage]
+                                   
+                            progressDataMessage['message'] = "Performing SQL query to pull out all forms--may take time"
+                            progressDataMessage['percent_done'] = "75"
+                            progressDataMessage['stats'] = queryStats
+                            progressData.jsonString=json.dumps(progressDataMessage)
+                            progressData.save()                        
+                            #CACHE -- This cache's the query before looping through it
+                            if masterQuery:
+                                formCounter = 0 
+                                for aForm in masterQuery:
+                                    progressDataMessage['message'] = "Running through forms and converting to a usable format for navigation"
+                                    progressDataMessage['percent_done'] = str(int(75+((25.0/numberOfFormsPerPage) * formCounter) ))
+                                    progressDataMessage['stats'] = queryStats
+                                    progressData.jsonString=json.dumps(progressDataMessage)
+                                    progressData.save()    
+                                    rowList = []
+                                    #Let's loop through each item in the queryRTYPE list and match up the frav's in each queried form so the headers match the form attribute values
+                                    for rtype in queryRTYPElist:
+                                        if rtype[1] == 'frat':
+                                            #logger.info( str(rtype[2]) + '  ' + str(aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2]).count()))
+                                            formRVAL = aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2])
+                                            #We need to check for NULL FRAV's here. When a user manually creates new forms, they don't always have FRAVS created for them if they leave it blank
+                                            if formRVAL.exists():
+                                                rowList.append((rtype[0],'frav',formRVAL[0].record_value, formRVAL[0].pk))
+                                            else:
+                                                logger.info( "Whoops--something happened. There are no RVALS for 'frats' using: " + str(rtype[2]))
+                                                #If there isn't an RVAL for this RTYPE then make a new one and return it instead
+                                                newFRAV = FormRecordAttributeValue()
+                                                newFRAV.record_attribute_type = FormRecordAttributeType.objects.get(pk=rtype[2])
+                                                newFRAV.form_parent = aForm
+                                                newFRAV.project = aForm.project
+                                                newFRAV.record_value = ""
+                                                newFRAV.save()
+                                                rowList.append((rtype[0],'frav',newFRAV.record_value, newFRAV.pk))
+                                        else:
+                                            logger.info( aForm.ref_to_parent_form.all().count())
+                                            logger.info( aForm.pk)
+                                            for frrt in aForm.ref_to_parent_form.all():
+                                                logger.info( "" + str(frrt.pk))
+                                            formRVAL = aForm.ref_to_parent_form.all().filter(record_reference_type__pk=rtype[2])
+                                            if formRVAL.exists():
+                                                formRVAL = formRVAL[0]
+                                                #First check to see if there are any relations stored in the many to many relationship
+                                                #   --if there are, then load them normally, and if not change the value to a frrv-ext tag and store the external ID for the
+                                                #   --ajax request to process properly
+                                                if formRVAL.record_reference.all().count() > 0:
+                                                    #we need to store a list of its references--it's a manytomany relationship
+                                                    #A comma should be sufficient to separate them, but to be safe--we'll make our delimeter a ^,^
+                                                    #-- we also need to provide the formtype pk value for the link
+                                                    listOfRefs = ""
+                                                    for rec in formRVAL.record_reference.all():
+                                                        listOfRefs += str(rec) + '|^|' + str(rec.form_type.pk) + '|^|' + str(rec.pk) + "^,^"
+                                                    #remove the last delimeter
+                                                    listOfRefs = listOfRefs[0:-3]
+                                                    rowList.append((rtype[0],'frrv',listOfRefs, formRVAL.pk))
+                                                else:
+                                                    #Store the external key value instead and change it to a frrv-ext for the AJAX callable
+                                                    rowList.append((rtype[0],'frrv-ext',formRVAL.external_key_reference, formRVAL.pk))
+                                            else:
+                                                #Store the external key value instead and change it to a frrv-null for the AJAX callable
+                                                rowList.append((rtype[0],'frrv-null',"", ""))
+
+                                   
+                                    #sort the new combined reference ad attribute type list combined
+                                    rowList = sorted(rowList, key=lambda att: att[0])
+                                    #logger.info( str(rowList))
+                                    #Now let's handle the thumbnail bit of business for the query
+                                    #--If the current form IS a media type already, then use itself to grab the thumbnail URI
+                                    logger.info('$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$ ABOUT TO GET THUMBNAILS')
+                                    if aForm.form_type.type == 1:
+                                        thumbnailURI = aForm.get_thumbnail_type()
+                                    else:
+                                        logger.info("LOOKING FOR A FRRT")
+                                        #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
+                                        thumbnailURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
+                                        for record in rowList:            
+                                            #if it's a reference
+                                            if record[1] == 'frrv' or record[1] == 'frrv-ext':
+                                                currentRTYPE = FormRecordReferenceValue.objects.get(pk=int(record[3]))
+                                                #if it's not a NoneType reference:
+                                                if currentRTYPE.record_reference_type.form_type_reference != None:
+                                                    #If its a reference to a media type
+                                                    if currentRTYPE.record_reference_type.form_type_reference.type == 1:
+                                                        logger.info( "WE GOT A MATCH")
+                                                        #Because a form record reference value is a ManyToMany relationship, we just grab the first one in the list
+                                                        #TODO this may need to be edited later--because you can't order the selections. I may add another ForeignKey called
+                                                        #"Thumbnail Reference" which links to a single relation to a form of a media type--this would also
+                                                        #probably solve the complexity of looping through to grab it as it stands right now
+                                                        #****WE also have to check for NULL references
+                                                        if currentRTYPE.record_reference.all().count() > 0:
+                                                            thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
+                                                        break
+                                        #Finally--if there aren't any relevant media types in our frrts, let's do a last second check for ANY frrts that are media types
+                                        #--that AREN'T in our RTYPE list
+                                        if thumbnailURI == staticfiles_storage.url("/site-images/no-thumb-missing.png"):
+                                            logger.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    We're TRYING TO GET A THUMBNAIL")
+                                            currentRVAL = aForm.ref_to_parent_form.filter(record_reference_type__form_type_reference__type=1)
+                                            logger.info(currentRVAL)
+                                            if currentRVAL.exists():
+                                                #Just get the first one out of the list
+                                                if len(currentRVAL[0].record_reference.all()) > 0:
+                                                    logger.info(currentRVAL[0].record_reference.all()[0].form_name)
+                                                    thumbnailURI = currentRVAL[0].record_reference.all()[0].get_thumbnail_type()
+                                                    
+                                    formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])   
+                                    formCounter += 1
+                            form_att_type_list, form_list = form_att_type_list, formList
+                            
+                            #update our progress bar
+
+                            
+                            finishedJSONquery = {}
+                            
+                            headerList=[]
+                            for rtype in queryRTYPElist:
+                                rtypeDict = {}
+                                rtypeDict["index"] = rtype[0]
+                                rtypeDict["rtype"] = rtype[1]
+                                rtypeDict["pk"] = rtype[2]
+                                rtypeDict["name"] = rtype[3]
+                                headerList.append(rtypeDict)
+
+                            #update our progress bar
+       
+                            
+                            finishedJSONquery["rtype_header"] = headerList
+                            allFormList = []
+                            counter = 0
+                            total = len(formList)
+                            for form in formList:
+                                #update our progress bar
+                                counter += 1
+                                currentPercent = 93 + int((counter*(5.0/total)))
+
+                                
+                                formDict = {}
+                                formDict["thumbnail_URI"] = form[0]
+                                formDict["pk"] = form[1]
+                                if queryFormtype.is_hierarchical: formDict["form_id"] = form[2].get_hierarchy_label()
+                                else: formDict["form_id"] = form[2].form_name
+                                formRVALS = []
+                                for rval in form[3]:
+                                    rvalDict = {}
+                                    rvalDict["index"] = rval[0]
+                                    rvalDict["rtype"] = rval[1]
+                                    rvalDict["value"] = rval[2]
+                                    rvalDict["pk"] = rval[3]
+                                    formRVALS.append(rvalDict)
+                                formDict["rvals"] = formRVALS
+                                allFormList.append(formDict)
+
+                            finishedJSONquery["pagination_rtype_header"] = queryRTYPElist
+                            finishedJSONquery["form_list"] = allFormList
+                            finishedJSONquery["currentQuery"] = request.POST['master_query']
+                            finishedJSONquery["totalResultCount"] = queryStats['count']
+                            finishedJSONquery['formtype'] = query['formtype_label']
+                            finishedJSONquery['formtype_pk'] = query['formtype_pk']
+                            finishedJSONquery['project'] = query['project_label']
+                            finishedJSONquery['project_pk'] = query['project_pk']
+                            finishedJSONquery['pagination_form_list'] = list(paginationFormList)
+                            finishedJSONquery['query_stats'] = queryStats
+                            logger.info(queryStats['query_list'])
+                            logger.info(json.dumps(queryStats['query_list']))
+                            all_project_queries.append(finishedJSONquery)
+                except Exception as e:
+                    logger.info("LONG QUERY ERROR")
+                    logger.info(e)
+                    progressDataMessage['SERVER_ERROR'] = e
+                    progressData.jsonString=json.dumps(progressDataMessage)
+                    progressData.is_finished = True
+                    progressData.save()      
+                    logging.exception("message")
+                    return HttpResponse(progressDataMessage, content_type="application/json")
                 #convert to JSON
+                progressDataMessage['completed_process_data'] = all_project_queries
                 all_project_queries = json.dumps(all_project_queries)
 
-                #Update our progress bar
-                progressData.jsonString = '{"message":"Finished!","current_query":"","current_term":"","percent_done":"100","is_complete":"True","stats":''}'
-                progressData.save() 
+                progressDataMessage['message'] = "Finished"
+                progressDataMessage['percent_done'] = "100"
+                progressDataMessage['stats'] = queryStats
+                
+                progressDataMessage['is_complete'] = "True"
+                progressData.jsonString=json.dumps(progressDataMessage)
+                progressData.is_finished = True
+                progressData.save()         
                 logger.info(  "Timer End"     )
                 return HttpResponse(all_project_queries, content_type="application/json")
 
@@ -5825,948 +6847,7 @@ class MyAdminSite(AdminSite):
         return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")   
     
 
-    #=======================================================#
-    #   ACCESS LEVEL :  1       RUN_QUERY_ENGINE() *Recycling
-    #=======================================================#   
-    def run_query_engine(self, request):
-        #***************#
-        ACCESS_LEVEL = 1
-        #***************#
-        
-        #------------------------------------------------------------------------------------------------------------------------------------ 
-        #  This is the real magic of the database in terms of non-geospatial data. This Query engine takes complicated input from json POST data 
-        #   --and runs it through a long complex Django filter series to perform 1 of 2 tasks--the first is to produce a long set of counts in their
-        #   --given search parameters in order to generate several graphs/charts of the data. The second function is to actually produce a list of
-        #   --forms from the provided parameters to inspect and bulk edit. 
-        #
-        #   This takes 3 layers of parameters:
-        #           *The main query, which produces the form results, and has complex search options and AND/OR statements
-        #           *The option constraints query, which acts as an additional parameter when looking for deep counts with a comparison
-        #           *The primary contraints query, which acts as a further nested constraint on the previous 2
-        #       --Essentially each, parameter is an axis of a graph or dimension/each new parameter adds another dimension to that axis. It's more obviously
-        #       --apparent when actually seeing the results of a query
-        #  
-        #   There is a tremendous amount of code--which could probably be reduced in line count and size, but it was my first major foray into Django's%s
-        #   --query engine, so no doubt there are probably redundant lines. It's a bit complex because I needed 3 layers of parameters, and also needed
-        #   --the ability to perform queries when those parameters included relations. I had spent some time looking into nested functions to help deal with
-        #   --what felt like a lot of boiler plate for each section, but--I couldn't figure it out. It works--and I need to move on to other pastures with
-        #   --the project for now.
-        #
-        #   SPEED: I spent a great deal of time looking for alternative ways to speed up the queries behind this--it does take time. I haven't had a query
-        #   --take longer than a minute, but the potential is there. A minute isn't long in the grand scheme of things, but still. The time it takes to query
-        #   --also depends upon how many forms are part of the query-e.g. the test case of Ceramics in the AL-Hiba project has roughly 110,000 individual forms.
-        #   --A formtype with only 5000 forms wouldn't take time at all to process in comparison. The speed loss comes with nested queries(MYSQL doesn't like these)
-        #   --as well as INNER JOINS when dealing with the relations. I was able to cut the time in half from the first iteration--which is significant, but there
-        #   --are probably other ways I can increase the speed further still. TODO: One option to try is to grab a value list of PKs to submit to another query
-        #   --rather than chaining 2 querysets together(which causes an INNER JOIN in SQL) I tentatively tried this before--but without much success. I know
-        #   --what I'm doing far more now and it's worth trying out again in the future, but for now--this works, and provides user feedback to keep them
-        #   --updated with the goings on behind the curtain.
-        #
-        #   TODO: I've also moved this into an API Endpoint rather than as a process of the view itself. There may be some strange code decisions left in here
-        #   --as a function of that transition
 
-        ERROR_MESSAGE = ""
-        
-        #Check our user's session and access level
-        if SECURITY_check_user_permissions(ACCESS_LEVEL, request.user.permissions.access_level):
-        
-            if request.method == 'POST':
-
-                #We need to make sure we have permission to deal with the formtype--e.g. it's part of the user's current project
-                formtype = FormType.objects.get(pk=request.POST['formtype_id'])
-                
-                #If the project IDs match, then we're good to go!
-                if formtype.project.pk == request.user.permissions.project.pk:
-                
-                    #Make the AJAX Request Data Model for subsequent AJAX calls
-                    progressData = AJAXRequestData(uuid=request.POST.get('uuid'), jsonString='{"message":"Loading Json","current_query":"","current_term":"","percent_done":"0","is_complete":"False"}')
-                    progressData.save()
-                    
-                    
-                    
-                    #create a dictionary to store the query statistics
-                    queryStats = {}
-                    queryStats['formtype'] = formtype.form_type_name
-                    queryStats['formtype_pk'] = formtype.pk
-                    queryList = []
-                    queryStats['query_list'] = queryList
-                    primaryConstraintList = []
-                    
-                    
-                    #First let's setup our header field of ordered labels 
-                    logger.info(  "Timer Start"                )
-                    form_att_type_list = []
-                    #***RECYCLING BIN*** Make sure our RTYPES are filtered by their deletion flags
-                    for attType in formtype.formrecordattributetype_set.all().filter(flagged_for_deletion=False).order_by('order_number')[:5]:
-                        form_att_type_list.append((attType.order_number,'frat',attType.pk,attType.record_type)) 
-             
-                    #***RECYCLING BIN*** Make sure our RTYPES are filtered by their deletion flags
-                    for refType in formtype.ref_to_parent_formtype.all().filter(flagged_for_deletion=False).order_by('order_number')[:5]:
-                        form_att_type_list.append((refType.order_number,'frrt',refType.pk,refType.record_type)) 
-
-                    #sort the new combined reference ad attribute type list combined
-                    form_att_type_list = sorted(form_att_type_list, key=lambda att: att[0])
-                    #we only want the first 5 types
-                    form_att_type_list = form_att_type_list[0:5]
-                    
-                    #Finally let's organize all of our reference and attribute values to match their provided order number
-                    formList = []                
-                   
-                    #Setup our inital queryset that includes all forms
-                    masterQuery = formtype.form_set.all() 
-                    
-                    
-                    #Setup a list to hold the attribute types from the query. We want to show the record types that are part of the search terms,
-                    #   --rather than the default types that are in order. If there are less than 5 query record types, use the ordered record type list
-                    #   --until 5 are met.
-                    queryRTYPElist = []
-                    uniqueRTYPES = []
-                    rtypeCounter = 1
-                    #Load the JSON query from POST
-                    masterQueryJSON = json.loads(request.POST['query'])
-                    
-                    #Update our progressbar to show we're at 10%
-                    progressData.jsonString = '{"message":"Performing Query","current_query":"","current_term":"","percent_done":"5","is_complete":"False"}'
-                    progressData.save() 
-                    
-                    #Loop through each separate query
-                    for query in sorted(masterQueryJSON['query_list']):
-                        logger.info( query)
-                        #setup a dictionary of key values of the query stats to add to the main querystas dictionary later
-                        singleQueryStats = {} 
-                        
-                        queriedForms = formtype.form_set.all()
-                        #***RECYCLING BIN*** Make sure our Forms are filtered by their deletion flags
-                        queriedForms.filter(flagged_for_deletion=False)
-                        currentJSONQuery = masterQueryJSON['query_list'][query]
-                        
-                        uniqueQuery = False
-                        #Let's not allow any duplicate rtypes in the query rtype list header e.g. we don't want "Object ID" to show up 4 times 
-                        #--if the user makes a query that compares it 4 times in 4 separate queries
-                        if currentJSONQuery['RTYPE'] not in uniqueRTYPES: 
-                            uniqueRTYPES.append(currentJSONQuery['RTYPE'])
-                            uniqueQuery = True
-                        
-                        #We need to check whether or not this query is an AND/OR  or a null,e.g. the first one(so there is no and/or)
-                        rtype, rtypePK = currentJSONQuery['RTYPE'].split("-")
-                        
-                        #store our percentDone variable to update the ajax progress message object
-                        percentDone = 0
-                        
-                        #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-                        # (FRAT) FormRecordAttributeType Lookups
-                        #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-                        if rtype == 'FRAT':
-                            #thisRTYPE = FormRecordAttributeType.objects.get(pk=rtypePK)
-
-                            #store the record type in a new rtype list if unique
-                            if uniqueQuery: queryRTYPElist.append((rtypeCounter,'frat',rtypePK,currentJSONQuery['LABEL'])) 
-                            rtypeCounter += 1
-                            tCounter = 0
-                            #store stats
-                            singleQueryStats['rtype_name'] = currentJSONQuery['LABEL']
-                            singleQueryStats['rtype_pk'] = rtypePK
-                            singleQueryStats['rtype'] = rtype
-                            termStats = []
-                            singleQueryStats['all_terms'] = termStats
-                            logging.info("TimerA"+ " : " + str(time.clock()))
-                            for term in currentJSONQuery['TERMS']:
-                                #Now begin modifying the SQL query which each term of each individual query
-                                #skip the term if the field was left blank
-                                if term['TVAL'] != "" or term['QCODE'] == '4':
-                                    newQuery = None
-                                    if term['T-ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
-                                        #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                        if   term['QCODE'] == '0': newQuery = queriedForms.filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#CONTAINS    
-                                        elif term['QCODE'] == '1': newQuery = queriedForms.filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
-                                        elif term['QCODE'] == '2': newQuery = queriedForms.filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
-                                        elif term['QCODE'] == '3': newQuery = queriedForms.exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
-                                        elif term['QCODE'] == '4': newQuery = queriedForms.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL        
-                                        #save stats and query
-                                        term['count'] =  newQuery.count()
-                                        termStats.append(term)
-                                        queriedForms = newQuery
-                                    else:#Otherwise it's an OR statement
-                                        #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                        if   term['QCODE'] == '0': newQuery = (formtype.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#CONTAINS    
-                                        elif term['QCODE'] == '1': newQuery = (formtype.form_set.all().filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#ICONTAINS                                   
-                                        elif term['QCODE'] == '2': newQuery = (formtype.form_set.all().filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#MATCHES EXACT                                    
-                                        elif term['QCODE'] == '3': newQuery = (formtype.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#EXCLUDES                                   
-                                        elif term['QCODE'] == '4': newQuery = (formtype.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK))#IS_NULL 
-                                        #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                        newQuery = newQuery.filter(flagged_for_deletion=False)
-                                        #save stats and query
-                                        term['count'] =  newQuery.count()
-                                        termStats.append(term)
-                                        queriedForms = (newQuery | queriedForms)
-                                logging.info("TimerB"+ " : " + str(time.clock()))
-                                #We'll calculate percent by claiming finishing the query is at 50% when complete and at 20% when starting this section.
-                                logging.info(rtypeCounter)
-                                logging.info(len(masterQueryJSON['query_list']))
-                                Qpercent = ((rtypeCounter-2) * (50.0/len(masterQueryJSON['query_list'])))
-                                logging.info(Qpercent)
-                                logging.info(len(currentJSONQuery['TERMS']))
-                                percentDone =  5 + Qpercent +  (tCounter * (Qpercent / len(currentJSONQuery['TERMS'])) )
-                                progressData.jsonString = '{"message":"Performing Query # '+ str(rtypeCounter-1) + ' on term: '+term['TVAL']+'","current_query":"'+ currentJSONQuery['RTYPE'] + '","current_term":"'+term['TVAL']+'","percent_done":"'+ str(int(percentDone)) +'","is_complete":"False"}'
-                                progressData.save() 
-                                tCounter += 1
-                                logging.info("TimerC"+ " : " + str(time.clock()))
-                        #########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     
-                        # (FRRT) FormRecordReferenceType Lookups            
-                        # This is where things can get complicated. I've added a 'deep' search -- or the ability to search fields from a related model
-                        # --Right now, this just looks at the form IDs of the related field and looks for matches--it will still need to do that, but
-                        # --it also needs to be able to look up FRAT or FRRTs in the same field--that will essentially double the code for this blocks
-                        # --to do all of this, and will also cause the time of the query to significantly increase because we are doing another JOIN in the
-                        # --SQL lookup to span this relationship. This won't affect the list of queried forms directly--they will be limited by what the
-                        # --query finds obviously--but the user will only see the column for the related FRRT that had a match--not specifically the field that matched
-                        # ----It WILL affect the counts for the graphs etc.
-                        #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
-                        elif rtype == 'FRRT':
-                            #thisRTYPE = FormRecordReferenceType.objects.get(pk=rtypePK)
-                            #store the record type in a new rtype list if unique
-                            if uniqueQuery: queryRTYPElist.append((rtypeCounter,'frrt',rtypePK,currentJSONQuery['LABEL'])) 
-                            rtypeCounter += 1
-                            tCounter = 0
-
-                            #store stats
-                            singleQueryStats['rtype_name'] = currentJSONQuery['LABEL'] + currentJSONQuery['DEEP-LABEL']
-                            singleQueryStats['rtype_pk'] = rtypePK
-                            singleQueryStats['rtype'] = rtype
-                            termStats = []
-                            singleQueryStats['all_terms'] = termStats
-                            logging.info("TimerD"+ " : " + str(time.clock()))
-                            
-                            #get the deep values
-                            deepRTYPE, deepPK = currentJSONQuery['RTYPE-DEEP'].split('-')
-                            
-                            for term in currentJSONQuery['TERMS']:
-                                #==========================================================================================================================================================================================
-                                # IF WE ARE JUST LOOKING UP THE RTYPE FORM ID
-                                #==========================================================================================================================================================================================
-                                #TODO: This also needs to check external reference values if no match is found
-                                if deepRTYPE == 'FORMID':
-                                    #Now begin modifying the SQL query which each term of each individual query
-                                    #skip the term if the field was left blank
-                                    if term['TVAL'] != "" or term['QCODE'] == '4':
-                                        newQuery = None
-                                        if term['T-ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            if   term['QCODE'] == '0': newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK) #CONTAINS    
-                                            elif term['QCODE'] == '1': newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__icontains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK) #ICONTAINS                                   
-                                            elif term['QCODE'] == '2': newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__exact=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
-                                            elif term['QCODE'] == '3': newQuery = queriedForms.exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
-                                            elif term['QCODE'] == '4': newQuery = queriedForms.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK) #IS_NULL        
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = newQuery
-                                        else:#Otherwise it's an OR statement
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            if   term['QCODE'] == '0': newQuery = (formtype.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#CONTAINS    
-                                            elif term['QCODE'] == '1': newQuery = (formtype.form_set.all().filter(ref_to_parent_form__record_reference__form_name__icontains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#ICONTAINS                                   
-                                            elif term['QCODE'] == '2': newQuery = (formtype.form_set.all().filter(ref_to_parent_form__record_reference__form_name__exact=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#MATCHES EXACT                                    
-                                            elif term['QCODE'] == '3': newQuery = (formtype.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#EXCLUDES                                   
-                                            elif term['QCODE'] == '4': newQuery = (formtype.form_set.all().filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK))#IS_NULL 
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = (newQuery | queriedForms)
-                                #==========================================================================================================================================================================================
-                                # IF WE ARE LOOKING UP THE RELATIONS FRAT
-                                #==========================================================================================================================================================================================
-                                elif deepRTYPE == 'FRAT':
-                                    logger.info( "We should be here")
-                                    #grab the formtype in question
-                                    deepFormType = FormType.objects.filter(pk=FormRecordAttributeType.objects.get(pk=deepPK).form_type.pk)
-                                    #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
-                                    deepFormType = deepFormType.filter(flagged_for_deletion=False)
-                                    deepFormType = deepFormType[0]
-                                    #Now begin modifying the SQL query which each term of each individual query
-                                    #skip the term if the field was left blank
-                                    if term['TVAL'] != "" or term['QCODE'] == '4':
-                                        newQuery = None
-                                        #----------------------------------------------------------
-                                        # AND STATEMENT FOR A --TERM--
-                                        if term['T-ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            #First we Get a flattened list of form pk values from the deepFormType
-                                            #Then we filter our current formtype queryset's frrt manytomany pks by the pk value list just created 
-                                            if   term['QCODE'] == '0': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '1': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '2': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '3': 
-                                                flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '4': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = newQuery
-                                        #--------------------------------------------------------
-                                        # OR STATEMENT FOR a --TERM--
-                                        else:
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            if   term['QCODE'] == '0': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = formtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '1': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = formtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '2': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = formtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '3': 
-                                                flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = formtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '4': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = formtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)    
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = (newQuery | queriedForms)                            
-                                #==========================================================================================================================================================================================
-                                # IF WE ARE LOOKING UP THE RELATION'S FRRT(Only form ID allowed)
-                                #==========================================================================================================================================================================================
-                                elif deepRTYPE == 'FRRT':
-                                    logger.info( "We should be here 3")
-                                    #grab the formtype in question
-                                    deepFormType = FormType.objects.filter(pk=FormRecordReferenceType.objects.get(pk=deepPK).form_type_parent.pk)
-                                    #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
-                                    deepFormType = deepFormType.filter(flagged_for_deletion=False)
-                                    deepFormType = deepFormType[0]
-                                    #Now begin modifying the SQL query which each term of each individual query
-                                    #skip the term if the field was left blank
-                                    if term['TVAL'] != "" or term['QCODE'] == '4':
-                                        newQuery = None
-                                        #----------------------------------------------------------
-                                        # AND STATEMENT FOR A --TERM--
-                                        if term['T-ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            #First we Get a flattened list of form pk values from the deepFormType
-                                            #Then we filter our current formtype queryset's frrt manytomany pks by the pk value list just created 
-                                            if   term['QCODE'] == '0': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #CONTAINS 
-                                                logger.info( "LOOK HERE ROBERT")
-                                                logger.info( flattenedSet)
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '1': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '2': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #EXACT MATCH
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '3': 
-                                                flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #EXCLUDES   
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '4': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True).values_list('pk', flat=True)) #IS NULL  
-                                                newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                                   
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = newQuery
-                                        #--------------------------------------------------------
-                                        # OR STATEMENT FOR a --TERM--
-                                        else:
-                                            #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                            if   term['QCODE'] == '0': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #CONTAINS    
-                                                newQuery = formtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '1': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                                newQuery = formtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '2': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #EXACT MATCH
-                                                newQuery = formtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '3': 
-                                                flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL']).values_list('pk', flat=True)) #EXCLUDES 
-                                                newQuery = formtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif term['QCODE'] == '4': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True).values_list('pk', flat=True)) #IS NULL
-                                                newQuery = formtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)    
-                                            #save stats and query
-                                            term['count'] =  newQuery.count()
-                                            termStats.append(term)
-                                            queriedForms = (newQuery | queriedForms)            
-                                #We'll calculate percent by claiming finishing the query is at 50% when complete and at 20% when starting this section.
-                                Qpercent = ((rtypeCounter-2) * (50.0/len(masterQueryJSON['query_list'])))        
-                                percentDone =  5 + Qpercent +  (tCounter * (Qpercent / len(currentJSONQuery['TERMS'])) )
-                                progressData.jsonString = '{"message":"Performing Query # '+ str(rtypeCounter-1) + ' on term: '+term['TVAL']+'","current_query":"'+ currentJSONQuery['RTYPE'] + '","current_term":"'+term['TVAL']+'","percent_done":"'+ str(percentDone) +'","is_complete":"False"}'
-                                progressData.save() 
-                                tCounter += 1
-                        #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-                        # (Form ID) Lookups
-                        #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
-                        elif rtype == "FORMID":
-                            tCounter = 0
-                            #store stats
-                            singleQueryStats['rtype_name'] = currentJSONQuery['LABEL']
-                            singleQueryStats['rtype_pk'] = rtypePK
-                            singleQueryStats['rtype'] = rtype
-                            termStats = []
-                            singleQueryStats['all_terms'] = termStats
-                            logging.info("TimerD"+ " : " + str(time.clock()))
-                            for term in currentJSONQuery['TERMS']:
-                                #Now begin modifying the SQL query which each term of each individual query
-                                #skip the term if the field was left blank
-                                if term['TVAL'] != "" or term['QCODE'] == '4':
-                                    newQuery = None
-                                    logger.info( str(formtype.form_set.all().filter(form_name__contains=term['TVAL'])))
-                                    if term['T-ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
-                                        logger.info( "Is it working?")
-                                        #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                        if   term['QCODE'] == '0': newQuery = queriedForms.filter(form_name__contains=term['TVAL']) #CONTAINS    
-                                        elif term['QCODE'] == '1': newQuery = queriedForms.filter(form_name__icontains=term['TVAL']) #ICONTAINS                                   
-                                        elif term['QCODE'] == '2': newQuery = queriedForms.filter(form_name__exact=term['TVAL'])#MATCHES EXACT                                    
-                                        elif term['QCODE'] == '3': newQuery = queriedForms.exclude(form_name__contains=term['TVAL'])#EXCLUDES                                   
-                                        elif term['QCODE'] == '4': newQuery = queriedForms.filter(form_name__isnull=True) #IS_NULL        
-                                        #save stats and query
-                                        term['count'] =  newQuery.count()
-                                        termStats.append(term)
-                                        queriedForms = newQuery
-                                    else:#Otherwise it's an OR statement
-                                        #Now let's figure out the QCODE, e.g. contains, match exact etc.
-                                        if   term['QCODE'] == '0': newQuery = (formtype.form_set.all().filter(form_name__contains=term['TVAL']))#CONTAINS    
-                                        elif term['QCODE'] == '1': newQuery = (formtype.form_set.all().filter(form_name__icontains=term['TVAL']))#ICONTAINS                                   
-                                        elif term['QCODE'] == '2': newQuery = (formtype.form_set.all().filter(form_name__exact=term['TVAL']))#MATCHES EXACT                                    
-                                        elif term['QCODE'] == '3': newQuery = (formtype.form_set.all().exclude(form_name__contains=term['TVAL']))#EXCLUDES                                   
-                                        elif term['QCODE'] == '4': newQuery = (formtype.form_set.all().filter(form_name__isnull=True))#IS_NULL 
-                                        #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                        newQuery = newQuery.filter(flagged_for_deletion=False)    
-                                        #save stats and query
-                                        term['count'] =  newQuery.count()
-                                        termStats.append(term)
-                                        queriedForms = (newQuery | queriedForms)
-                                #We'll calculate percent by claiming finishing the query is at 50% when complete and at 20% when starting this section.
-                                Qpercent = ((rtypeCounter-2) * (50.0/len(masterQueryJSON['query_list'])))        
-                                percentDone =  5 + Qpercent +  (tCounter * (Qpercent / len(currentJSONQuery['TERMS'])) )
-                                progressData.jsonString = '{"message":"Performing Query # '+ str(rtypeCounter-1) + ' on term: '+term['TVAL']+'","current_query":"'+ currentJSONQuery['RTYPE'] + '","current_term":"'+term['TVAL']+'","percent_done":"'+ str(percentDone) +'","is_complete":"False"}'
-                                progressData.save() 
-                                tCounter += 1
-                    
-                                
-                        
-                        logging.info("Timer1"+ " : " + str(time.clock()))
-                        #add stats to the query stats
-                        singleQueryStats['ANDOR'] = currentJSONQuery['Q-ANDOR']
-                        singleQueryStats['count'] = queriedForms.count()
-                        logging.info("Timer3"+ " : " + str(time.clock()))
-                        queryList.append(singleQueryStats)
-                        #If this is an AND query--attach it to the masterQuery as so.
-                        if currentJSONQuery['Q-ANDOR'] == 'and': 
-                            logging.info("TimerR"+ " : " + str(time.clock()))
-                            masterQuery = (masterQuery & queriedForms)
-                            singleQueryStats['intersections'] = masterQuery.count()
-                            #if this is the last query--go ahead and grab this count for the aggregate query--this helps up from doing another redundant time-consuming masterQuery.count() later
-                            if rtypeCounter-1 == len(masterQueryJSON['query_list']): queryStats['count'] = singleQueryStats['intersections']
-                            logging.info("TimerU"+ " : " + str(time.clock()) + " : " + str(singleQueryStats['intersections']))
-                        #If it's an OR query, attach it to the masterQuery as an OR statement
-                        elif currentJSONQuery['Q-ANDOR'] == 'or': 
-                            logging.info("TimerX"+ " : " + str(time.clock()))
-                            masterQuery = (masterQuery | queriedForms)
-                            singleQueryStats['additions'] = masterQuery.count()
-                            #if this is the last query--go ahead and grab this count for the aggregate query--this helps up from doing another redundant time-consuming masterQuery.count() later
-                            if rtypeCounter-1 == len(masterQueryJSON['query_list']): queryStats['count'] = singleQueryStats['additions']
-                            logging.info("TimerZZ"+ " : " + str(time.clock()))
-                        #Otherwise its the first, or a single query and should simply replace the masterQuery
-                        #also set the count to this first query so we have one in case there is only one query
-                        else: 
-                            logger.info( "Master Query assignment??")
-                            masterQuery = queriedForms
-                            queryStats['count'] = singleQueryStats['count']
-                        logging.info("TimerF"+ " : " + str(time.clock()))
-                       
-                        #--------------------------------------------------------------------------------------------------------------------
-                        #   CONSTRAINTS
-                        #
-                        #Let's add a count for our constraints and some information about the constraints
-                        #These are just used to flesh out more information for graphs, and don't produce queried results
-                        #--Doing it this way will improve the speed of queries significantly, as we don't NEED to get individual database
-                        #--record information for each query--just count()'s  -- These will all essentially be 'AND' statements for the query
-                        #--!!!Make sure we are using this specific query's queryset and not the amalgamated masterQuery--otherwise each constraint will be affected
-                        constraints = []
-                        singleQueryStats['constraints'] = constraints
-                        counter = 0
-                        total = len(masterQueryJSON['constraint_list'])
-                        for aConstraint in masterQueryJSON['constraint_list']:
-                            logger.info( aConstraint)
-                            logging.info("TimerY START" + " : " + str(time.clock()))
-                            constraint = masterQueryJSON['constraint_list'][aConstraint]
-                            #Send our progresss update message
-                            counter += 1
-                            constraintPercentDone = int(percentDone + (counter *(5.0/total)))
-                            progressData.jsonString = '{"message":"Performing Query # '+ str(rtypeCounter-1) + ' on constraint: '+constraint['LABEL']+ ' : ' + constraint['TVAL'] +'","current_query":"'+ currentJSONQuery['RTYPE'] + '","current_term":"'+str(percentDone)+'","percent_done":"'+ str(constraintPercentDone) +'","is_complete":"False"}'
-                            progressData.save() 
-     
-                            singleConstraintStat = {}
-                            #Only check if the entry box was filled in--if it's blank then do nothing and ignore it
-                            if constraint['TVAL'] != "" or constraint['QCODE'] == '4': 
-                                #Check whether or not it's a frat or frrt
-                                #We don't use an 'else' statement because I want to make sure that if someone edits the json before
-                                #sending, that it will do nothing if it doesn't get the proper code
-                                rtype, rtypePK = constraint['RTYPE'].split("-")
-                                if rtype == 'FRAT':
-                                    logging.info("TimerZ START" + " : " + str(time.clock()))
-                                    if   constraint['QCODE'] == '0': constraintQuery = queriedForms.filter(pk__in=list(formtype.form_set.all().filter(formrecordattributevalue__record_value__contains=constraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)))
-                                    #if   constraint['QCODE'] == '0': constraintQuery = (queriedForms & formtype.form_set.all().filter(formrecordattributevalue__record_value__contains=constraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)).count()#CONTAINS  
-                                    #if   constraint['QCODE'] == '0': constraintQuery = queriedForms.filter(formrecordattributevalue__record_value__contains=constraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK).count()#CONTAINS    
-                                    elif constraint['QCODE'] == '1': constraintQuery = queriedForms.filter(formrecordattributevalue__record_value__icontains=constraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
-                                    elif constraint['QCODE'] == '2': constraintQuery = queriedForms.filter(formrecordattributevalue__record_value__exact=constraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
-                                    elif constraint['QCODE'] == '3': constraintQuery = queriedForms.exclude(formrecordattributevalue__record_value__icontains=constraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
-                                    elif constraint['QCODE'] == '4': constraintQuery = queriedForms.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL       
-                                    logging.info("TimerZ END" + "-- : " + str(time.clock()))  
-                                elif rtype == 'FORMID':
-                                    if   constraint['QCODE'] == '0': constraintQuery = queriedForms.filter(form_name__contains=constraint['TVAL']) #CONTAINS    
-                                    elif constraint['QCODE'] == '1': constraintQuery = queriedForms.filter(form_name__icontains=constraint['TVAL']) #ICONTAINS                                   
-                                    elif constraint['QCODE'] == '2': constraintQuery = queriedForms.filter(form_name__exact=constraint['TVAL'])#MATCHES EXACT                                    
-                                    elif constraint['QCODE'] == '3': constraintQuery = queriedForms.exclude(form_name__contains=constraint['TVAL'])#EXCLUDES                                   
-                                    elif constraint['QCODE'] == '4': constraintQuery = queriedForms.filter(form_name__isnull=True) #IS_NULL          
-                                elif rtype == 'FRRT_ID':
-                                    deepFormType = FormType.objects.filter(pk=FormRecordReferenceType.objects.get(pk=rtypePK).form_type_parent.pk)
-                                    #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
-                                    deepFormType = deepFormType.filter(flagged_for_deletion=False)
-                                    deepFormType = deepFormType[0]
-                                    if   constraint['QCODE'] == '0': constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__contains=constraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#CONTAINS    
-                                    elif constraint['QCODE'] == '1': constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__icontains=constraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#ICONTAINS                                   
-                                    elif constraint['QCODE'] == '2': constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__exact=constraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
-                                    elif constraint['QCODE'] == '3': constraintQuery = queriedForms.exclude(ref_to_parent_form__record_reference__form_name__icontains=constraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
-                                    elif constraint['QCODE'] == '4': constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK).count()#IS_NULL                                           
-                                elif rtype == 'DEEP_FRRT':
-                                    deepFormType = FormType.objects.filter(pk=FormRecordReferenceType.objects.get(pk=rtypePK).form_type_parent.pk)
-                                    #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
-                                    deepFormType = deepFormType.filter(flagged_for_deletion=False)
-                                    deepFormType = deepFormType[0]                                
-                                    if   constraint['QCODE'] == '0': 
-                                        flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=constraint['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                        constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
-                                    elif constraint['QCODE'] == '1':
-                                        flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__icontains=constraint['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                        constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)                                    
-                                    elif constraint['QCODE'] == '2': 
-                                        flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__exact=constraint['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                        constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
-                                    elif constraint['QCODE'] == '3':
-                                        flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=constraint['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                        constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                    elif constraint['QCODE'] == '4': 
-                                        flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True).values_list('pk', flat=True)) #ICONTAINS    
-                                        constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
-                                elif rtype == 'DEEP_FRAT':
-                                    deepFormType = FormType.objects.filter(pk=FormRecordAttributeType.objects.get(pk=rtypePK).form_type.pk)
-                                    #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
-                                    deepFormType = deepFormType.filter(flagged_for_deletion=False)
-                                    
-                                    deepFormType = deepFormType[0]   
-                                    logger.info( deepFormType)
-                                    logger.info( rtypePK)
-                                    if   constraint['QCODE'] == '0':
-                                        flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=constraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)) #CONTAINS    
-                                        constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                    elif constraint['QCODE'] == '1':
-                                        flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains=constraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)) #CONTAINS    
-                                        logger.info( "WHAT?!?!?!?!  " + str(len(flattenedSet)) + "   <!--------------------------------------------------")
-                                        logger.info( flattenedSet)
-                                        constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                    elif constraint['QCODE'] == '2':
-                                        flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__exact=constraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)) #CONTAINS    
-                                        constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                    elif constraint['QCODE'] == '3': 
-                                        flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=constraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)) #CONTAINS    
-                                        constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                    elif constraint['QCODE'] == '4': 
-                                        flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)) #CONTAINS    
-                                        constraintQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                               
-                               #***RECYCLING BIN*** Make sure our NEW Constraints query is always filtered by recycling bin flags
-                                constraintQuery = constraintQuery.filter(flagged_for_deletion=False)                                    
-                                singleConstraintStat['count'] = constraintQuery.count()
-                                singleConstraintStat['name'] = constraint['LABEL']
-                                singleConstraintStat['rtype_pk'] = rtypePK
-                                singleConstraintStat['rtype'] = rtype
-                                singleConstraintStat['qcode'] = constraint['QCODE']
-                                singleConstraintStat['tval'] = constraint['TVAL']
-                                constraints.append(singleConstraintStat)
-
-                            logging.info("TimerY END" + "-- : " + str(time.clock()))
-                            #--------------------------------------------------------------------------------------------------------------------
-                            #   PRIMARY CONSTRAINTS
-                            #
-                            #Let's add a count for our primary constraints and some information about them
-                            #These are just used to flesh out more information for graphs, and don't produce queried results
-                            #--Doing it this way will improve the speed of queries significantly, as we don't NEED to get individual database
-                            #--record information for each query--just count()'s  -- These will all essentially be 'AND' statements for the query
-                            #--!!!Make sure we are using this specific query's queryset and not the amalgamated masterQuery--otherwise each constraint will be affected
-                            #--This also differs from a normal constraint in that a Primary constraint is seen as another dimensional control over the results.
-                            #--This runs within each CONSTRAINT LOOP
-                            pCounter = 0
-                            if 'primary_constraints' in masterQueryJSON:
-                                for aPrimaryConstraint in masterQueryJSON['primary_constraints']:
-                                    
-                                    pConstraint = masterQueryJSON['primary_constraints'][aPrimaryConstraint]
-                                    #Only set up and initialize the dictionary for the first loop through the contraints--we won't need them for successive primary constraint loops--they're the same.
-                                    #We'll rely on indexing at that point to fill out the data[] array for the constraints
-                                    if len(primaryConstraintList) < len(masterQueryJSON['primary_constraints']):
-                                        logger.info( "NEW PRIMARY CONSTRAINT")
-                                        newPConstraint = {}
-                                        currentDataList = []
-                                        newPConstraint['name'] = pConstraint['LABEL']
-                                        newPConstraint['qcode'] = pConstraint['QCODE']
-                                        newPConstraint['tval'] = pConstraint['TVAL']
-                                        newPConstraint['data'] = currentDataList
-                                        primaryConstraintList.append(newPConstraint)
-                                    else:
-                                        logger.info( "OLD PRIMARY CONSTRAINT:   "+ str(counter) + " : " + str(pCounter) + str(primaryConstraintList))
-                                        currentPConstraint = primaryConstraintList[pCounter]
-                                        currentDataList = currentPConstraint['data']
-                                        
-                                    #Only check if the entry box was filled in--if it's blank then do nothing and ignore it
-                                    if pConstraint['TVAL'] != "" or pConstraint['QCODE'] == '4': 
-                                        #Check whether or not it's a frat or frrt
-                                        #We don't use an 'else' statement because I want to make sure that if someone edits the json before
-                                        #sending, that it will do nothing if it doesn't get the proper code
-                                        rtype, rtypePK = pConstraint['RTYPE'].split("-")
-                                        if rtype == 'FRAT':
-                                            logging.info("TimerKK START" + " : " + str(time.clock()))
-                                            if   pConstraint['QCODE'] == '0': primaryConstraintQuery = constraintQuery.filter(pk__in=list(formtype.form_set.all().filter(formrecordattributevalue__record_value__contains=pConstraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)))
-                                            elif pConstraint['QCODE'] == '1': primaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__icontains=pConstraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
-                                            elif pConstraint['QCODE'] == '2': primaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__exact=pConstraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
-                                            elif pConstraint['QCODE'] == '3': primaryConstraintQuery = constraintQuery.exclude(formrecordattributevalue__record_value__icontains=pConstraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
-                                            elif pConstraint['QCODE'] == '4': primaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL      
-                                        elif rtype == 'FRRT':
-                                            if   pConstraint['QCODE'] == '0': primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__form_name__contains=pConstraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#CONTAINS    
-                                            elif pConstraint['QCODE'] == '1': primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__form_name__icontains=pConstraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#ICONTAINS                                   
-                                            elif pConstraint['QCODE'] == '2': primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__form_name__exact=pConstraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
-                                            elif pConstraint['QCODE'] == '3': primaryConstraintQuery = constraintQuery.exclude(ref_to_parent_form__record_reference__form_name__icontains=pConstraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
-                                            elif pConstraint['QCODE'] == '4': primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK)#IS_NULL                                                
-                                            logging.info("TimerKK END" + "-- : " + str(time.clock()))
-                                        elif rtype == 'FORMID':
-                                            if   pConstraint['QCODE'] == '0': primaryConstraintQuery = constraintQuery.filter(form_name__contains=pConstraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK) #CONTAINS    
-                                            elif pConstraint['QCODE'] == '1': primaryConstraintQuery = constraintQuery.filter(form_name__icontains=pConstraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK) #ICONTAINS                                   
-                                            elif pConstraint['QCODE'] == '2': primaryConstraintQuery = constraintQuery.filter(form_name__exact=pConstraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
-                                            elif pConstraint['QCODE'] == '3': primaryConstraintQuery = constraintQuery.exclude(form_name__contains=pConstraint['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
-                                            elif pConstraint['QCODE'] == '4': primaryConstraintQuery = constraintQuery.filter(form_name__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK) #IS_NULL                                      
-                                        elif rtype == 'DEEP_FRRT':
-                                            deepFormType = FormType.objects.filter(pk=FormRecordReferenceType.objects.get(pk=rtypePK).form_type_parent.pk)
-                                            #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
-                                            deepFormType = deepFormType.filter(flagged_for_deletion=False)
-                                            deepFormType = deepFormType[0]                                
-                                            if   pConstraint['QCODE'] == '0': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=pConstraint['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                                primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
-                                            elif pConstraint['QCODE'] == '1':
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__icontains=pConstraint['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                                primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)                                    
-                                            elif pConstraint['QCODE'] == '2': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__exact=pConstraint['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                                primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
-                                            elif pConstraint['QCODE'] == '3':
-                                                flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=pConstraint['TVAL']).values_list('pk', flat=True)) #ICONTAINS    
-                                                primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif pConstraint['QCODE'] == '4': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True).values_list('pk', flat=True)) #ICONTAINS    
-                                                primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
-                                        elif rtype == 'DEEP_FRAT':
-                                            deepFormType = FormType.objects.filter(pk=FormRecordAttributeType.objects.get(pk=rtypePK).form_type.pk)
-                                            #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
-                                            deepFormType = deepFormType.filter(flagged_for_deletion=False)
-                                            
-                                            deepFormType = deepFormType[0]   
-                                            logger.info( deepFormType)
-                                            logger.info( rtypePK)
-                                            if   pConstraint['QCODE'] == '0':
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__contains=pConstraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)) #CONTAINS    
-                                                primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif pConstraint['QCODE'] == '1':
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains=pConstraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)) #CONTAINS    
-                                                logger.info( "WHAT?!?!?!?!  " + str(len(flattenedSet)) + "   <!--------------------------------------------------")
-                                                logger.info( flattenedSet)
-                                                primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif pConstraint['QCODE'] == '2':
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__exact=pConstraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)) #CONTAINS    
-                                                primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif pConstraint['QCODE'] == '3': 
-                                                flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=pConstraint['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)) #CONTAINS    
-                                                primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                            elif pConstraint['QCODE'] == '4': 
-                                                flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK).values_list('pk', flat=True)) #CONTAINS    
-                                                primaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
-                                        #***RECYCLING BIN*** Make sure our NEW Constraints query is always filtered by recycling bin flags
-                                        primaryConstraintQuery = primaryConstraintQuery.filter(flagged_for_deletion=False)     
-                                        newPData = {}
-                                        newPData['data_label'] = singleConstraintStat['name'] + ' ' + singleConstraintStat['tval'] +' - ' + singleQueryStats['rtype_name'] + ' ' + singleQueryStats['all_terms'][0]['TVAL']
-                                        newPData['group'] = counter
-                                        newPData['count'] = primaryConstraintQuery.count()
-                                        currentDataList.append(newPData)
-                                    pCounter += 1    
-                        logging.info("TimerG"+ " : " + str(time.clock()))
-                        
-                    #Add any constraints if they exist
-                    if len(primaryConstraintList) != 0:    
-                        queryStats['p_constraints'] = primaryConstraintList   
-                    
-                    #logger.info( str(masterQuery)                )
-                    #Now make sure our final queried list has distint values--merging querysets has a tendency to create duplicates
-                    masterQuery = masterQuery.distinct()
-                    #***RECYCLING BIN*** A Final redundant recycling bin filter--just to be safe
-                    masterQuery = masterQuery.filter(flagged_for_deletion=False)
-                    
-                    
-                    #logger.info( str(masterQuery))
-                    
-                    #Send a message to our AJAX request object
-                    progressData.jsonString = '{"message":"Running raw SQL","current_query":"","current_term":"''","percent_done":"50","is_complete":"False"}'
-                    progressData.save()                 
-                   
-                   
-                    jsonStats = json.dumps(queryStats)
-                    #Send a message to our AJAX request object
-                    progressData.jsonString = '{"message":"Loading Queried Forms & Sending generated stats now...","current_query":"","current_term":"''","percent_done":"60","is_complete":"False","stats":'+jsonStats+'}'
-                    progressData.save()                    
-
-                   
-
-                    #We need to check the # of rtypes in our header list now--if it's less than 5, then let's add from the ordered list
-                    #We also need to make sure we aren't adding duplicates of the RTYPES, e.g. if we're looking for a match under "Object Number" and Object Number is already
-                    #--in our sorted order-num list--let's not re-add it.
-                    for attType in form_att_type_list:
-                        logger.info( "AttTypeList:  " + str(attType))
-                        matchfound = False
-                        for queryAttType in queryRTYPElist:
-                            if attType[2] == queryAttType[2]:
-                                matchfound = True
-                        if matchfound == False and len(queryRTYPElist) < 5:    
-                            #let's arbitrarily add '100' to the order number so that our queries are definitely in front of these
-                            queryRTYPElist.append((attType[0] + 100,attType[1],attType[2],attType[3]))
-                            
-                    for q in queryRTYPElist:
-                        logger.info( "QTypeList:  " + str(q))
-
-
-                    
-                    #serializeTest = serializers.serialize("json", masterQuery)         
-                    queryCounter = 0
-                    logging.info("TEST A")
-                    total = queryStats['count']
-                    paginationTotal = total
-                    logging.info("TEST A END")
-                    
-                    # logger.info( str(masterQuery))
-                    
-                    
-                    #-----------------------------------------------------------------------------------------------------------
-                    # Here we need to determine whether or not the form type being queried is hierchical.
-                    #   --If it is hierachical, then we just organize the masterQuery and sort it with the hierachy in mind
-                    #   --as well as with its hierchical labels--otherwise just perform a normal sort by its label
-                    if formtype.is_hierarchical:
-                        global hierarchyFormList
-                        hierarchyFormList = []
-                        #Finally let's organize all of our reference and attribute values to match their provided order number
-                        #We want to find all the forms that have no parent element first--these are the top of the nodes
-                        #Then we'll organize the forms by hierarchy--which can then be put through the normal ordered query
-                        masterQuery =  masterQuery.filter(hierarchy_parent=None).exclude(form_number=None, form_name=None)[:25]
-                        #CACHE -- this caches the query for the loop
-                        if masterQuery:
-                            for aForm in masterQuery: 
-                                
-                                queryCounter += 1
-                                Qpercent = ( queryCounter * (30/(total*1.0)))
-                                finalPercent = (60 + int(Qpercent))
-                                progressData.jsonString = '{"SQL":"True","message":"Loading Queried Forms!","current_query":"'+ str(queryCounter) +'","current_term":"'+ str(total) +'","percent_done":"' + str(finalPercent) + '","is_complete":"False","stats":'+jsonStats+'}'
-                                progressData.save()
-                                logging.info(aForm.form_name)
-                                hierarchyFormList.append(aForm)
-                                #Make a recursive function to search through all children
-                                def find_children(currentParentForm):          
-                                    global hierarchyFormList
-                                    for currentChild in currentParentForm.form_set.all(): 
-                                        hierarchyFormList.append(currentChild)
-                                        find_children(currentChild)
-                                find_children(aForm)
-                        #reset our masterQuery to our new hierachical list!
-                        masterQuery = hierarchyFormList
-                    else:             
-                        #sort the formlist by their sort_index
-                        masterQuery = masterQuery.order_by('sort_index')[:25]
-                        
-                        
-                    #logger.info( masterQuery  )
-                    #CACHE -- This cache's the query before looping through it
-                    if masterQuery:
-                        for aForm in masterQuery:
-                            queryCounter += 1
-                            Qpercent = ( queryCounter * (30/(total*1.0)))
-                            finalPercent = (60 + int(Qpercent))
-                            progressData.jsonString = '{"SQL":"True","message":"Loading Queried Forms!","current_query":"'+ str(queryCounter) +'","current_term":"'+ str(total) +'","percent_done":"' + str(finalPercent) + '","is_complete":"False","stats":'+jsonStats+'}'
-                            progressData.save()
-                            logger.info( str(aForm.pk) + ":  <!-- Current Form Pk")
-                            rowList = []
-                            #Let's loop through each item in the queryRTYPE list and match up the frav's in each queried form so the headers match the form attribute values
-                            for rtype in queryRTYPElist:
-                                if rtype[1] == 'frat':
-                                    logger.info( str(rtype[2]) + '  ' + str(aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2]).count()))
-                                    formRVAL = aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2])
-                                    #We need to check for NULL FRAV's here. When a user manually creates new forms, they don't always have FRAVS created for them if they leave it blank
-                                    if formRVAL.exists():
-                                        rowList.append((rtype[0],'frav',formRVAL[0].record_value, formRVAL[0].pk))
-                                    else:
-                                        logger.info( "Whoops--something happened. There are no RVALS for 'frats' using: " + str(rtype[2]))
-                                        #If there isn't an RVAL for this RTYPE then make a new one and return it instead
-                                        newFRAV = FormRecordAttributeValue()
-                                        newFRAV.record_attribute_type = FormRecordAttributeType.objects.get(pk=rtype[2])
-                                        newFRAV.form_parent = aForm
-                                        newFRAV.project = project
-                                        newFRAV.record_value = ""
-                                        newFRAV.save()
-                                        rowList.append((rtype[0],'frav',newFRAV.record_value, newFRAV.pk))
-                                else:
-                                    logger.info( aForm.ref_to_parent_form.all().count())
-                                    logger.info( aForm.pk)
-                                    for frrt in aForm.ref_to_parent_form.all():
-                                        logger.info( "" + str(frrt.pk))
-                                    formRVAL = aForm.ref_to_parent_form.all().filter(record_reference_type__pk=rtype[2])
-                                    if formRVAL.exists():
-                                        formRVAL = formRVAL[0]
-                                        #First check to see if there are any relations stored in the many to many relationship
-                                        #   --if there are, then load them normally, and if not change the value to a frrv-ext tag and store the external ID for the
-                                        #   --ajax request to process properly
-                                        if formRVAL.record_reference.all().count() > 0:
-                                            #we need to store a list of its references--it's a manytomany relationship
-                                            #A comma should be sufficient to separate them, but to be safe--we'll make our delimeter a ^,^
-                                            #-- we also need to provide the formtype pk value for the link
-                                            listOfRefs = ""
-                                            for rec in formRVAL.record_reference.all():
-                                                listOfRefs += str(rec) + '|^|' + str(rec.form_type.pk) + '|^|' + str(rec.pk) + "^,^"
-                                            #remove the last delimeter
-                                            listOfRefs = listOfRefs[0:-3]
-                                            rowList.append((rtype[0],'frrv',listOfRefs, formRVAL.pk))
-                                        else:
-                                            #Store the external key value instead and change it to a frrv-ext for the AJAX callable
-                                            rowList.append((rtype[0],'frrv-ext',formRVAL.external_key_reference, formRVAL.pk))
-                                    else:
-                                        #Store the external key value instead and change it to a frrv-null for the AJAX callable
-                                        rowList.append((rtype[0],'frrv-null',"", ""))
-
-                           
-                            #sort the new combined reference ad attribute type list combined
-                            rowList = sorted(rowList, key=lambda att: att[0])
-                            logger.info( str(rowList))
-                            #Now let's handle the thumbnail bit of business for the query
-                            #--If the current form IS a media type already, then use itself to grab the thumbnail URI
-                            if aForm.form_type.type == 1:
-                                thumbnailURI = aForm.get_thumbnail_type()
-                            else:
-                                #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
-                                thumbnailURI = staticfiles_storage.url("/static/site-images/no-thumb-missing.png")
-                                for record in rowList:            
-                                    #if it's a reference
-                                    if record[1] == 'frrv' or record[1] == 'frrv-ext':
-                                        currentRTYPE = FormRecordReferenceValue.objects.get(pk=int(record[3]))
-                                        #if it's not a NoneType reference:
-                                        if currentRTYPE.record_reference_type.form_type_reference != None:
-                                            #If its a reference to a media type
-                                            if currentRTYPE.record_reference_type.form_type_reference.type == 1:
-                                                logger.info( "WE GOT A MATCH")
-                                                #Because a form record reference value is a ManyToMany relationship, we just grab the first one in the list
-                                                #TODO this may need to be edited later--because you can't order the selections. I may add another ForeignKey called
-                                                #"Thumbnail Reference" which links to a single relation to a form of a media type--this would also
-                                                #probably solve the complexity of looping through to grab it as it stands right now
-                                                #****WE also have to check for NULL references
-                                                if currentRTYPE.record_reference.all().count() > 0:
-                                                    thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
-                                                break
-                                        
-                            #we only want the first 5 values from the final ordered list of attributes
-                            rowList = rowList[0:5]
-
-
-                            formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])   
-                            
-                    form_att_type_list, form_list = form_att_type_list, formList
-                    
-                    #update our progress bar
-                    progressData.jsonString = '{"message":"Packaging Query for User","current_query":"","current_term":"","percent_done":"90","is_complete":"False","stats":'+jsonStats+'}'
-                    progressData.save() 
-                    
-                    finishedJSONquery = {}
-                    
-                    headerList=[]
-                    for rtype in queryRTYPElist:
-                        rtypeDict = {}
-                        rtypeDict["index"] = rtype[0]
-                        rtypeDict["rtype"] = rtype[1]
-                        rtypeDict["pk"] = rtype[2]
-                        rtypeDict["name"] = rtype[3]
-                        headerList.append(rtypeDict)
-
-                    #update our progress bar
-                    progressData.jsonString = '{"message":"Packaging Query for User","current_query":"","current_term":"","percent_done":"93","is_complete":"False","stats":'+jsonStats+'}'
-                    progressData.save() 
-                    
-                    finishedJSONquery["rtype_header"] = headerList
-                    allFormList = []
-                    counter = 0
-                    total = len(formList)
-                    for form in formList:
-                        #update our progress bar
-                        counter += 1
-                        currentPercent = 93 + int((counter*(5.0/total)))
-                        progressData.jsonString = '{"message":"Packaging Query for User","current_query":"","current_term":"","percent_done":"'+str(currentPercent)+'","is_complete":"False","stats":'+jsonStats+'}'
-                        progressData.save() 
-                        
-                        formDict = {}
-                        formDict["thumbnail_URI"] = form[0]
-                        formDict["pk"] = form[1]
-                        if formtype.is_hierarchical: formDict["form_id"] = form[2].get_hierarchy_label()
-                        else: formDict["form_id"] = form[2].form_name
-                        formRVALS = []
-                        for rval in form[3]:
-                            rvalDict = {}
-                            rvalDict["index"] = rval[0]
-                            rvalDict["rtype"] = rval[1]
-                            rvalDict["value"] = rval[2]
-                            rvalDict["pk"] = rval[3]
-                            formRVALS.append(rvalDict)
-                        formDict["rvals"] = formRVALS
-                        allFormList.append(formDict)
-
-                    
-                    finishedJSONquery["form_list"] = allFormList
-                    finishedJSONquery["formtype"] = formtype.form_type_name
-                    finishedJSONquery["formtype_pk"] = formtype.pk
-                    finishedJSONquery["project_pk"] = request.user.permissions.project.pk
-                    finishedJSONquery["project"] = request.user.permissions.project.name
-                    finishedJSONquery["currentQuery"] = request.POST['query']
-                    finishedJSONquery["totalResultCount"] = paginationTotal
-                    #convert to JSON
-                    finishedJSONquery = json.dumps(finishedJSONquery)
-
-                    #Update our progress bar
-                    progressData.jsonString = '{"message":"Finished!","current_query":"","current_term":"","percent_done":"100","is_complete":"True","stats":'+jsonStats+'}'
-                    progressData.save() 
-                    logger.info(  "Timer End"     )
-                    return HttpResponse(finishedJSONquery, content_type="application/json")
-                ERROR_MESSAGE += "Error: You don't have permission to access this FormType from another project"
-            ERROR_MESSAGE += "Error: You have not submitted through POST"
-        else: ERROR_MESSAGE += "Error: You do not have permission to access querying this project"
-        #If anything goes wrong in the process, return an error in the json HTTP Response
-        SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
-        return HttpResponse('{"ERROR":"'+ ERROR_MESSAGE +'"}',content_type="application/json")   
     
 
     #=======================================================#
@@ -7919,6 +8000,7 @@ class MyAdminSite(AdminSite):
             kwargs.update({'toolbar_title_code': 'FormType_' + kwargs['form_type_pk']})
             kwargs.update({'deletable': 'False'})
             logger.info( request)
+            logger.info(kwargs)
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
@@ -7973,7 +8055,12 @@ class MyAdminSite(AdminSite):
             kwargs.update({'form':'False'})
             kwargs.update({'toolbar_title_code': 'Project_' + kwargs['project_pk']})
             kwargs.update({'deletable': 'False'})
+            
             logger.info( request)
+            
+            if 'starter_query' in request.GET: kwargs.update({'starter_query':request.GET['starter_query']})
+            
+            
         else:
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
@@ -8226,7 +8313,8 @@ class MyAdminSite(AdminSite):
             kwargs.update({'project':project}) 
             kwargs.update({'toolbar_title_code': 'Project_' + kwargs['project_pk']})
             kwargs.update({'form':'False'})
-            kwargs.update({'deletable': 'False'})           
+            kwargs.update({'deletable': 'False'})
+            kwargs['webpages'] = project.webpage_set.all()
         else: 
             #If anything goes wrong in the process, return an error in the json HTTP Response
             SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), 'Trying to access another project.', request.META)
@@ -8624,11 +8712,64 @@ class MyAdminSite(AdminSite):
         #   --to make sure that only the custom admin can be used. The reason is that all users have to be "is_staff"
         #   --giving them access to change things. If they find a way into the Django built-in admin, they will be able to affect
         #   --the database in potentially nefarious ways
-        logger.info( reverse('maqlu_admin:project_home',kwargs={'project_pk': request.user.permissions.project.pk}))
-        return redirect('maqlu_admin:project_home',project_pk=request.user.permissions.project.pk)
+        #
+        #Additionally if we are a MASTER admin, we redirect to the TARA admin console page
+        if (request.user.permissions.master_admin):
+        
+            #Get a list of all logged in user PKs by looking at non-expired sessions that exist NOW
+            sessions = Session.objects.filter(expire_date__gte=timezone.now())
+            pk_list = []
+            # Build a list of user ids from that query
+            for session in sessions:
+                data = session.get_decoded()
+                pk_list.append(data.get('_auth_user_id', None))
+            
+            projects = FormProject.objects.all()
+            users = User.objects.order_by('-permissions__master_admin', 'permissions__project__name', 'username')
+            security_messages = SecurityMessage.objects.order_by('-date_created')
+            blogposts = BlogPost.objects.filter(project=None).order_by('-date_created')
+            kwargs.update({'user': request.user,'has_permission': admin.site.has_permission(request)})
+            kwargs.update({'pk_list':pk_list})
+            kwargs.update({'api_urls':get_api_endpoints()})
+            kwargs.update({'user_access':request.user.permissions.access_level})
+            kwargs.update({'user_project':request.user.permissions.project})     
+            kwargs.update({'user_list':users})
+            kwargs.update({'project_list':projects})
+            kwargs.update({'message_list':security_messages})
+            kwargs.update({'blogpost_list':blogposts})
+            
+            return render (request, 'maqluengine/tara_admin_console.html',kwargs)
+        else:
+            return redirect('maqlu_admin:project_home',project_pk=request.user.permissions.project.pk)
 
-        
-        
+    
+    def master_admin_project_redirect(self, request, **kwargs):   
+        # This view let's a master admin switch their project ownership to emulate being a level 5 access member of the project
+        #   --It expects a project ID in the provided kwargs to the view
+        #   --It sets the project of the master admin user to the provided project ID, saves, and then redirects the master-admin to that
+        #   --project's admin page
+        if (request.user.permissions.master_admin):
+            #If an invalid project ID is given then redirect to the main admin page
+            try:
+                new_project = FormProject.objects.get(pk=kwargs['project_pk'])
+                request.user.permissions.project = new_project
+                request.user.save()
+                return redirect('maqlu_admin:project_home',project_pk=request.user.permissions.project.pk)
+            except:
+                ERROR_MESSAGE = "Invalid Project ID"
+                SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+                kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
+                return render(request, 'maqluengine/admin_error.html', kwargs)  
+            
+        else:
+            #Set a security notification because the only people who should get to this view without hacking the url addresses are master_admins
+            ERROR_MESSAGE = "Invalid Project ID"
+            SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
+            kwargs.update({'ERROR_MESSAGE': ERROR_MESSAGE})
+            return render(request, 'maqluengine/admin_error.html', kwargs)   
+
+
+            
     ##==========================================================================================================================    
     #  CUSTOM ADMIN URL PATTERNS   *********************************************************************************************
     ##==========================================================================================================================    
@@ -8654,6 +8795,18 @@ class MyAdminSite(AdminSite):
             url(r'^$', admin.site.admin_view(self.index), name='index'),
             
             #All Admin API Endpoints 
+
+            # MASTER ADMIN Endpoints
+            url(r'^create_project/$', admin.site.admin_view(self.create_project), name='create_project'),
+            url(r'^delete_project/$', admin.site.admin_view(self.delete_project), name='delete_project'),
+            url(r'^reset_user_password/$', admin.site.admin_view(self.reset_user_password), name='reset_user_password'),
+            url(r'^create_project_admin/$', admin.site.admin_view(self.create_project_admin), name='create_project_admin'),
+            url(r'^delete_user/$', admin.site.admin_view(self.delete_user), name='delete_user'),
+            url(r'^edit_security_message/$', admin.site.admin_view(self.edit_security_message), name='edit_security_message'),
+            url(r'^create_edit_blogpost/$', admin.site.admin_view(self.create_edit_blogpost), name='create_edit_blogpost'),
+            url(r'^get_admin_blog_post/$', admin.site.admin_view(self.get_admin_blog_post), name='get_admin_blog_post'),
+            url(r'^delete_admin_post/$', admin.site.admin_view(self.delete_admin_post), name='delete_admin_post'),
+            url(r'^master_admin_project_redirect/(?P<project_pk>[0-9]+)/$', admin.site.admin_view(self.master_admin_project_redirect), name='master_admin_project_redirect'),
             
             # All Endpoints that return model objects
             url(r'^get_user_list/$', admin.site.admin_view(self.get_user_list), name='get_user_list'),
@@ -8674,7 +8827,7 @@ class MyAdminSite(AdminSite):
             url(r'^get_geo_graduated_applied_classes/$', admin.site.admin_view(self.get_geo_graduated_applied_classes), name='get_geo_graduated_applied_classes'),
             url(r'^get_geo_rules_classes/$', admin.site.admin_view(self.get_geo_rules_classes), name='get_geo_rules_classes'),
             # All Endpoints that run tools non-database-modification tools
-            url(r'^run_query_engine/$', admin.site.admin_view(self.run_query_engine), name='run_query_engine'),
+            
             url(r'^run_master_query_engine/$', admin.site.admin_view(self.run_master_query_engine), name='run_master_query_engine'),
 
             # Endpoints for Editing Model objects
@@ -8684,11 +8837,13 @@ class MyAdminSite(AdminSite):
             url(r'^save_form_changes/$', admin.site.admin_view(self.save_form_changes), name='save_form_changes'),            
             url(r'^modify_project_user/$', admin.site.admin_view(self.modify_project_user), name='modify_project_user'),
             url(r'^bulk_edit_formtype/$', admin.site.admin_view(self.bulk_edit_formtype), name='bulk_edit_formtype'),
+            url(r'^edit_menugroup/$', admin.site.admin_view(self.edit_menugroup), name='edit_menugroup'),
             
-            # Endpoints for Creating new model objects
+            # Endpoints for Creating new model objects 
             url(r'^create_new_form/$', admin.site.admin_view(self.create_new_form), name='create_new_form'),
             url(r'^create_new_form_type/$', admin.site.admin_view(self.create_new_form_type), name='create_new_form_type'),
             url(r'^create_new_form_type_template/$', admin.site.admin_view(self.create_new_form_type_template), name='create_new_form_type_template'),
+            url(r'^create_new_webpage/$', admin.site.admin_view(self.create_new_webpage), name='create_new_webpage'),
             
             # Endpoints for random tools
             url(r'^navigate_query_pagination/$', admin.site.admin_view(self.navigate_query_pagination), name='navigate_query_pagination'),
@@ -8700,6 +8855,7 @@ class MyAdminSite(AdminSite):
             url(r'^debug_toolA/$', admin.site.admin_view(self.debug_toolA), name='debug_toolA'),
             
             # Endpoints for the Recycling Bin
+            url(r'^delete_user_profile_query/$', admin.site.admin_view(self.delete_user_profile_query), name='delete_user_profile_query'),
             url(r'^delete_form_type/$', admin.site.admin_view(self.delete_form_type), name='delete_form_type'),
             url(r'^delete_form/$', admin.site.admin_view(self.delete_form), name='delete_form'),
             url(r'^delete_frat/$', admin.site.admin_view(self.delete_frat), name='delete_frat'),
@@ -8713,6 +8869,7 @@ class MyAdminSite(AdminSite):
             url(r'^recycle_form/$', admin.site.admin_view(self.recycle_form), name='recycle_form'),
             url(r'^recycle_frat/$', admin.site.admin_view(self.recycle_frat), name='recycle_frat'),
             url(r'^recycle_frrt/$', admin.site.admin_view(self.recycle_frrt), name='recycle_frrt'),
+            url(r'^recycle_webpage/$', admin.site.admin_view(self.recycle_webpage), name='recycle_webpage'),
             url(r'^load_recycling_bin/$', admin.site.admin_view(self.load_recycling_bin), name='load_recycling_bin'),
 
             #Endpoints for Importing and Exporting data into TARA

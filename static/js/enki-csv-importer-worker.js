@@ -33,7 +33,8 @@ onmessage = function(file) {
                          console.log('":"'+n[x].replace(/([^\\])((\\\\)*)\\(?![\\/{])/g, "$1$2")+'"'+',');
                           console.log('":"'+n[x].replace(/"/g, '\\"').replace(/([^\\])((\\\\)*)\\(?![\\/{"])/g, "$1$2")+'"'+',');
                     }
-                        
+                    
+                    console.log(x);
                     jsonString+='"'+x.replace(/([^\\])((\\\\)*)\\(?![\\/{"])/g, "$1$2").replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/_/g, "-") +'":"'+n[x].replace(/([^\\])((\\\\)*)\\(?![\\/{"])/g, "$1$2").replace(/\\/g, "\\\\").replace(/"/g, '\\"')+'"'+',';
                     
                     //If we've already done one step, then we have the header information we need for the webform--just stick to parsing out the json string for post

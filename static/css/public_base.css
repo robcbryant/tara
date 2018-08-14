@@ -1,0 +1,535 @@
+  * {
+    margin: 0px 0px 0px 0px;
+    padding: 0px 0px 0px 0px;
+  }
+
+  body, html {
+
+    background-color: #FFFFFF;
+
+    font-family: Verdana, sans-serif;
+    font-size: 11pt;
+    text-align: center;
+    height: 100%;
+    width: 100%;
+    position: relative;
+    background: #0057b9;
+    border-radius: 36px 0px 0px 0px;
+  }
+  
+#base-page {
+    position: relative; /*This allows the 0 positioned footer to stick to the bottom of the site*/
+    height: 100%; 
+}
+ 
+
+a:link, a:visited, a:hover, a:active {
+    text-decoration-line: none;
+    text-decoration: none;/* IExplorer Fix */
+    color:inherit;
+}
+
+
+
+#header #branding {
+    height: 17px;
+    background: black;
+}
+
+#header {
+    height: 100px;
+    background: #0057b9;
+    position: relative;
+    width: 100%;
+    border-bottom: 10px solid #00a1ff;
+}
+   
+   
+#header .logo-parent{
+    width: 30%;
+    height: 100%;
+    position: relative;
+    left: 0em;
+    float: left;
+}
+   
+   
+#header .main-logo {
+font-size: 1.12em;
+    top: -2px;
+    left: 1.2em;
+    letter-spacing: -3px;
+    font-weight: bold;
+    color: white;
+    position: absolute;
+    font-family: "Arial";
+    
+}
+   
+#header .sub-logo {
+    color: white;
+    letter-spacing: 0px;
+    font-family: sans-serif;
+    font-weight: bold;
+    position: absolute;
+    top: .6em;
+    left: 4.5em;
+    font-size: .5em;
+    width: 30em;
+}
+
+#header .img-logo{
+    position: absolute;
+    left: 0.5em;
+    width: 12px;
+    height: 12px;
+    top: 2px;
+
+}        
+
+
+#header .project-title {
+    width: 40%;
+    color: white;
+    font-size: 2em;
+    font-weight: bold;
+    position: relative;
+    height: 63px;
+    float: left;
+    top: 20px;
+    letter-spacing: -3px;
+}
+
+#header .menu {
+    width: 60%;
+    height: 53px;
+    display: flex;
+    top: 0;
+    position: relative;
+    right: 0;
+    top: 30px;
+}
+
+#header .menu div{
+    color: white;
+    flex: 1;
+    font-size: 1.2em;
+    font-weight: bold;
+    height: 30px;
+    top: 4px;
+    position: relative;
+    text-transform: lowercase;
+    font-family: "Arial", sans-serif;
+    letter-spacing: -1px;
+        margin-right: 3%;
+}
+
+#header .menu a{
+    color: white;
+    flex: 1;
+    font-size: 1.2em;
+    font-weight: bold;
+    height: 30px;
+    top: 4px;
+    position: relative;
+    text-transform: lowercase;
+    font-family: "Arial", sans-serif;
+    letter-spacing: -1px;
+        margin-right: 3%;
+}
+
+#header .menu a:hover{
+    color:rgba(0, 161, 255,1);
+}
+
+.update {
+    margin: 0 auto;
+    background: #5959c7;
+    width: 60%;
+    margin-top: 2%;
+    min-height: 60px;
+    color: white;
+    border-radius: 6px 6px 40px 40px;
+    font-weight: bold;
+    font-size: 1.5em;
+    }
+    
+   
+.login-access {
+    position: absolute;
+    right: 0em;
+    top: 0em;
+    z-index: 10;
+    font-size: 0.6em;
+    background: #5959c7;
+    width: 6em;
+    height: 13px;
+    border-radius: 0px 0px 0px 16px;
+    border-left: 4px solid #25f6a7;
+    border-bottom: 4px solid rgba(0, 161, 255,1);
+    /* padding-bottom: 3px; */
+}
+    
+.login-access a {
+    color: white;
+    font-weight: bold;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    text-transform: lowercase;
+    padding: 1px 0px 0px 1em;
+}
+
+.login-access img {
+    width: 12px;
+    height: 12px;
+}
+
+
+#footer {
+    width: 100%;
+    margin: 0 auto;
+    background: #0057b9;
+    height: 50px;
+    position: relative;
+    bottom: 0;
+}
+
+#footer .project-name {
+    float: left;
+    color: white;
+    font-weight: bold;
+    letter-spacing: -1px;
+    font-size: 1.3em;
+    margin-left: 0%;
+    width: 33%;
+    top: 25%;
+    position: relative;
+}
+
+#footer .footer-logo {
+    width: 7%;
+    float: left;
+    height: 24px;
+    top: 25%;
+    position: relative;
+}
+
+#footer .footer-logo .img-logo {
+    width: 20px;
+    height: 20px;
+    position: relative;
+    top: 3px;
+}
+
+#footer .footer-logo .main-logo {
+    font-size: 1.3em;
+    letter-spacing: -3px;
+    font-weight: bold;
+    color: white;
+    font-family: "Verdana";
+    height: 20px;
+    padding: 0;
+}
+
+#footer .branding {
+    float: right;
+    width: 55%;
+    display: flex;
+    top: 34%;
+    position: relative;
+    padding-right: 3%;
+}
+
+
+#footer .branding span {
+    text-align: right;
+    color: white;
+    flex: 1;
+    font-size: .5em;
+    font-weight: bold;
+    line-height: 2.2em;
+}
+
+#footer .branding a {
+    color: white;
+    flex: 1;
+    text-align: left;
+    padding-left: .2em;
+    font-size: .7em;
+    font-weight: bold;
+    letter-spacing: -1px;
+    text-transform: lowercase;
+    text-decoration: none;
+    line-height: 10px;
+}
+
+#footer .branding a img {
+    height: 15px;
+}
+
+#main .main {
+    display: flex;
+    flex-direction: column;
+    width: 80%;
+    margin-top: 2%;
+    margin-left: 3%;
+}
+#main #sub-header {
+        width: 100%;
+    height: 29px;
+    display: flex;
+    background: #00a1ff;
+}
+
+#main #sub-header .geospatial-engine{
+    flex:1;
+}
+
+#main #sub-header .query-engine{
+    flex: 1;
+}
+
+#main #sub-header .browse{
+    flex: 1;
+}
+
+#main #sub-header a:hover {
+    background: #5959c7;
+}
+
+#main #sub-header a {
+    display: flex;
+    border: 4px solid #0057b9;
+    height: 21px;
+}
+
+#main #sub-header  span {
+    color: white;
+    font-size: 1.45em;
+    display: flex;
+    font-weight: bold;
+    height: 20px;
+    margin: 0 auto;
+}
+
+#main #sub-header  span div:nth-child(2) {
+    letter-spacing: -3px;
+    font-size: .8em;
+    line-height: 1.3em;
+    margin-right: 1%;
+}
+
+#main #sub-header  span div:nth-child(3) {
+    letter-spacing: -3px;
+    font-weight: bold;
+    font-family: arial;
+    line-height: 1.05em;
+}
+
+#main #sub-header  span div:nth-child(4) {
+    letter-spacing: -3px;
+    margin-left: 4%;
+    font-size: .8em;
+    line-height: 1.3em;
+}
+#main #sub-header .icon {
+    width: 22px;
+    height: 14px;
+    background-size: cover;
+    border: 2px solid white;
+    border-radius: 12px;
+    margin: 0 auto;
+    margin-top: 1px;
+}
+#main #sub-header .geospatial-engine .icon {
+    background-image: url(/static/site-images/ki_gis_icon.png);
+}
+
+#main #sub-header .query-engine .icon {
+    background-image: url(/static/site-images/murgu_query_icon.png);
+}
+
+#main #sub-header .info .browse .icon {
+    background-image: url(/static/site-images/sa_browse_icon.png);
+}
+#main{
+    display: flex;
+    min-height: calc(100% - 150px);
+    background: url(/static/site-images/main_bg.jpg);
+    background-size: cover;
+    background-repeat: no-repeat;
+        padding: 0em 2em 0em 0em;
+    background-position: 10% 50%;
+    background-attachment: fixed;
+}
+
+
+.main-content {
+    padding: 3% 2% 10% 2%;
+    height: 100%;
+    background: #000000c2;
+    color: white;
+    letter-spacing: -1px;
+}
+
+
+.main-content .latest-post {
+margin: 0 auto;
+    width: 66%;
+    background: #0057b9;
+    color: white;
+    padding: 2%;
+    text-align: left;
+    border-right: 50px solid #000000;
+    border-left: 50px solid #000000;   
+    padding-top: 6%;
+}
+
+.main-content .latest-post  .name{
+font-size: 4em;
+    font-weight: bold;
+    letter-spacing: -6px;
+    line-height: 84%;
+    text-align: left;
+    margin-bottom: 2%;
+}
+
+.main-content .latest-post .date{
+    font-size: 1.2em;
+    font-style: italic;
+    font-weight: bold;
+    letter-spacing: -2px; 
+}
+
+.main-content .latest-post .author{
+    font-size: 1.5em;
+    font-weight: bold;
+    letter-spacing: -3px;
+}
+
+.main-content .latest-post .image{
+width: 100%;
+    height: 400px;
+    /* border: 4px solid #000000a3; */
+    /* border-radius: 16px 16px 0px 0px; */
+    background-size: cover;
+}
+
+.main-content .latest-post .content{
+    font-size: 1.3em;
+    letter-spacing: -1px;
+    padding-top: 5%;
+}
+
+.main-content .post-list {
+    display: inline-block;
+}
+
+
+.main-content .recent-post {
+    color: white;
+    float: left;
+    position: relative;
+    width: 30%;
+    margin: 1%;
+    min-height: 20em;
+}
+
+
+
+.main-content .recent-post .name{
+    font-size: .9em;
+    font-weight: bold;
+    letter-spacing: -1px;
+    border-radius: 3px 16px 3px 16px;
+    padding: 0% 0% 0% 2%;
+    width: 100%;
+    text-align: left;
+    color: white;
+}
+
+.main-content .recent-post .name a:hover{
+    color: #000000a6;
+}
+
+.main-content .recent-post .image{   
+    height: 12em;
+    width: 100%;
+    background-size: cover;
+    background-position: 50% 50%;
+    background-color: #020701;
+
+}
+
+.main-content .recent-post .date{
+font-size: .8em;
+    padding: 0% 0% 0% 2%;
+    font-weight: bold;
+    float: left;
+    width: 100%;
+    text-align: left;
+    color: #00a1ff;
+    letter-spacing: 1px;
+}
+
+.main-content .recent-post .author{
+padding: 0% 2% 0% 2%;
+    font-size: 1em;
+    font-weight: bold;
+    float: left;
+    color: #25f6a7;
+    width: 100%;
+    text-align: left;
+    letter-spacing: 0px;
+}
+
+.main-content .recent-post .content{
+width: 86%;
+    font-size: .5em;
+    font-weight: bold;
+    text-align: left;
+    border-radius: 10px;
+    padding: 3%;
+    float: left;
+    border-bottom: 1px solid #00a1ff;
+}
+
+.main-content .other-posts{
+border-top: 3px solid white;
+    margin-top: 8%;
+    padding-top: 1%;
+    margin-bottom: 2%;
+        font-size: 1.5em;
+    font-weight: bold;
+}
+
+
+.side-bar {
+    width: 20%;
+    padding: 0% 2% 2% 2%;
+    color: white;
+    background: #0085e5;
+    height: fit-content;
+    border-radius: 0px 0px 12px 0px;
+}
+
+.form-type-group-title {
+    background: #0085e5;
+    font-size: 1.4em;
+    font-weight: bold;
+    letter-spacing: -2px;
+    position: relative;
+    right: 0;
+}
+
+.formtype:hover {
+    color: #00a1ff;
+    background: #5959c7;
+}
+
+.formtype {
+    background: #0057b9;
+    font-weight: bold;
+    letter-spacing: -1px;
+}

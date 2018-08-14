@@ -148,8 +148,8 @@ $("#search-form").find('form.query-engine').submit(function(e){
     formData.push({name: 'uuid', value: progress_uuid});
     formData.push({name: 'query', value: queryJSON});
     formData.push({name: 'sesID', value: progress_uuid});
-    formData.push({name: 'formtype_id', value: $('#FORMTYPE_ID').attr('title')});
-    formData.push({name: 'project_id', value: $('#PROJECT_ID').attr('title')});
+    formData.push({name: 'formtype_id', value: CURRENT_FORMTYPE_PK});
+    formData.push({name: 'project_id', value: CURRENT_PROJECT_PK});
     console.log(progress_uuid);
     
     showBusyGraphic($('#view-table'));
@@ -350,6 +350,14 @@ function createNewChart(jsondata){
                         ticks: {
                             beginAtZero:true
                         }
+                    }],
+                    xAxes: [{
+                        categoryPercentage: 1.0,
+                        barPercentage: 1.0,
+                        
+                        ticks: {
+                            beginAtZero:true
+                        }
                     }]
                 }
             }
@@ -382,6 +390,8 @@ function createNewChart(jsondata){
             $emptyChart = $('<canvas id="myChart" width="400" height="400"></canvas>');
             $emptyChartParent.append($emptyChart);
      
+            console.log($constraintDataSets);
+            console.log($constraintLabels);
             var myBarChart = new Chart( $emptyChart, {
                 type: 'horizontalBar',
                 data: {
@@ -406,7 +416,15 @@ function createNewChart(jsondata){
                             ticks: {
                                 beginAtZero:true
                             }
-                        }]
+                        }],
+                    xAxes: [{
+                        categoryPercentage: 1.0,
+                        barPercentage: 1.0,
+                        
+                        ticks: {
+                            beginAtZero:true
+                        }
+                    }]
                     }
                 }
                 });
@@ -450,7 +468,7 @@ function createNewChart(jsondata){
         $emptyChartParent = $('<div class="canvas-parent" style="width:46%;"></div>');
         $emptyChart = $('<canvas id="myChart" width="400" height="400"></canvas>');
         $emptyChartParent.append($emptyChart);
-            
+
         var myPieChart = new Chart( $emptyChart, {
             type: 'doughnut',
             data: {
@@ -539,6 +557,9 @@ function createNewChart(jsondata){
         $emptyChartParent = $('<div class="canvas-parent"></div>');
         $emptyChart = $('<canvas id="myChart" width="400" height="'+height+'"></canvas>');
         $emptyChartParent.append($emptyChart);
+ 
+        console.log(mainLabels);
+        console.log(allDataSets);
  
         var myBarChart = new Chart( $emptyChart, {
             type: 'horizontalBar',
@@ -749,7 +770,9 @@ $("#add-constraint").click( function(){
 //--Then we'll fill in a a new select box below it with this relation's available attributes to query
 //--Finally it needs to be appended to the direct parent of this selection's onchange event that calls for this once the AJAX request returns
 //--successfully. If the user selects another non-FRRT term in the parent select, then delete this new child select IF it exists, otherwise do nothing
-$('.formtype-select .__RTYPE').change(addDeepSearchListener);
+
+
+//$('.formtype-select .__RTYPE').change(addDeepSearchListener);
 
 function addDeepSearchListener() {
     console.log( $(this))

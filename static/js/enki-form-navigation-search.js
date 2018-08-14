@@ -64,6 +64,18 @@ $('#form-nav-search-form').submit(function(e){
     
 }
  
+$('input').keypress(function(e) {
+    var code = e.keyCode || e.which;
+    if (code == 13 && this.form.id == "form-nav-search-form") // Enter key = keycode 13
+    {
+        $('#form-nav-search-form').submit();
+        return false;
+    }
+    
+    if (code == 13) {return false;}
+    
+});
+
 
  $(document).mouseup(function(e) 
 {

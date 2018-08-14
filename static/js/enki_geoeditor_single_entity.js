@@ -33,7 +33,10 @@ $prevEl.prepend( $('<div id="test-map" class="col-md-12"></div>') );
         app.EditModeControl = function(opt_options) {
 
             var options = opt_options || {};
-
+            
+            
+                       
+            
             //Create Edit Mode Button            
             var button_editmode = $('<button class="gis-button gis-button-off" id="gis-button-edit" type="button" title="OFF"><span class="glyphicon glyphicon-pencil"></span></button>')
          
@@ -117,7 +120,7 @@ $prevEl.prepend( $('<div id="test-map" class="col-md-12"></div>') );
                                 }),
                                 stroke: new ol.style.Stroke({
                                     color: '#ffccdd',
-                                    width: 2
+                                    width: 1
                                 }),
                                 image: new ol.style.Circle({
                                     radius: 7,
@@ -199,24 +202,93 @@ $prevEl.prepend( $('<div id="test-map" class="col-md-12"></div>') );
             button_addAllLayers[0].addEventListener('touchstart', addAllFormTypeLayers, false);            
             
             //Create container to hold the button in OpenLayers that is addded to the standard controls
-            var element = document.createElement('div');
-            element.className = 'edit-mode ol-unselectable ol-control';
-            element.appendChild(button_editmode[0]);
-            element.appendChild(vectorselect_form);
-            element.appendChild(button_selectMode[0]);
-            element.appendChild(button_delfeature[0]);
-            element.appendChild(button_addAllLayers[0]);
-
-
-
+            $geoToolBar = $('<div></div>');
+            $geoToolBar.addClass('edit-mode ol-unselectable ol-control');
+            $geoToolBar.append(button_editmode[0]);
+            $geoToolBar.append(vectorselect_form);
+            $geoToolBar.append(button_selectMode[0]);
+            $geoToolBar.append(button_delfeature[0]);
+            //$geoToolBar.append(button_addAllLayers[0]);
+            $geoToolBar.append('<div style="width:20%; color:black;float:left;font-size:.8em;font-weight:bold;">Choose BG Layer</div>');
+            $layerSelect = $('#geo-bglayer-select');
+            console.log($layerSelect);
+            $geoToolBar.append($layerSelect);
+            $layerSelect.show();
             ol.control.Control.call(this, {
-                element: element,
+                element: $geoToolBar[0],
                 target: options.target
             });
 
+            
+            
+
+                    var currentBGLayer;
+                    $layerSelect.change( function() {
+                        console.log("===================================================================================");
+                        console.log($(this));
+                        if ($(this).val() != "none"){
+                                console.log(MAP.getLayers().getLength());
+                                 console.log(MAP.getLayers());
+                                    //Clear the bg vector layer
+                                    if (MAP.getLayers().getLength() > 2){
+                                        MAP.removeLayer(currentBGLayer);
+                                    }
+                                    //If clicked, we need to add it to our map
+                                    var postJSON = [];
+                                    var layerName = $(this).find('option:selected').html();
+                                    var layerPK = $(this).val();
+                                    console.log(layerName);
+                                    postJSON.push( {name:'formtype_pk', value:layerPK});
+                                    $.ajax({ url   : API_URLS['get_geo_formtype_layers'], type  : "POST", data  : postJSON, // data to be submitted
+                                        success : function(returnedQuery){
+                                            console.log(returnedQuery);
+                                            //var geojson_collection;
+                                            var geojson_object = new ol.format.GeoJSON().readFeatures(returnedQuery);
+                                            currentBGLayer = new ol.layer.Vector({
+                                                        name: "Base Vector Layer",
+                                                        renderMode:'image',
+                                                        name: layerName,
+                                                        pk: layerPK,
+                                                        source: new ol.source.Vector({features: new ol.Collection(geojson_object)}),
+                                                        style: new ol.style.Style({
+                                                            fill: new ol.style.Fill({
+                                                              color: 'rgba(255, 255, 255, 0.3)'
+                                                            }),
+                                                            stroke: new ol.style.Stroke({
+                                                              color: '#319FD3',
+                                                              width: 1
+                                                            })
+                                                        })
+                                                     
+                                                      })
+                                                
+                                            MAP.addLayer(currentBGLayer);
+                                            currentBGLayer.setZIndex(0);
+                                        }
+                                    });     
+                        } else {
+                            //Clear the bg vector layer
+                            if (MAP.getLayers().getLength() > 2){
+                                MAP.removeLayer(currentBGLayer);
+                            }
+                        }
+                    });
+            
         };
+        
+        
         ol.inherits(app.EditModeControl, ol.control.Control);
 
+
+        
+        
+        
+        
+        
+        
+        
+        
+        
 
         var geojsontest_element =  document.getElementById('id_geojson_string');
 
@@ -228,16 +300,30 @@ $prevEl.prepend( $('<div id="test-map" class="col-md-12"></div>') );
         var geojson_collection;
         var geojson_object = new ol.format.GeoJSON();
         try {
-            geojson_object = new ol.format.GeoJSON().readFeatures(geojson_string);
-            console.log(geojson_object.readProjection);
-            geojson_collection = new ol.Collection(geojson_object);
+            if ( geojson_string == '{"type":"FeatureCollection","features":[]}'){
+                try {
+                    geojsontest_element.innerHTML = DEFAULT_GEOJSON;
+                    geojson_string = geojsontest_element.innerHTML;
+                    geojson_collection = new ol.Collection(new ol.format.GeoJSON().readFeatures(geojson_string));
+                }catch(err) {
+                    geojsontest_element.innerHTML = '{"type":"FeatureCollection","features":[]}'
+                    geojson_string = geojsontest_element.innerHTML;
+                    geojson_collection =  new ol.Collection(new ol.format.GeoJSON().readFeatures('{"type":"FeatureCollection","features":[]}'));
+                }
+            } else {
+                geojson_object = new ol.format.GeoJSON().readFeatures(geojson_string);
+                console.log(geojson_object.readProjection);
+                geojson_collection = new ol.Collection(geojson_object);
+            }
         } catch(error) {
             console.log(error);
             try {
                 geojsontest_element.innerHTML = DEFAULT_GEOJSON;
+                geojson_string = geojsontest_element.innerHTML;
                 geojson_collection = new ol.Collection(new ol.format.GeoJSON().readFeatures(geojson_string));
             }catch(err) {
                 geojsontest_element.innerHTML = '{"type":"FeatureCollection","features":[]}'
+                geojson_string = geojsontest_element.innerHTML;
                 geojson_collection =  new ol.Collection(new ol.format.GeoJSON().readFeatures('{"type":"FeatureCollection","features":[]}'));
             }
 
@@ -260,16 +346,16 @@ $prevEl.prepend( $('<div id="test-map" class="col-md-12"></div>') );
             source: vectorSource,
             style: new ol.style.Style({
                 fill: new ol.style.Fill({
-                    color: 'rgba(255, 255, 255, 0.2)'
+                    color: 'rgba(0, 0, 0, 0.3)'
                 }),
                 stroke: new ol.style.Stroke({
-                    color: '#ffcc33',
-                    width: 2
+                    color: '#44caa3',
+                    width: 3
                 }),
                 image: new ol.style.Circle({
                     radius: 7,
                     fill: new ol.style.Fill({
-                        color: '#ffcc33'
+                        color: '#44caa3'
                     })
                 })
             })
@@ -295,7 +381,7 @@ $prevEl.prepend( $('<div id="test-map" class="col-md-12"></div>') );
         });
 
 
-        
+        vectorLayer.setZIndex(20);
         //This creates the map container and sets it to the div element created with the HTML ID 'test-map'
         MAP = new ol.Map({
             //Add our controls

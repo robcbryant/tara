@@ -1,0 +1,61 @@
+{% extends "public_frontend/tara_base.html" %}
+
+{% load staticfiles %}
+
+{% block content %}
+<div class="main">
+
+{% include "public_frontend/tara_subheader.html" %}
+
+    <div class="main-content">
+
+    
+    
+    <div id="bulk-content">
+    
+        <div class="tara-page-header">
+            <div class="inner-border">
+                CONTACT INFORMATION
+            </div>
+        </div>
+        
+        <div class="contact-block"> 
+            <div class="photo"><img src="{% static 'site-images/tara_robert_profile.png' %}"></img></div>
+            <div class="info">
+                <span>Robert C Bryant</span>
+                <span>robryant@upenn.edu</span>
+                <span>System Admin/Programmer</span>
+            </div>
+        </div>
+
+        <div class="contact-block"> 
+         <div class="photo"><img src="{% static 'site-images/profile_no_img.png' %}"></img></img></div>
+            <div class="info">
+                <span>Stephen J Tinney</span>
+                <span>stinney@sas.upenn.edu</span>
+                <span>Project Supervisor</span>
+            </div>
+           
+
+        </div>
+        
+        
+        <div class="contact-block"> 
+            <div class="photo"><img src="{% static 'site-images/profile_no_img.png' %}"></img></div>
+            <div class="info">
+                <span>Holly Pittman</span>
+                <span>hpittman@upenn.edu</span>
+                <span>Project Supervisor</span>
+            </div>
+        </div>
+
+        
+    </div>    
+    
+    
+    
+    
+    
+    </div>
+</div>
+{% endblock %}

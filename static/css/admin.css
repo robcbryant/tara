@@ -6,37 +6,47 @@
     transition: none;
 }​
 
-
-
 #wrap {height: 100% !important;} 
 #container{height: 100% !important;}
-body{min-height:1000px;}
+body{
+    background-color:#000000 !important;
+    padding: 0;
+    margin: 0;
+    }
 #project-content{margin-left:-15px; display: flex;}
 #left-pane{flex: 1.5;padding-top: 1%; background-color:#0057b9; min-height:700px;border-radius: 0px 00px 20px 20px; padding-bottom: 20px;border: 3px solid #0057b9; border-top: 0px;}
 #center-pane{ }
 #project-form{    
-    background-color: #5a96ca;
+    background-color: #0057b9;
     padding: 20px;
     border-radius:16px;
-    margin-top: 1%;
     border: 3px solid #074572;
 }
-#id_project_description{width:100%; border-radius: 0px 0px 16px 16px;}
+
+#id_project_description {width:100%; border-radius: 0px 0px 16px 16px;}
 .project-description {
         font-weight: bold;
     font-size: 29px;
     letter-spacing: -2px;
     padding-left: 15px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border-radius: 16px 16px 0px 0px;
     color: white;
 }
+.canvas-parent.PRIMARY {
+    min-height: 150px;
+    width: 98%;
+    float: left;
+    position: relative;
+    background-color: #ffffff;
+    border-radius: 8px;
+    border: 3px solid #074572;
+    margin: 1%;    
+}
 
 #project-stats{
-    background-color: #5a96ca;
+    background-color: #0057b9;
     min-height: 500px;
-    width: 100%;
-    margin-top: 2%;
     border: 3px solid #074572;
     border-radius: 16px;
     padding: 2%;
@@ -70,7 +80,7 @@ body{min-height:1000px;}
     font-weight: bold;
     font-size: 43px;
     letter-spacing: -2px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border-radius: 16px 16px 0px 0px;
     padding-left: 30px;
     height: 60px;
@@ -93,7 +103,7 @@ body{min-height:1000px;}
     border-radius: 4px;
 }
 
-#project-header{background-color:#5a96ca; padding-left: 15px; border-radius: 0px 0px 50px 0px;}
+#project-header{background-color:#0057b9; padding-left: 15px; border-radius: 0px 0px 50px 0px;}
 #project-header h1{margin-top:5px; margin-bottom: 5px; color:#ffffff; letter-spacing:-1px; text-variant:small-caps;}
 #project-header h1 small{margin-top:5px; margin-bottom: 5px; color:#ffffff; letter-spacing:-2px; text-variant:small-caps;}
 #project-header a {color:#ffffff;}
@@ -114,7 +124,7 @@ body{min-height:1000px;}
 #form-type-toolbar .formtype-tools{border-radius: 0px 0px 80px 0px;background-color: #86bee3; padding-left: 9px; left:-1%;}
 
 #center-pane {
-padding: 0px 0px 0px 1%;
+padding: 1% 0px 0px 1%;
     flex: 8.5;
 }
 
@@ -131,7 +141,7 @@ background-color: #44caa3;
     padding: 5px 0px 50px 6px;
     border: 3px solid #074572;
     border-top: 0px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
     border-radius: 0px 0px 16px 16px;
 }
 
@@ -162,7 +172,7 @@ background-color: #44caa3;
 #form-type-controls {
     margin: 8px 3% 0px 0px;
     width: 200px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border: 3px solid #074572;
     border-bottom: 0px;
     padding: 1px 1px 1px 1px;
@@ -210,7 +220,7 @@ padding: 7px;
     border-radius: 30px;
     margin: 0px 0px 5px 0px;
     padding: 7px 1px 1px 1px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
 }
 
 #form-type-title h2 input[type="text"] {
@@ -232,7 +242,7 @@ padding: 7px;
 }
     
 .title-band {
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border-radius: 30px 30px 0px 0px;
     font-size: 30px;
     border: 3px solid #074572;
@@ -259,8 +269,8 @@ padding: 7px;
 }
 
 .offline {
-    background-color: #337ab7;
-    border-color: #337ab7;
+    background-color: #2eb2ff;
+    border-color: #2eb2ff;
 }
 
 
@@ -288,10 +298,10 @@ padding: 7px;
 -------------------------------*/
 .attribute-float-importer-row { 
     margin: 3px 0px 0px 0px;
-    padding: 0px 0px 0px 0px;
+    padding: 2px 0px 0px 2px;
     font-size: 1em;
     border-radius: 8px;
-    height: 23px;
+    height: 27px;
 }   
 
 
@@ -317,7 +327,7 @@ padding: 7px;
 }
 #importer-header {
     border: 3px solid #074572;
-    background-color: #5a96ca;
+    background-color: #0057b9;
     border-radius: 16px 16px 0px 0px;
     color: white;
     height: 100%;
@@ -337,7 +347,7 @@ padding: 7px;
     border-top: 0px;
     border-radius: 0px 0px 16px 16px;
     padding: 16px 24px 16px 24px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
 }
 .progress-bar-finished{
 background-color: #44caa3 !important;    
@@ -416,7 +426,7 @@ min-width: 5%;
 }
 
 #form-all-fields-grid{
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border: 3px solid #074572;
     border-top: 0px;
     border-radius: 0px 0px 24px 24px;
@@ -434,7 +444,7 @@ min-width: 5%;
 
 
 #form-header .header-container {
-    background-color: #5a96ca;
+    background-color: #0057b9;
     margin: 0px 0px 0px 0px;
     border: 3px solid #074572;
     border-bottom: 0px;
@@ -486,7 +496,7 @@ min-width: 5%;
 }
 #form-all-fields-grid  .input-label{
     padding: 5px 0px 5px 0px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
     border-radius: 3px 3px 0px 0px;
     border: 0px;
     text-align: center;
@@ -528,7 +538,7 @@ min-width: 5%;
     border: 3px solid #074572;
     border-top: 0px;
     border-radius: 0px 0px 16px 16px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
     padding: 5px 0px 50px 6px;
 }
 #formmediareferencegrid .new-ref-chk-box {
@@ -590,7 +600,7 @@ min-width: 5%;
     border: 3px solid #074572;
     border-top: 0px;
     border-radius: 0px 0px 16px 16px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
     padding: 5px 0px 50px 6px;
 
 }
@@ -707,7 +717,7 @@ a.del-reference-button{
     overflow:auto;
     width: 100%; 
     max-width:90%;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     font-size: 1.5em;
     color: white;
     font-size: 2em;
@@ -718,7 +728,7 @@ a.del-reference-button{
 }
 
 #form-properties .panel-heading{
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     font-size: 2em;
     font-weight: bold;
     border-radius: 24px 24px 0px 0px;
@@ -731,15 +741,15 @@ a.del-reference-button{
 
 #form-info .property-label{
 border-radius: 24px 0px 0px 24px;
-    border: 1px solid #5a96ca;
-    background-color: #5a96ca;
+    border: 1px solid #0057b9;
+    background-color: #0057b9;
     color: white;
     font-weight: bold;    
 }
 
 #form-info .property-value{
     border-radius: 0px 24px 24px 0px;
-    border: 1px solid #5a96ca;
+    border: 1px solid #0057b9;
     border-left: 0px;    
     
 }
@@ -827,7 +837,7 @@ border-radius: 24px 0px 0px 24px;
     width: 100px;
 }
 #view-table .table-striped > tbody > tr:nth-of-type(2n+1){
-    background-color: #5a96ca;
+    background-color: #0057b9;
     
 }
 #view-table-header-hidden {
@@ -844,7 +854,7 @@ border-radius: 24px 0px 0px 24px;
     border-radius: 16px;
     border: 3px solid #074572;
     margin-top: 1%;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     color: white;
     float: left;
     width: 100%; 
@@ -1022,7 +1032,7 @@ border-radius: 16px;
     float: left;
     min-height: 162px;
     border-radius: 16px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     padding: 12px;
 }
 
@@ -1034,7 +1044,7 @@ width: 100%;
 
 #search-form .constraints-container {
     width: 100%;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border-radius: 16px;
     padding: 8px 10px 8px 22px;
 }
@@ -1056,7 +1066,7 @@ width: 100%;
 #search-form .constraints-header {
     width: 100%;
     padding: 4px 0px 4px 85px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border-radius: 8px 8px 4px 4px;
     margin-bottom: 5px;
     color: white;
@@ -1066,7 +1076,7 @@ width: 100%;
 #search-form .single-constraint{
     width: 100%;
     margin-bottom: 14px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
     padding: 8px;
     border-radius: 16px;
 }
@@ -1094,7 +1104,7 @@ width: 100%;
     color: white;
     height: 50px;
     top: -32px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border-radius: 8px;
     padding: 6px 4px 4px 9px;   
 }
@@ -1137,7 +1147,7 @@ width: 100%;
 
 
 #search-form {
-    background-color: #5a96ca;
+    background-color: #0057b9;
     border-radius: 24px;
     border: 3px solid #074572;
     padding: 7px;
@@ -1151,7 +1161,7 @@ width: 100%;
     letter-spacing: -2px;
     font-weight: bold;
     font-size: 36px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border-radius: 24px 24px 4px 4px;
     padding: 4px 0px 0px 28px;
     margin: 0px 0px 10px 0px;
@@ -1163,7 +1173,7 @@ width: 100%;
 #search-form .query-container{
     border: 1px solid #074572;
     border-radius: 16px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     padding: 4px 3px 3px 3px;
     height: 36px;
     margin-left: 4px;
@@ -1205,7 +1215,7 @@ width: 100%;
 
 #search-form .single-query{
     margin-bottom: 10px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
     border-radius: 16px;
     padding: 6px;
     width: 700px;
@@ -1218,7 +1228,7 @@ width: 100%;
 
 #search-form .big-and-or-select{
     margin: -8px 280px 6px 290px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
     padding: 4px 0px 5px 8px;
     border-radius: 0px 0px 16px 16px; 
 }
@@ -1249,7 +1259,7 @@ width: 100%;
 }
 
 #search-form .and-or-query {
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     width: 503px;
     height: 36px;
     border-radius: 16px 16px 16px 16px;
@@ -1348,13 +1358,13 @@ width: 100%;
     border-radius: 16px;
     padding: 1%;
     margin-top: 1%;
-    background-color: #5a96ca;   
+    background-color: #0057b9;   
     float: left;
     width: 100%;    
 }
 
 #query-stats .stats-header {
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     color: white;
     border-radius: 16px 16px 6px 6px;
     padding: 3px 3px 3px 23px;
@@ -1557,7 +1567,8 @@ div .breadcrumbs {
     padding: 0px 16px 2px 16px;
 }
 #toolbar-buttons{
-    float:right !important;
+    position: absolute;
+    right: 0;
 }
 
 #toolbar-buttons form{
@@ -1685,9 +1696,9 @@ background: #00a1ff;
 }
 
 #form-type-title .input-group-addon {
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     color: #ffffff;
-    border: 1px solid #337ab7;
+    border: 1px solid #2eb2ff;
     border-radius: 8px 0px 0px 30px;
 }
 #form-type-title .small-option{
@@ -1715,7 +1726,7 @@ background: #00a1ff;
 }
 
 #project-form .input-group div{
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     color: #ffffff;
     border-radius: 16px 0px 0px 16px;
     border: 0px;
@@ -1728,18 +1739,18 @@ background: #00a1ff;
     background-color: #ffffff;
     border-radius: 0px 16px 16px 0px;
     font-size: 10px;
-    border: 3px solid #337ab7;
+    border: 3px solid #2eb2ff;
 }
 
-#project-form .user-list{
+.user-list{
     border: 3px solid #074572;
     border-radius: 16px;
-    height: 400px;
-    margin-top: 10%;    
+    background: #0057b9;
+    padding: 2%;
 }
 
-#project-form .user-list-title {
-    background-color: #337ab7;
+.user-list-title {
+    background-color: #2eb2ff;
     height: 10%;
     width: 100%;
     border-radius: 16px 16px 0px 0px;
@@ -1750,11 +1761,17 @@ background: #00a1ff;
     padding: 0px 0px 0px 22px;    
 }
 
-#project-form .user-scroll {
-    height: 80%;
-    background-color: #ffffff;
+.user-scroll {
+height: 80%;
+    background-color: #0057b9;
     border-radius: 0px 0px 0px 0px;
-    overflow-y: scroll;   
+    overflow-y: scroll;
+    border-left: 8px solid #2eb2ff;
+    border-right: 8px solid #2eb2ff;
+}
+
+#add-user-btn {
+    background-color: #44caa3;
 }
 
 #project-form .button-container {
@@ -1802,7 +1819,7 @@ background: #00a1ff;
 #form-info .image-thumb {
     width: 218px;
     float: left;
-    border: 9px solid #337ab7;
+    border: 9px solid #2eb2ff;
     border-radius: 10px;
 }
 
@@ -1812,7 +1829,7 @@ background: #00a1ff;
 }
 
 #form-info .image-thumb div{
-    background-color:#337ab7;
+    background-color:#2eb2ff;
 }
 
 #form-info .image-thumb div a{
@@ -1841,7 +1858,7 @@ background: #00a1ff;
 #nav-container .save-delete-buttons {
 margin: 0px 0px 0px 20%;
     width: 90px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     height: 40px;
     border-radius: 24px 24px 0px 0px;
     padding: 2px 2px 0px 2px;
@@ -1872,7 +1889,7 @@ padding: 7px;
 }
 
 #form-navigation {
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border-radius: 24px 24px 0px 0px;
     position: relative;
     height: 40px;
@@ -1886,7 +1903,7 @@ padding: 7px;
 }
          
 #form-navigation.view-form-type-version {
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border-radius: 24px 24px 0px 0px;
     position: relative;
     height: 40px;
@@ -1933,7 +1950,7 @@ padding: 7px;
 #search-box-list {
     background-color: white;
     width: 90%;
-    border: 3px solid #337ab7;
+    border: 3px solid #2eb2ff;
     z-index: 5000;
     position: absolute;
     display: table;
@@ -1972,7 +1989,7 @@ float: left;
 }
 
 .img-popup-bg {
-     background-color: rgba(0, 0, 0, 0.37);
+     background-color: rgba(0, 0, 0, 0.57);
     position: absolute;
     top: 0px;
     left: 0px;
@@ -2040,7 +2057,7 @@ float: left;
         margin: 0 auto;
     position: relative;
     width: 400px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     min-height: 300px;
     border-radius: 24px;
     margin-top: 12%;
@@ -2079,7 +2096,7 @@ margin: 0 auto;
     text-align: center;
     margin-top: 80px;
     padding: 0px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
     border-radius: 12px 12px 40px 40px;
     border: 3px solid #074572;
     color: white;
@@ -2095,7 +2112,7 @@ margin: 0 auto;
 .login #content-main {
     width: 28em;
     min-width: 300px;
-    background: #5a96ca;
+    background: #0057b9;
     padding: 20px;
     border-radius: 0px 0px 75px 75px;
     border: 3px solid #074572;
@@ -2200,7 +2217,7 @@ margin: 0 auto;
     border-top: 2px solid #074572;
     border-left: 1px solid #bdd5ea;
     margin-bottom: 5px;
-    background: #337ab7;
+    background: #2eb2ff;
     border-radius: 24px;
     padding: 9px;
 }
@@ -2216,12 +2233,13 @@ margin: 0 auto;
 ===========================================================*/
 
 #user-table {
-    background-color:#337ab7;
+    background-color:#0057b9;
+    width:100%;
 }
 
 #user-table .header td {
 background-color: #074572;
-    border: 3px solid #337ab7;
+    border: 3px solid #0057b9;
     padding: 4px 10px 4px 10px;
     color: white;
     border-left: 0px;
@@ -2231,8 +2249,8 @@ background-color: #074572;
 #user-table tr td {
     background-color: #ffffff;
     padding: 4px 10px 4px 10px;
-    border-right: 4px solid #337ab7;
-    border-bottom: 1px solid #337ab7;
+    border-right: 4px solid #0057b9;
+    border-bottom: 1px solid #0057b9;
     font-weight: bold;
     color: #074572;
 }
@@ -2290,6 +2308,12 @@ border-radius: 16px;
     float:right;
 }
 
+.button-container {
+padding-left: 5%;
+    background: #2eb2ff;
+    border-radius: 0px 0px 8px 8px;
+}
+
 #submit-user-changes {
     float: right;
     margin-right: 4%;
@@ -2341,7 +2365,7 @@ border-radius: 16px;
 .widget-FRRT {
     float: left;
     padding: 0px 0px 0px 0px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
     border-radius: 8px;
     border: 3px solid #074572;   
     height: 150px;
@@ -2373,7 +2397,7 @@ border-radius: 16px;
 
 .widget-FRRT div.frrv-list div.frrv-container{
     color: white;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border: 1px solid #074572;
     border-radius: 16px;
     display: inline-flex;
@@ -2438,7 +2462,7 @@ float: left;
     margin: 0px;
     padding: 5px 0px 0px 4px;
     border-radius: 4px 4px 4px 4px;
-    background-color: #337ab7;    
+    background-color: #2eb2ff;    
 }
 
 .widget-FRRT div.frrv-search div input{
@@ -2503,7 +2527,7 @@ float: left;
     border: 3px solid #074572;
     border-radius: 16px;
     padding: 9px;
-    background: #337ab7;
+    background: #2eb2ff;
 }
 
 #query-pagination .pagination-container button{
@@ -2611,7 +2635,7 @@ This 'should' all be related to the form-type template engine
 
 #template-editor-toolbar {
     
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border: 3px solid #074572;
     border-top: dashed;
     /* border-radius: 0px 0px 24px 24px; */
@@ -2834,7 +2858,7 @@ This 'should' all be related to the form-type template engine
 }
 
 #recycling-bin .recycled-item {
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     width: 100%;
     height: 50px;
     border-radius: 16px;
@@ -3042,13 +3066,14 @@ This 'should' all be related to the form-type template engine
 /* MASTER QUERY ENGINE STYLES */
 
 #master-query-engine {
-    background-color: #5a96ca;
+    background-color: #0057b9;
     border-radius: 24px;
     border: 3px solid #074572;
     padding: 7px;
     overflow-y: auto;
     float: left;
     width: 100%;
+    position: relative;
 }
 
 #master-query-engine .search-title{
@@ -3056,7 +3081,7 @@ This 'should' all be related to the form-type template engine
     letter-spacing: -2px;
     font-weight: bold;
     font-size: 36px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     border-radius: 24px 24px 4px 4px;
     padding: 4px 0px 0px 28px;
     margin: 0px 0px 10px 0px;
@@ -3072,20 +3097,21 @@ This 'should' all be related to the form-type template engine
     float: left;
     min-height: 162px;
     border-radius: 16px;
-    background-color: #337ab7;
-    padding: 12px;
-    width: 70%;
+    background-color: #2eb2ff;
+    padding: 12px 4px 12px 4px;
+    width: 100%;
 }
 
 #master-query-engine .single-query{
     margin-bottom: 10px;
-    background-color: #5a96ca;
+    background-color: #0057b9;
     border-radius: 16px;
     padding: 6px;
     width: 100%; 
-    border: 3px solid #44caa3; 
+    border: 6px solid #44caa3; 
     position: relative;   
-    padding-bottom: 5%;    
+    padding-bottom: 3%;    
+    display: flex;
 }
 
 #master-query-engine .single-query .query-project{
@@ -3196,7 +3222,7 @@ This 'should' all be related to the form-type template engine
 #master-query-engine .single-query .and-or-add-btn {
     position: absolute;
     right: 1%;
-    bottom: 3%;
+    bottom: -10%;
     padding: 2px;
     font-weight: bold;
 }
@@ -3218,7 +3244,7 @@ This 'should' all be related to the form-type template engine
 #master-query-engine .query-constraints .constraints-container .single-constraint {
     width: 49%;
     border-radius: 16px;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     padding: 1%;
     float: left;
     margin-right: 1%;
@@ -3248,27 +3274,140 @@ This 'should' all be related to the form-type template engine
     
 }
 
+
+
+
 #master-query-engine :disabled {
     background-color: #555555;
 }
 
+#master-query-engine .FRRT-option{
+    color: green;
+}
+
+#master-query-engine .del-query {
+    background: #e3534f;
+    color: white;
+    padding: 0px 6px 0px 6px;
+    font-weight: bold;
+}
+
 #master-query-engine .delete-query{
     position: absolute;
-    bottom: 0;
+    bottom: -12%;
     left: 0;
     border-radius: 4px 8px 8px 16px;
     width: 5%;
-    height: 20%;
+    height: 2em;
     padding: 0px;
     background: #e3534f;
     color: white;
 }
 
+#all-results {
+    position: relative;
+    float: left;
+    width: 100%;
+}
+
+#all-results .view-table a.download-stats {
+    width: 50%;
+    background: #44caa3;
+    height: 20px;
+    position: absolute;
+    top: 0;
+    border-radius: 0px 0px 0px 18px;
+    text-align: center;
+    color: white;
+    border: 2px solid #2eb2ff;
+    line-height: 1em;
+    right: 0;
+}
+#all-results .chart-tab {
+    height: 480px;
+    position: absolute;
+    width: 100%;
+    bottom: 0;
+}
+
+
+#all-results .tab-button.basic {
+    left:0%;
+}
+
+#all-results .tab-button.primary{
+    left:33%;
+}
+
+#all-results .tab-button.secondary{
+    left:66%;
+}
+#all-results .tab-button:hover {
+    background: #0057b9;
+    border: 3px solid #0057b9;
+    border-bottom: 0px;
+}
+
+#all-results .tab-button.selected {
+    background: #ffffff;
+    border: 3px solid #0057b9;
+    border-bottom: 0px;
+    color:black;
+}
+
+#all-results .tab-button {
+    position: absolute;
+    height: 5%;
+    width: 33%;
+    background: #2eb2ff;
+    top: 0;
+    color:white;
+    border: 3px solid #0057b9;
+    border-radius: 12px 12px 0px 0px;
+    font-weight: bold;
+    text-align: center;
+    z-index: 15;
+}
+
+#all-results .tab-content {
+    height: 95%;
+    width: 99%;
+    background: white;
+    position: absolute;
+    top: 5%;
+    overflow-y: scroll;
+    border: 4px solid #0057b9;
+    padding: 1%;
+    border-top: 0px;
+}
+
+#all-results .form-preview {
+    width: 100%;
+    height: 100%;
+    background: #d5e0ff;
+    position: absolute;
+    left: 0;
+    top: 0;
+    overflow-y: scroll;
+    z-index: 30;
+}
+
+#all-results .chart-parent {
+    border: 2px solid black;
+    border-radius: 8px;
+    margin-bottom:1%;
+}
+
+
+#all-results .form-quick-view {
+    background: #44caa3;
+}
+
 #all-results  .project-results{
     border-radius: 16px;
-    border: 3px solid #074572;
+    border: 12px solid #074572;
     margin-top: 1%;
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     color: white;
     float: left;
     width: 100%;
@@ -3287,7 +3426,12 @@ This 'should' all be related to the form-type template engine
 #all-results .query-pagination .query-stats{
     height: 60px;
     width: 30%;
-    float: left;    
+    float: left;   
+    font-size: .9em;
+    font-weight: bold;
+    line-height: 1em;
+    padding-top: 5px;
+    letter-spacing: -1px;    
 }
 
 #all-results .pagination-container{
@@ -3298,7 +3442,7 @@ This 'should' all be related to the form-type template engine
 }
 
 #all-results .view-table{
-    background-color: #5a96ca;
+    background-color: #0057b9;
     color: white;
     position: relative;
     height: 500px;
@@ -3309,10 +3453,10 @@ This 'should' all be related to the form-type template engine
 
 #all-results .scroll-container {
     width: 50%;
-    overflow-y: scroll;
     height: 500px;
     float: left;    
     border-radius: 0px 0px 0px 16px;
+    overflow: scroll;
 }
 
 #all-results .stats-graphic {
@@ -3320,8 +3464,8 @@ This 'should' all be related to the form-type template engine
     height: 500px;
     float: left;
     border-radius: 0px 0px 16px 0px;
-    background: white;
-    padding: 1%;
+    background: #0057b9;
+    position: relative;
 }
 
 
@@ -3476,6 +3620,79 @@ This 'should' all be related to the form-type template engine
 }
 
 
+
+
+
+#master-query-engine .main-query {
+    width: 70%;
+    position: relative;
+}
+
+#master-query-engine .constraints-list {
+    width: 15%;
+    border: 3px solid #2eb2ff;
+    border-radius: 12px;
+    padding: .4em;
+}
+
+#master-query-engine .constraints-list .header {
+    text-align: center;
+    color: white;
+    font-weight: bold;
+    font-size: 1.2em;
+}
+
+#master-query-engine select.rtype-list.__RTYPE {
+    width: 100%;
+}
+
+#master-query-engine select.deep-rtype-list.__RTYPE-DEEP {
+    width: 100%;
+}
+
+#master-query-engine select.__QCODE {
+    width: 100%;
+}
+
+#master-query-engine .inputs div {
+    display: flex;
+}
+
+#master-query-engine button.delete-constraint-term {
+    width: 15%;
+    background: #e3534f;
+    border: 2px solid #5959c7;
+    border-radius: 5px;
+    color: white;
+    font-size: 1em;
+    font-weight: bold;
+}
+
+#master-query-engine input.__TVAL {
+    width: 85%;
+}
+
+#master-query-engine button.add-constraint-term {
+    width: 100%;
+    border-radius: 0px 0px 8px 8px;
+    border: 2px solid #5959c7;
+    background: #44caa3;
+    color: white;
+    font-size: 1em;
+    font-weight: bold;
+}
+
+
+#master-query-engine .add-constraint-term{
+    border: 2px solid #5959c7;
+    background: #44caa3;
+    width: 100%;
+    border-radius: 0px 0px 8px 8px;
+    color: white;
+    font-weight: bold;    
+}
+
+
 #form-type-importer.geojson-importer  .rtype-container{
     
     float: left;
@@ -3498,6 +3715,104 @@ This 'should' all be related to the form-type template engine
     float: left;    
     
 }
+
+
+
+
+#all-results  .form-header{
+    font-size: 1.5em;
+    color: white;
+    font-weight: bold;
+    text-align: center;
+    text-align-last: center;
+    margin-bottom: 6%;
+    border: 4px solid #0057b9;
+    border-radius: 16px;
+    background: #5959c7;
+}
+    
+#all-results  .details-frrt{
+    margin-top: 10%;
+    font-size: 1em;
+    font-weight: bold;
+    width: 100%;
+    background: #2eb2ff;
+    color: white;
+    border-radius: 16px;
+    padding: .5em .5em .5em 0.5em;
+}
+
+#all-results .details-frrt .header{
+    text-align: center;
+    text-align-last: center;
+    font-weight: bold;
+    margin-bottom: 3%;
+}
+
+#all-results .details-frrt .frrt-list{
+    font-size: 1em;
+}
+
+#all-results  .details-frrt .frrt-entry{
+    border: 2px solid #5959c7;
+    border-radius: 20px;
+    padding: 1%;
+    padding-left: 4%;
+    background: #0057b9;
+    color: white;
+    margin-bottom: 2%;
+}
+
+#all-results  .details-frrt .frrt-entry img{
+    height: 2em;
+    width: 2em;  
+    border-radius: 16px;    
+}
+
+#all-results  .details-frrt .frrt-entry a{
+    font-size: 1em;
+    font-weight: bold;
+    color: white;       
+}
+
+#all-results  .frat-label{
+    font-size: 1em;
+    font-weight: bold;
+    width: 50%;
+    background: #2eb2ff;
+    color: white;
+    border-radius: 8px 0px 0px 8px;
+    padding: .1em .1em .1em 0.5em;
+    
+}
+
+#all-results  .frat-value{
+    font-size: 1em;
+    font-weight: bold;
+    width: 50%;
+    background: #0057b9;
+    color: white;
+    border-radius: 0px 8px 8px 0px;
+    padding: .1em .1em .1em 0.5em;
+}
+#all-results  .frat-entry{
+font-size: 1em;
+    font-weight: bold;
+    width: 100%;
+    border: 2px solid #5959c7;
+    border-radius: 10px;
+    display: flex;  
+}
+
+#all-results .remove-form-preview {
+    background: #e3534f;
+    float: right;
+    width: 6%;
+    border-radius: 16px;
+    cursor: pointer;
+}
+
+
 
 
 
@@ -3751,7 +4066,7 @@ margin-top:1%;
 }
 
 #geospatial-engine .main-window .center-map-view  .add-layer-select .layer-list-formtype-container .layer-list-formtype-header:hover{
-    background-color: #337ab7;
+    background-color: #2eb2ff;
     color: white;
 }
 
@@ -3782,7 +4097,7 @@ margin-top:1%;
 
 #geospatial-engine .main-window .center-map-view  .add-layer-select .layer-list-form-container .layer-list-form-title{
       width: 90%;
-    color: #337ab7;
+    color: #2eb2ff;
     font-weight: bold;  
 }
 
@@ -4609,4 +4924,770 @@ font-size: 1em;
     border: 2px solid #5959c7;
     border-radius: 10px;
     display: flex;  
+}
+
+
+/* ======================================================================================*/
+/**/
+/**/    /* TARA ADMIN CONSOLE CSS */
+/**/
+/* ======================================================================================*/
+
+html { width: 100%; height:100%;}
+body{ width: 100%; height:100%;}
+
+#tara-admin-project-header {
+    position: absolute;
+    right: 23em;
+    height: 20px;
+    width: 22em;
+    background: #0057b9;
+    letter-spacing: -1px;
+    border: 3px solid #00f594;
+    border-top: 0px;
+    border-radius: 0px 0px 9px 8px;
+    color: #00ff90;
+    font-size: .8em;
+    font-weight: bold;
+    z-index: 1;
+}
+
+#tara-admin-project-header span{
+    position: absolute;
+    left: 3%;
+    padding-top: 3px;
+}
+
+#header #tara-admin-project-header a{
+    background: none;
+    border: 1px solid #00ee9c;
+    padding: 0 6px 0 4px;
+    border-radius: 5px;
+    height: 16px;
+    position: absolute;
+    right: 3%;
+}
+
+#tara-admin a:link, #tara-admin a:visited, #tara-admin a:hover, #tara-admin a:active {
+    text-decoration-line: none;
+    text-decoration: none;/* IExplorer Fix */
+    color:inherit;
+}
+
+#tara-admin .btn {
+    border-radius: 24px;
+    color: white;
+    font-weight: bold;
+    font-size: 1em !important; 
+}
+
+#tara-admin .btn-red {
+    background: #f45954;
+    border-color: #8759c7; 
+}
+
+#tara-admin .btn-green{
+    background: #44caa3;
+    border-color: #00a1ff;  
+}
+
+#tara-admin .btn-orange{
+    background: #ffa850;
+    border-color: #f1765a;
+}
+
+#tara-admin .flex-col {
+    flex-direction: column;
+    display: flex;
+}
+
+#tara-admin {
+    width: 100%;
+    height: 100%;
+    font-size: 16px;
+    font-family: Arial, SANS-SERIF;
+    color: white;
+    letter-spacing: -1px;
+    padding: 0;
+    margin: 0;
+}
+
+#tara-admin .header {
+    height: 30px;
+    background: #0057b9;
+    position: relative;   
+    background-image: url(/static/site-images/header_bg.png);
+    background-repeat-y: no-repeat;
+    background-position-y: top;
+    background-repeat: repeat-x;
+    border-top: 5px solid #5959c7;
+    background-position-y: -5px;
+}
+
+#tara-admin  .branding {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+}
+
+#tara-admin .user-tools {
+position: absolute;
+    top: 0;
+    right: 0;
+    font-size: 0.6em;
+    letter-spacing: -1px;
+    text-transform: lowercase;
+    background: #5959c7;
+    padding: 0em 1.5em 0.2em 1em;
+    border-radius: 0px 0px 0px 12px;
+    border-left: 4px solid #00a1ff;
+    border-bottom: 4px solid #0057b9;
+}
+
+#tara-admin .user-tools  a:nth-child(2){
+    color: #00ff90;
+    font-weight: bold;
+}
+
+#tara-admin .user-tools  a:nth-child(3){
+    color: #00a1ff;
+    font-weight: bold;
+}
+
+#tara-admin .header .logo-parent{
+    width: 20em;
+    position: relative;
+    height: 100%;
+}
+
+#tara-admin .header .img-logo {
+    width: 20px;
+    height: 20px;
+    position: absolute;
+    left: .5em;
+    top: 20%;  
+}
+
+#tara-admin .header .main-logo {
+font-weight: bold;
+    font-size: 1.6em;
+    letter-spacing: -4px;
+    position: absolute;
+    top: 8%;
+    left: 1.1em;
+    text-transform: uppercase;
+}
+
+#tara-admin .header .sub-logo {
+position: absolute;
+    top: 35%;
+    left: 5.5em;
+    font-weight: bold;
+    text-transform: lowercase;    
+}
+
+#tara-admin .main {
+    position: relative;
+    width: 100%;
+    height: calc(100% - 35px);
+    background: url(/static/site-images/admin_console_bg.jpg);
+    background-size: contain;
+    background-repeat: no-repeat;   
+}
+
+#tara-admin .main .widget {
+background: rgba(0, 88, 181, 0.66);
+    padding: .2em;
+    border-radius: 4px;
+    color: white;
+    letter-spacing: -1px;
+    font-weight: bold;
+    border: 4px solid rgba(89, 89, 199, 0.66);
+    position: absolute;    
+}
+
+#tara-admin .widget .title {
+    height: 1.5em;    
+}
+
+#tara-admin .widget .content {
+    overflow-y: scroll;
+    width: 100%;
+    height: calc(100% - 1.5em);
+    background: #00a1ffa3;
+    border-radius: 4px; 
+}
+
+#tara-admin .widget .content.flex{
+    display:flex;
+}
+
+#tara-admin .widget .content.flex select{
+    min-width:0px;
+    flex:2;
+}
+
+#tara-admin .widget .content.flex input{
+    min-width:0px;
+    flex:2;
+}
+
+#tara-admin .widget .content.flex input[type="checkbox"]{
+    flex:.2;
+}
+
+#tara-admin .widget .content.flex button{
+    min-width:0px;
+}
+
+#tara-admin .widget .content.flex span{
+    flex:1;
+    font-size:.8em;
+}
+
+#tara-admin .project-list {
+    right: 1em;
+    bottom: 66%;
+    width: 30%;
+    height: 32%; 
+}
+
+#tara-admin .project-list a{    
+    margin-left: 2%;
+}
+
+#tara-admin .blog-posts .entry a:hover{
+    color:#28e296;
+}
+
+#tara-admin .project-list  .entry:nth-child(even){
+    background: rgba(0, 87, 185, 0.77);
+}
+
+#tara-admin .add-project {
+right: 1em;
+    bottom: 58%;
+    width: 30%;
+    height: 6%;
+
+}
+
+#tara-admin .user-list {
+    left: 1.4em;
+    bottom: 66%;
+    width: 65%;
+    height: 32%;
+    font-size: 0.7em;
+}
+
+#tara-admin .user-list .entry:nth-child(even){
+    background: rgba(0, 87, 185, 0.77);
+}
+
+#tara-admin .user-list input {
+    min-width:0;
+    flex:1;
+}
+
+#tara-admin .user-list button {
+    flex:.1;
+}
+
+#tara-admin .user-list .logged-in {
+   flex:.1;    
+   font-size: 2em;
+    color: #70fd00;
+    line-height: 70%;
+}
+
+#tara-admin .add-user{
+left: 1em;
+    bottom: 58%;
+    width: 65%;
+    height: 6%;
+}
+
+#tara-admin .security-messages  {
+    right: 1em;
+    bottom: 1%;
+    width: 30%;
+    height: 55%; 
+}
+
+#tara-admin .security-messages .show-all {
+    float: right;
+    height: 100%;
+    width: 6%;
+    background-image: url(/static/site-images/eye_icon.png);
+    background-size: contain;
+}
+
+#tara-admin .security-messages  .entry {
+    font-size: .8em;
+}    
+
+#tara-admin .security-messages  input {
+    flex:1;
+}
+
+#tara-admin .security-messages  .date-message {
+    flex:20;
+}
+
+#tara-admin .security-messages  .entry .date{
+    font-size: .9em;
+    border: 2px solid #f45954;
+    padding: 1%;
+    border-radius: 0px 16px 16px 0px;
+    background: rgba(244, 89, 84, 0.58);
+}    
+
+#tara-admin .security-messages  .entry .date.seen{
+    border: 2px solid #44caa3;
+    background: rgba(84, 244, 161, 0.58);
+}
+
+#tara-admin .security-messages  .entry .message{
+    font-size: .8em;
+    letter-spacing: 0px;
+}    
+
+#tara-admin .security-messages  .entry:nth-child(even){
+    background: rgba(0, 87, 185, 0.77);
+}
+
+#tara-admin .blog-posts {
+    left: 1em;
+    bottom: 1%;
+    height: 55%;
+    width: 24%;
+}
+
+#tara-admin .blog-posts  .entry:nth-child(even){
+    background: rgba(0, 87, 185, 0.77);
+}
+
+#tara-admin .blog-posts .entry span{
+    font-size:.6em;
+}
+
+#tara-admin .blog-posts .entry .edit-post{
+    font-size: .8em;
+    overflow: hidden;
+    white-space: nowrap;
+    margin-right: 4%;
+}
+
+#tara-admin .blog-posts .entry .edit-post:hover{
+    color:#28e296;
+}
+
+#tara-admin .new-blog-post {
+    left: 27%;
+    bottom: 1%;
+    height: 55%;
+    width: 39%;  
+}
+
+#tara-admin .widget .content.no-scroll {
+    overflow:none;
+    padding: 0% 2% 0% 2%;
+    width: 96%;
+}
+
+#tara-admin .save-post {
+    float: right;
+    height: 90%;    
+}
+
+
+#tara-admin .top {
+    display: flex;
+    height: 16%;
+}
+
+#tara-admin .image-upload {
+    width: 27%;
+    height: 70%;
+    display: inline-block;
+    background: #084673;
+    border-radius: 4px;
+    flex: 0.5;
+    text-align-last: center;
+    text-align: center;
+    padding: 3% 0px 0px 0px;
+    margin-top: 1%;
+}
+
+#tara-admin .image-upload.editing{
+    font-size:0px;
+    background-size: cover;
+}
+
+#tara-admin .new-blog-post .top-label {
+    flex: 2;
+}
+
+#tara-admin .new-blog-post .top .name {
+    width: 96%;
+    margin: 0;
+    padding: 0px 2% 0 0px;
+    border: 0;
+    border-radius: 8px;
+    height: 50%;
+}
+#tara-admin .new-blog-post .top div {
+    width: 100%;
+    height: 70%;
+    line-height: 2em;    
+}
+
+#tara-admin .new-blog-post textarea {
+    width: 100%;
+    border-radius: 8px;
+    height: 73%;
+    resize: none;
+    font-size: .6em;
+}
+
+#tara-admin .new-blog-post .content-label {
+    height: 7%;
+    line-height: 2em;
+}
+
+
+#tara-admin .footer  {
+    
+}
+
+
+
+#tara-admin .entry {
+    display:flex;
+    padding: 0px 8px 0px 8px;
+    
+}
+
+#tara-admin .entry div {
+    flex:1;
+    overflow: hidden;
+}
+
+
+
+
+
+
+
+
+
+/*    ------------------------------------
+
+ STYLE FOR PROJECT ADMIN WEBPAGE AND BLOG STUFF
+
+------------------------------------------ */
+
+#website-maintenance {
+        background: #0057b9;
+    padding: 1%;
+    border-radius: 16px;
+    width: 100%;
+    border: 3px solid #134880;
+}
+
+#blog-manager p {
+    text-align: center;
+    margin-top: 20%;
+    font-size: 2em;
+    color: white;
+}
+
+.webpage-list .del-webpage-button {
+    background: #e55954;
+    border: 2px solid #0057b9;
+    border-radius: 8px;
+}
+
+.webpages {
+    width: 100%;
+    display: flex;
+}
+
+.webpage-list {
+background: #2eb2ff;
+    border-radius: 8px 0px 0px 8px;
+    padding: 0% 0% 1% 0%;
+    list-style-type: none;
+    flex: 1.8;
+}
+
+.webpages ul.menu {
+    list-style-type: none;
+    background: #0057b9;
+    margin: 0% 0% 0 7%;
+    padding: 0% 0% 0% 0%;
+    line-height: 100%;
+    border-radius: 60px 0px 0px 12px;
+}
+
+.webpages .menu li {
+    background: #2eb2ff;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: white;
+    letter-spacing: -1px;
+    padding: 2%;
+    line-height: 100%;
+    list-style-type: none;
+}
+
+.webpages .menu ul li {
+    background: #5959c7;
+    color: white;
+    padding: 0% 0% 0% 3%;
+    border-bottom: 3px solid #0057b9;
+    font-size: 1.1em;
+}
+
+.webpages .menu ul ul li {
+    background: #2eb2ff;
+    border-radius: 0px 0px 0px 8px;
+    padding: 1% 0px 2% 2%;
+}
+
+.webpages .menu ul ul ul li {
+    background: #5959c7;
+    line-height: 100%;
+    padding-bottom: 0%;
+}
+.webpages .menu li a {
+    color: white;
+}
+.webpages .menu li a.view {
+color: #44caa3;
+    background: #5959c7;
+    border-radius: 16px;
+    border: 2px solid #2eb2ff;
+    font-size: .8em;
+    margin-right: 1%;
+}
+.menu ul {
+    padding-left: 10%;
+}
+.menu ul ul {
+    padding-left: 0%;
+}
+.menu ul ul ul {
+    padding-left: 12%;
+}
+
+.webpage-list select {
+    color: black;
+    width: 10%;
+    height: 20px;
+    margin-left: 1%;
+    border-radius: 8px;
+}
+
+.webpage-list input {
+    background: #2eb2ff;
+    border: 1px solid #0057b9;
+    width: 88%;
+    border-radius: 12px;
+}
+
+.webpage-list button.save-menu-name {
+    width: 12%;
+    font-size: .5em;
+    padding: 0;
+    margin: 0;
+    background: #44caa3;
+    border: 2px solid #0057b9;
+    border-radius: 4px;
+    margin-left: 1%;
+}
+
+
+.webpage-creator {
+    flex: 5;
+    background: #2eb2ff;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    padding: 2%;
+}
+
+.webpage-creator .basic-options{
+    width: 100%;
+    flex: 1;
+    background: #0057b9;
+    padding: 1%;
+    border-radius: 4px;
+}
+
+.webpage-creator .basic-options .color-header {
+    letter-spacing: -1px;
+    font-size: 1.4em;
+        background: #2eb2ff;
+    border-radius: 4px;
+    padding-left: 2%;
+}
+
+.color-content {
+    display: flex;
+    height: 70px;
+}
+.color-content div {
+    flex: 1;
+    /* width: 100%; */
+}
+.color-content div div {
+    width: 100%;
+    text-align: center;
+    height: 30%;
+    font-weight: bold;
+}
+
+.color-content input {
+    width: 100%;
+    height: 70%;
+}
+
+.webpage-creator .page-content {
+    flex: 10;
+    margin-top: 5%;
+    background: #0057b9;
+    border-radius: 4px;
+    padding: 1%;
+}
+
+.page-content input {
+        color: black;
+}
+
+.page-content input.title {
+
+    width: 80%;
+}
+.page-content select {
+    color: black;
+}
+
+.webpage-creator .page-content .content-block .content-header {
+    height: 10%;
+    padding: 2% 0% 0% 2%;
+    letter-spacing: -1px;
+    font-size: 1.2em;
+}
+
+.webpage-creator .page-content .content-block .content {
+    margin: 0px;
+    width: 100%;
+    height: 500px;
+    resize: none;
+    color:black;
+    border-radius: 4px;
+}
+
+button.btn.save-page-button {
+    color: #ffffff;
+    background: #44caa3;
+    padding: 4px;
+    font-weight: bold;
+    float: right;
+}
+
+button.btn.save-palette-button {
+    color: #ffffff;
+    background: #44caa3;
+    padding: 3px;
+    font-weight: bold;
+    float: right;
+}
+
+
+/*   project control tabs */
+
+.tab.project-control {
+    position: absolute;
+    top: -27px;
+    background: #5959c7;
+    color: #ffffff;
+    border: 3px solid #074574;
+    width: 16%;
+    border-radius: 8px 8px 0px 0px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.tab.project-control.active{
+    background: #0057b9;
+    color: white;
+    border-bottom: 5px solid #0057b9;
+}
+
+.tab.project-control:hover {
+    background: #2eb2ff;
+    color: #ffffff;
+    cursor: pointer;
+}
+
+#center-pane {
+    position:relative;
+}
+
+ #project-form {
+    position: absolute;
+    top:3%;
+    left:1%; 
+    z-index: 10;
+    height: 100%;
+    width: 100%;
+}
+
+#project-stats, #user-list, #website-maintenance, #blog-manager{
+    position: absolute;
+    top:3%;
+    left:1%; 
+    z-index: 1;
+    height: 100%;
+    width: 100%;
+}
+
+
+#blog-manager .tab.project-control {
+    left: 81%;
+}
+
+#website-maintenance .tab.project-control {
+    left: 61%;
+}
+#project-stats .tab.project-control {
+    left: 41%;
+}
+#user-list .tab.project-control {
+
+    left: 21%;
+}
+#project-form .tab.project-control {
+
+    left: 2%;
+}
+
+
+
+
+
+
+
+
+/*   BLOG MANAGER */
+
+#blog-manager {
+    background: #0057b9;
+    padding: 1%;
+    border-radius: 16px;
+    width: 100%;
+    border: 3px solid #134880;
 }

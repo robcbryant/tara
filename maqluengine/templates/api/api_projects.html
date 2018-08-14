@@ -1,0 +1,110 @@
+
+{% extends "api/api_pretty.html" %}
+
+
+{% block sidelinks %}
+
+{% endblock %}
+
+
+{% block jsonheader %}
+
+{% endblock %}
+
+
+
+
+{% block reference %}
+
+<div class="ref-header"> Get A {{current_endpoint|title}}</div>
+<div class="description">
+Returns a single {{current_endpoint|title}} or a list of {{current_endpoint|title}} objects from the database.
+</div>
+
+<div class="ref-content">
+
+
+<h3>Request Parameters</h3>
+
+<h4>Path Parameters</h4>
+<table>
+<thead><tr><th>Path Parameter</th><th>Value</th></tr></thead>
+<tbody>
+
+<tr>
+<td>{{current_endpoint|lower}}_id</td>
+<td>The Primary Key or ID of the {{current_endpoint|title}} to lookup</td>
+</tr>
+
+</tbody>
+</table>
+
+
+<h4>Header Fields</h4>
+<table>
+<thead><tr><th>Header Field</th><th>Value</th></tr></thead>
+<tbody>
+
+<tr>
+<td>Content-Type</td>
+<td>Required. The content type of the request body: application/json</td>
+</tr>
+
+</tbody>
+</table>
+
+
+<h4>Query Parameters</h4>
+<table>
+<thead><tr><th>Query Parameter</th><th>Value</th></tr></thead>
+<tbody>
+
+<tr>
+<td>ids</td>
+<td>(Optional) A comma-separated list of {{current_endpoint|title}} ids. Maximum: 20 IDs</td>
+</tr>
+<tr>
+<td>year</td>
+<td>(Optional) YYYY format. Returns the 20 most recent {{current_endpoint|title}}s for that year</td>
+</tr>
+</tbody>
+</table>
+
+<h3>Response Format</h3>
+On success, the HTTP status code in the response header is 200 OK and the response body contains an object whose key is "posts" and whose value is an array of post objects in JSON format. Objects are returned in the order requested. If an object is not found, a null value is returned in the appropriate position. Duplicate ids in the query will result in duplicate objects in the response. On error, the header status code is an error code and the response body contains an error object.
+
+<h3>{{current_endpoint|title}} Objects</h3>
+
+<table>
+<thead><tr><th>Key</th><th>Value Type</th><th>Value Description</th></tr></thead>
+<tbody>
+
+<tr>
+<td>name</td>
+<td>string</td>
+<td>Title of the {{current_endpoint|title}} Object</td>
+</tr>
+<tr>
+<td>id</td>
+<td>int</td>
+<td>Primary Key the {{current_endpoint|title}} Object</td>
+</tr>
+<tr>
+<td>date_created</td>
+<td>string</td>
+<td>Date the {{current_endpoint|title}} was Created</td>
+</tr>
+<tr>
+<td>created_by</td>
+<td>string</td>
+<td>Author of the {{current_endpoint|title}} Object</td>
+</tr>
+
+
+</tbody>
+</table>
+
+
+
+</div>
+{% endblock %}

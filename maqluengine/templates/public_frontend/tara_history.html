@@ -1,0 +1,45 @@
+{% extends "public_frontend/tara_base.html" %}
+
+
+
+{% block content %}
+<div class="main">
+
+{% include "public_frontend/tara_subheader.html" %}
+
+    <div class="main-content">
+    <div id="bulk-content">
+    <div class="tara-page-header">
+        <div class="inner-border">
+            HISTORY
+        </div>
+    </div>
+        
+        <p> This received funding to establish a world-leading digital environment enabling broad interdisciplinary research which integrates all aspects of archaeological enquiry from individual artifacts and samples to widespread networks of interaction played out across a range of landscapes and ecosystems. TARA was developed to incorporate two major intersecting projects which have already invested substantially in creating data and technical infrastructure. TARA needed to enhance existing assets, create a new infrastructure for future research, and provide a focus of interaction that will enable multiple schools, centers and Digital Humanities(DH) initiatives to develop their models for and gain valuable experience in carrying out collaborative research and tool-building.
+            Two existing archaeological projects at Penn provided the basis for the development of this platform: the UrOnline project, and The Al-Hiba Publication Project. In their own right, both of the projects are uniquely important digital archives for the study of southern Mesopotamia. When interconnected and enhanced through our proposed platform, they will represent the state of the art in digital analysis and visualization of archaeological data. In addition to the fact that both projects seek to analyze archaeological data using a powerful digital environment, the logic of joining these two particular projects is based on the fact that they are the two most important sites in southern Mesopotamia during the 3rd Millennium BCE. It is their interdependence and competition that motivated and shaped the evolving political, economic, and religious structures. The technical and intellectual work of joining two extant digital projects will also provide a model for bringing together two of what are dozens of similar stand-alone projects out there.
+        </p>
+        
+        <p>What was missing from both systems was integration with a Geographic Information System (GIS) that would allow for the generation of three-dimensional plans and visualizations. In order to develop our capacity for next-generation research and integrating knowledge, we need to combine these two distinct datasets through an open-source environment with an integrated open-source GIS that will allow for multifaceted data exploration.
+            The needs for such a system were manifold: new standards of digital data collection in the field must be catered for, as well as historic data and field records from sites excavated over 100 years ago. Satellite imagery continues to improve in resolution and is now augmented by the real-time 3D capture of landscape features by drones. This GIS data needed to link metadata from small scale to large scale features supporting a multi-scalar platform. This system needed to allow the user to retrieve and manipulate relationally generated information for each site, resulting in a rich data environment that can be applied within and across sites and landscapes, where appropriate.         
+        </p>
+        <p> Working with legacy data is never easy. It may contain rich information, but extracting that data can pose problems. Converting it to a digital format makes this process all the more difficult, and even if a legacy dataset was digitized in the past, digital technology and storage methods have changed over time. Often these past projects used bespoke solutions to organize their data—whether by spreadsheet or by paper.
+            In the case of Al-Hiba, we were using an older Filemaker database. Although Filemaker can perform some fairly sophisticated queries etc., exporting the data to something newer proved difficult. 
+            We wanted to see if we could utilize the existing UrOnline system to handle this newly exported data. Unfortunately, we ran into some problems, and had to design something new.
+        </p>
+        
+        <p>So what worked with Alhiba and UrOnline as database systems—and what didn’t work?</p>
+        
+        <p> Alhiba was relational and organized quite well in a bespoke system designed in Filemaker. It was the focus of our project early on however, because we wanted to move it out of a proprietary framework. It had no public access to the data and suffered from limited exporting/sharing of data.
+            UrOnline was opensource, relational, and semi-generic in structure. Robust queries could be formed on the data thanks to the simplicity of Django(a webcontent SQL based management system). The biggest asset UrOnline provided was a public and private interface for accessing the data. It had a good system we wanted to incorporate Al-Hiba into. That’s where we started discovering the structural limitations of the system. Although it is fairly generic—or has the ability to define different ‘data types’ – they still required a lot of database restructuring/modification to the raw tables in order to add new and unique data types.
+            So, if we’re talking about archaeological objects—it could generically define any type of object imaginable—but an object ‘type’ couldn’t be—say an image or document. These required separate data types to represent them.
+            Although Alhiba and UrOnline have a lot of overlapping data types—UrOnline wasn’t truly generic enough to incorporate all of the Alhiba data without exponentially increasing the code to add more generic types. 
+        </p>
+        <p> We needed a solution that could integrate not just these two legacy datasets—but ANY dataset. Robert had an idea he had been working on for some time, and jumping head first into Django allowed him to find an avenue to piece it together. We wanted to keep it online—as a web-application. Django already provided the tools to separate a private and public access with built-in security and allowed me to focus on design, rather than build a content management system from the ground up, or attempt to link 2 different systems together. It HAD to be capable of rich geospatial querying and data manipulation.
+            We wanted to use familiar terminology to archaeological and historical data to describe the system and what it does.  The system needed to have the ability to define its own forms—or entity types—with no additional coding or database structure modification. A project director could login, design their forms and templates for those forms without any coding necessary. 
+            We now house both UrOnline and Al Hiba’s data in the TARA system and are ready to receive new projects who are interested in contributing data!
+        </p>
+    
+    </div>
+    </div>
+</div>
+{% endblock %}

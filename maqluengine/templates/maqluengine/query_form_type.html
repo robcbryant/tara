@@ -48,13 +48,24 @@
                             <div class="query-container">
                                 <span class="glyphicon glyphicon-th-list"></span>
                                 <div class="formtype-select">
-                                    <select class="__RTYPE" >
-                                        <option value="FORMID-0">{{formtype}} ID</option>
+                                    <select class="__RTYPE">
+                                            <option value="FORMID-0">{{formtype}} ID</option>
                                         {% for atttype in formtype.formrecordattributetype_set.all %}
-                                            <option value="FRAT-{{atttype.pk}}">{{atttype}}</option>
+                                            {% if not atttype.flagged_for_deletion %}
+                                            <option value="FRAT-{{atttype.pk}}">{{formtype}} -- {{atttype}}</option>
+                                            {% endif %}
                                         {% endfor %}
+                                        
                                         {% for reftype in formtype.ref_to_parent_formtype.all %}
-                                            <option value="FRRT-{{reftype.pk}}">{{reftype}}</option>
+                                            {% if not reftype.flagged_for_deletion %}
+                                            <option value="FRRT_ID-{{reftype.pk}}">{{reftype}} ID</option>
+                                            {% for deepatttype in reftype.form_type_reference.formrecordattributetype_set.all %}
+                                                {% if not deepatttype.flagged_for_deletion %} <option value="DEEP_FRAT-{{deepatttype.pk}}">{{reftype}} :: {{deepatttype}}</option> {% endif %}
+                                            {% endfor %}
+                                            {% for deepreftype in reftype.form_type_reference.ref_to_parent_formtype.all %}
+                                                {% if not deepreftype.flagged_for_deletion %}<option value="DEEP_FRRT-{{deepreftype.pk}}">{{reftype}} :: {{deepreftype}}</option> {% endif %}
+                                            {% endfor %}
+                                            {% endif %}
                                         {% endfor %}
                                      </select>
                                 </div>
@@ -108,10 +119,21 @@
                                     <select class="__RTYPE">
                                             <option value="FORMID-0">{{formtype}} ID</option>
                                         {% for atttype in formtype.formrecordattributetype_set.all %}
-                                            <option value="FRAT-{{atttype.pk}}">{{atttype}}</option>
+                                            {% if not atttype.flagged_for_deletion %}
+                                            <option value="FRAT-{{atttype.pk}}">{{formtype}} -- {{atttype}}</option>
+                                            {% endif %}
                                         {% endfor %}
+                                        
                                         {% for reftype in formtype.ref_to_parent_formtype.all %}
-                                            <option value="FRRT-{{reftype.pk}}">{{reftype}}</option>
+                                            {% if not reftype.flagged_for_deletion %}
+                                            <option value="FRRT_ID-{{reftype.pk}}">{{reftype}} ID</option>
+                                            {% for deepatttype in reftype.form_type_reference.formrecordattributetype_set.all %}
+                                                {% if not deepatttype.flagged_for_deletion %} <option value="DEEP_FRAT-{{deepatttype.pk}}">{{reftype}} :: {{deepatttype}}</option> {% endif %}
+                                            {% endfor %}
+                                            {% for deepreftype in reftype.form_type_reference.ref_to_parent_formtype.all %}
+                                                {% if not deepreftype.flagged_for_deletion %}<option value="DEEP_FRRT-{{deepreftype.pk}}">{{reftype}} :: {{deepreftype}}</option> {% endif %}
+                                            {% endfor %}
+                                            {% endif %}
                                         {% endfor %}
                                      </select>
                                 </div>
@@ -289,6 +311,11 @@
     var CURRENT_PROJECT_PK = '{{project.pk}}';
     var INITIALIZATION_CODE = 0;
     var API_URLS = getAPIEndpoints();
+    
+    console.log(CURRENT_FORMTYPE_PK);
+    console.log(CURRENT_PROJECT_PK);
+    console.log('{{formtype.pk}}');
+    
     
     //Query Engine Specific
     var GLOBAL_CURRENT_QUERY; console.log('{{user.permissions.saved_queries|escapejs}}');
@@ -493,15 +520,27 @@
             for(col=0; col < $currentForm.rvals.length;col++){
                $thisRval = $currentForm.rvals[col];
                //If we're working with a FRAT (Form Record Attribute Value) or a 'frrv-ext' value then just display the text
-               if($thisRval.rtype != "frrv"){
+               if($thisRval.rtype == "frav"){
                    if($thisRval.value.length < 40){$newRow.append('<td><div><span class="frav_view" {% if user_access >= access_level %} onclick="editIndividualRecord(this)" {% endif %} >'+ $thisRval.value.replace(/,/g, ",&nbsp;") +'</span>{% if user_access >= access_level %}<textarea form="find-replace-form" class="frav_edit" name="frav__'+$thisRval.pk+'" oninput="flagTextareaAsChanged(this)" style="display:none"  disabled>'+ $thisRval.value.replace(/,/g, ",&nbsp;") +'</textarea>{% endif %} </div></td>');}
                    else{$newRow.append('<td><div><span class="frav_view" {% if user_access >= access_level %} onclick="editIndividualRecord(this)" {% endif %} >'+ $thisRval.value.replace(/,/g, ",&nbsp;") +'</span>{% if user_access >= access_level %}<textarea form="find-replace-form" class="frav_edit" name="frav__'+$thisRval.pk+'" oninput="flagTextareaAsChanged(this)" style="display:none"  disabled>'+ $thisRval.value.replace(/,/g, ",&nbsp;") +'</textarea>{% endif %}</div></td>');}
                //Otherwise we are dealing with a FRAV   reference type, and we need to parse out the list of names and make them links
-               } else {
+               } else if ($thisRval.rtype == "deep_frav"){
+                    var FRRVlist = $thisRval.value.split("^,^");
+                    console.log(FRRVlist);
+                    var parsedHTML = ""; 
+                    for(i=0; i<FRRVlist.length;i++){
+                        parsedHTML+='<div><span class="frav_view">'+ FRRVlist[i].replace(/,/g, ",&nbsp;") +'</span></div>';
+                        }
+                    $newRow.append('<td>' + parsedHTML + '</td>');
+               } else if($thisRval.rtype == "frrv"){
                    var FRRVlist = $thisRval.value.split("^,^");
                    var parsedHTML = ""; 
                    for(i=0; i<FRRVlist.length;i++){parsedHTML+='<a class="relation-link" href="http://'+ document.location.hostname +'/admin/project/' + results.project_pk +'/formtype/' + FRRVlist[i].split("|^|")[1] + '/form_editor/' + FRRVlist[i].split("|^|")[2] + '/">' + FRRVlist[i].split("|^|")[0] + '</a>';}
                    $newRow.append('<td>' + parsedHTML + '</td>');
+               } else if($thisRval.rtype == "frrv-ext"){
+                   $newRow.append('<td><div><span class="frav_view">'+$thisRval.value+'</span></div></td>');
+               } else if($thisRval.rtype == "frrv-null"){
+                    $newRow.append('<td><div><span class="frav_view"></span></div></td>');
                }
             }
         }
@@ -524,13 +563,18 @@
     
     formData = [];
     progress_uuid=gen_uuid()
+    
+    console.log("THESE ARE READY FUNCTION");
+    console.log(CURRENT_FORMTYPE_PK);
+    console.log(CURRENT_PROJECT_PK);
+    console.log("END READY FUNCTION");
     formData.push({name: 'uuid', value: progress_uuid});
     formData.push({name: 'query', value: vanillaQuery});
-    formData.push({name: 'formtype_id', CURRENT_FORMTYPE_PK});
-    formData.push({name: 'project_id', CURRENT_PROJECT_PK});
+    formData.push({name: 'formtype_id', value: CURRENT_FORMTYPE_PK});
+    formData.push({name: 'project_id', value: CURRENT_PROJECT_PK});
     
      showBusyGraphic($('#view-table'));
-    
+    console.log(formData);
     $.ajax({ 
          url   : API_URLS['run_formtype_query_engine'],
          type  : "POST",

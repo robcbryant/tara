@@ -54,14 +54,23 @@ function updateImagePopup(){
               $('.IMG-POPUP').remove();
               $('.img-popup-bg').remove();                
             });
+
+            //set the popup to destroy when background clicked
+            $imgBG.click(function() {
+               //Let's add additional protection by making sure we remove ALL instances of .IMG-POPUP in case duplicates 
+               //were still made -- redudancy is beauty.
+              $('.IMG-POPUP').remove();
+              $('.img-popup-bg').remove();                
+            });
+
             
             //set the element to destroy itself when the user stops hovering a mouse cursor over it
-            $imgBG.hover(function() {
+/*             $imgBG.hover(function() {
                //Let's add additional protection by making sure we remove ALL instances of .IMG-POPUP in case duplicates 
                //were still made -- redudancy is beauty.
               $('.IMG-POPUP').remove();
               $('.img-popup-bg').remove();
-           });
+           }); */
         }   
         
     });

@@ -31,6 +31,7 @@
     <!-- Header -->
     <div id="header">
         <div id="branding">
+        {% if user.permissions.master_admin %}<div id="tara-admin-project-header">Logged in as MASTER ADMIN | <a href="{% url 'maqlu_admin:index'%}">TARA console</a></div>  {%endif%}
         <a href="{% url 'maqluengine:index' %}"><span class="glyphicon glyphicon-certificate"></span>TARA : T<small>oolkit</small> <small>for</small> A<small>rchaeological</small> R<small>esearch</small> & A<small>nalysis</small></a>{
         {% block branding %}{% endblock %}
         </div>

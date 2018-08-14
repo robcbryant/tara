@@ -1,0 +1,454 @@
+{% extends "admin/tara_admin_base.html" %}
+{% load staticfiles %}
+
+{% load enki_tags %}
+{% block title %}Maqlu Engine{% endblock %}
+
+
+{% block branding %}
+
+    <div class="logo-parent">
+        <img class="img-logo" src="{% static 'site-images/tara_logo.png' %}"></img>
+        <span class="main-logo"><a href="/">TARA</a></span>
+        <span class="sub-logo">Administrative Console</span>
+    </div>
+
+{% endblock %}
+
+{% block breadcrumbs %}
+    
+{% endblock %}
+
+{% block content %}
+
+
+    <div class="main">
+        {% csrf_token %}
+        <div class="widget project-list">
+            <div class="title">all projects</div>
+            <div class="content">
+                {% for project in project_list %}
+                    <div class="entry"><button pk="{{project.pk}}" class="btn btn-red del-project" type="button"><span>X</span></button><a title="Login as {{project.name}} superuser?" href="{% url 'maqlu_admin:master_admin_project_redirect' project_pk=project.pk %}">{{project.name}}</a></div>
+                {% endfor %}
+            </div>
+        </div>
+    
+        <div class="widget add-project">
+            <div class="title">add project</div>
+            <div class="content flex">
+                <button class="btn btn-green new-project" type="button"><span>+</span></button><input placeholder="New Project Name"/>
+            </div>
+        </div>   
+ 
+        <div class="widget user-list">
+            <div class="title">all users</div>
+            <div class="content">
+                {% for aUser in user_list %}
+                    <div class="entry">
+                        <div class="logged-in" title="Logged In">{% if aUser.pk|stringformat:"s" in pk_list %}¤{%endif%}</div>
+                        <div>{{aUser.username}}</div>
+                        <div>{{aUser.first_name}} {{aUser.last_name}}</div>
+                        <div>{% if aUser.permissions.master_admin%} TARA Admin {% else %} {{aUser.permissions.project.name}} {% endif %}</div>
+                        <div>{{aUser.email}}</div>
+                        <button class="btn btn-red del-user" type="button" title="Permanently Delete User" pk="{{aUser.pk}}"><span>X</span></button>
+                        <button class="btn btn-orange reset-password" type="button" title="Reset User Password" pk="{{aUser.pk}}"><span>Δ</span></button>
+                        <input class="alt-email" placeholder="Alternate Reset Email" />
+                        
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="widget add-user">
+            <div class="title">add user</div>
+            <div class="content flex">
+                 <button class="btn btn-green new-user" type="button"><span>+</span></button>
+                 <select>
+                 {% for project in project_list %}
+                    <option value="{{project.pk}}">{{project.name}}</option>
+                 {% endfor %}
+                 </select>
+                 <input class="username" placeholder="New Username"/>
+                 <input class="email" placeholder="Email"/>
+                 <input class="is-master" type="checkbox"><span>Master Admin?</span></input>
+            </div>
+        </div>
+
+        <div class="widget security-messages">
+            <div class="title">security message log<button class="btn btn-green show-all" type="button"></button></div>
+            <div class="content">
+                {% for message in message_list %}
+                    {% if not message.seen_by_admin %}
+                        <div class="entry">
+                            <input type="checkbox" pk="{{message.pk}}"></input>
+                            <div class="date-message">
+                                <div class="date">{{message.date_created}}</div>
+                                <div class="message">{{message.content}}</div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="entry" style="display:none;">
+                            
+                            <input type="checkbox" pk="{{message.pk}}" checked="checked"></input>
+                            <div class="date-message">
+                                <div class="date seen">{{message.date_created}}</div>
+                                <div class="message">{{message.content}}</div>
+                            </div>
+                        </div>                
+                    {% endif %}
+                {% endfor %}
+            </div>
+        </div>        
+        
+        <div class="widget blog-posts">
+            <div class="title">tara blog posts</div>
+            <div class="content">
+                {% for post in blogpost_list %}
+                    <div class="entry"><div class="flex-col"><span>{{post.date_created}}</span><a pk="{{post.pk}}" class="edit-post" href=# title="Click to Edit Blog">{{post.name}}</a></div><button pk="{{post.pk}}" type="button" class="btn btn-red del-post">x</button></div>
+                {% endfor %}
+            </div>
+        </div>        
+
+        <div class="widget new-blog-post">
+            <div class="title">create blog post<button is-new="T" type="button" class="btn btn-green save-post">SAVE</button></div>
+            <div class="content no-scroll">
+                <div class="top">
+                    <div class="top-label">
+                        <div> blog title</div>
+                        <input class="name"/>
+                    </div>
+                    <input id="image-upload" class="file" type="file" style="display:none" accept="image/x-png,image/gif,image/jpeg">
+                    <label for="image-upload" class="image-upload">Upload Image</label>
+                </div>
+                <div class="content-label">blog post content</div>
+                <textarea class="post"></textarea>
+                
+            </div>
+        </div>  
+        
+    </div>
+
+  
+{% endblock %}
+
+
+{% block footer %} 
+<script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+<script>
+//GLOBAL FUNCTIONS//
+function getAPIEndpoints(){
+    return JSON.parse('{{api_urls|safe}}');
+}
+//GLOBALS VARIABLES//
+var API_URLS = getAPIEndpoints();
+
+$('.new-project').click(function(){
+    var formData = {};
+    formData['project_name'] = $(this).parent().find('input').val();
+    $.ajax({ 
+         url   : API_URLS['create_project'],
+         type  : "POST",
+         data  : formData, // data to be submitted
+         success : function(returnedQuery)
+         {
+            console.log(returnedQuery);
+            //Add it to the all projects list
+            $('.project-list').find('.content').append('<div class="entry"><button pk="'+returnedQuery.pk+'" class="btn btn-red del-project" type="button"><span>X</span></button><span>'+returnedQuery.name+'</span></div>');
+            //add it to the add user select options
+            $('.add-user').find('select').append('<option value="'+returnedQuery.pk+'">'+returnedQuery.name+'</option>');
+            //clear current add project form
+            $('.add-project').find('input').val('');
+         },
+        // handle a non-successful response
+        fail : function(xhr,errmsg,err) {
+            console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+        }
+    });     
+});
+
+
+$('.del-project').click(function(){
+    password = prompt("Are you sure you want to delete this Project? Type your master admin account password to confirm.")
+    project_pk = $(this).attr('pk');
+    var formData = {};
+    formData['project_pk'] = project_pk;
+    formData['password'] = password;
+    console.log(password);
+    //If the user cancels (password will be null) then do nothing
+    if (password) {
+        $.ajax({ 
+             url   : API_URLS['delete_project'],
+             type  : "POST",
+             data  : formData, // data to be submitted
+             success : function(returnedQuery)
+             {
+                console.log(returnedQuery);
+                if (returnedQuery.accepted == "YES"){
+                    //Add it to the all projects list
+                    $('.project-list').find('.content').find('.entry').find('button[pk="'+project_pk+'"]').parent().remove();
+                    //add it to the add user select options
+                    $('.add-user').find('select').find('option[value="'+project_pk+'"]').remove();
+                } else {
+                    alert("The password you entered was wrong!");
+                }
+             },
+            // handle a non-successful response
+            fail : function(xhr,errmsg,err) {
+                console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+            }
+        });   
+    }
+    
+});
+
+
+$('.reset-password').click(function(){
+    if ( confirm("Reset "+$(this).parent().children().first().html()+"'s password?") ){
+        user_pk = $(this).attr('pk');
+        var formData = {};
+        formData['user_pk'] = user_pk;
+        formData['alt_email'] = $(this).parent().find('.alt-email').val();
+        $.ajax({ 
+             url   : API_URLS['reset_user_password'],
+             type  : "POST",
+             data  : formData, // data to be submitted
+             success : function(returnedQuery)
+             {
+                console.log(returnedQuery);
+                if (returnedQuery.sent == "YES"){
+                    alert("Successfully reset the user's password and sent them an email!");
+                } else {
+                    alert("Something went wrong!");
+                }
+             },
+            // handle a non-successful response
+            fail : function(xhr,errmsg,err) {
+                console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+            }
+            });   
+    }
+    
+});
+
+$('.new-user').click(function(){
+   
+        project_pk = $(this).parent().find('select').find('option').filter(":selected").val();
+        project_name = $(this).parent().find('select').find('option').filter(":selected").text();
+        username = $(this).parent().find('.username').val();
+        email = $(this).parent().find('.email').val();
+        if ($(this).parent().find('.is-master').is(':checked')) is_master = "T";
+        else is_master = "F";
+        var formData = {};
+        formData['project_pk'] = project_pk
+        formData['email'] = email
+        formData['is_master'] = is_master;
+        formData['username'] = username;
+        $.ajax({ 
+             url   : API_URLS['create_project_admin'],
+             type  : "POST",
+             data  : formData, // data to be submitted
+             success : function(returnedQuery)
+             {
+                console.log(returnedQuery);
+                if (returnedQuery.accepted == "YES"){
+                    alert("Successfully added "+ username +" and sent them an email!");
+
+                    //Clear out all the add user inputs, and add the user to the list
+                    $('.add-user').find('input').val("");
+                    $('.add-user').find('input').prop('checked', false)
+                    newUser = ""
+                    newUser += '<div class="entry"><div>'+username+'</div><div></div>';
+                    if (is_master == "T") newUser += '<div>TARA Admin</div>';
+                    else newUser += '<div>'+project_name+'</div>';
+                    newUser += '<div>'+email+'</div><button class="btn btn-red reset-password" type="button" title="Reset User Password" pk="'+returnedQuery.user_pk+'"><span>Δ</span></button>';
+                    newUser +=  '<input class="alt-email" placeholder="Alternate Reset Email" /></div>';
+                    $('.user-list').find('.content').prepend($(newUser));
+                } else {
+                    alert("Something went wrong!");
+                }
+             },
+            // handle a non-successful response
+            fail : function(xhr,errmsg,err) {
+                console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+            }
+            });   
+    
+    
+});
+
+$('.del-user').click(function(){
+    password = prompt("Are you sure you want to delete this User? Type your master admin account password to confirm.")
+    user_pk = $(this).attr('pk');
+    var formData = {};
+    formData['user_pk'] = user_pk;
+    formData['password'] = password;
+    //If the user cancels (password will be null) then do nothing
+    if (password) {
+        $.ajax({ 
+             url   : API_URLS['delete_user'],
+             type  : "POST",
+             data  : formData, // data to be submitted
+             success : function(returnedQuery)
+             {
+                console.log(returnedQuery);
+                if (returnedQuery.accepted == "YES"){
+                    //Remove it from the user list
+                    $('.user-list').find('.content').find('.entry').find('button[pk="'+user_pk+'"]').parent().remove();
+                } else {
+                    alert("The password you entered was wrong!");
+                }
+             },
+            // handle a non-successful response
+            fail : function(xhr,errmsg,err) {
+                console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+            }
+        });   
+    }
+});
+
+$('.security-messages').find('input').change(function() {
+    var is_seen = false;
+    if (this.checked) {
+        //Check to see if we're viewing ALL messsages or just unseen ones
+        if (!$('.show-all').hasClass('ON')){
+            $(this).parent().hide();
+        }
+        $(this).parent().find('.date').addClass('seen');
+        is_seen = true;
+    } else {
+        $(this).parent().find('.date').removeClass('seen');    
+    }
+
+    formData = {}; formData['message_pk'] = $(this).attr('pk'); formData['is_seen'] = is_seen;
+    $.ajax({  url:API_URLS['edit_security_message'], type:"POST", data:formData,});  
+});
+
+
+$('.show-all').click(function(){
+    if( $(this).hasClass('ON') ) {
+        $(this).removeClass('ON');
+        //Turn off all 'seen' messages
+        $('.security-messages').find('.entry .seen').parent().parent().hide();
+    } else {
+        $(this).addClass('ON');
+        //Turn ON all messages
+        $('.security-messages').find('.entry').show();
+        }
+
+});
+
+
+$('.save-post').click(function() {
+    //Because we have file content, I have to build a FormData object and send it as POST rather than the normal way
+    var image = $('#image-upload')[0].files[0];
+    var blogpostData = new FormData();
+    blogpostData.append("name", $(this).parent().parent().find('.name').val());
+    blogpostData.append("content",$(this).parent().parent().find('.post').val());
+    blogpostData.append("is_new", $(this).attr('is-new'));
+    blogpostData.append("post_pk", $(this).attr('pk'));
+    if (image) blogpostData.append("image", image);
+    
+    
+    $.ajax({  url:API_URLS['create_edit_blogpost'], 
+        type:"POST", 
+        data:blogpostData,  
+        processData: false,
+        contentType: false,
+        success: function(returnedQuery){
+            console.log(returnedQuery);
+            if (returnedQuery.accepted = "YES"){
+                //Add the new blog post to the blog post list if a "NEW" post
+                if ( $('.save-post').attr('is-new') == 'T'){
+                    $('.blog-posts .content').prepend('<div class="entry"><div class="flex-col"><span>Posted Just Now</span><a pk="'+returnedQuery.post_pk+'" class="edit-post" href=#>'+ $('input.name').val() +'</a></div><button pk="'+returnedQuery.post_pk+'" type="button" class="btn btn-red del-post">x</button></div> ')
+                } else {
+                    $('.save-post').attr('is-new', 'T')
+                    $('.del-post[pk="'+$('.save-post').attr('pk')+'"]').parent().find('a').html($('.new-blog-post input').val());
+                    $('.save-post').attr('pk', '');
+                    $('.image-upload').removeClass('editing');
+                    $('.image-upload').css('background', '');
+                }
+                
+                //Clear our blog form
+                $('.new-blog-post input').val('');
+                $('.new-blog-post textarea').val('');
+            } else {
+                alert("Post was not saved--there was some issue serverside");
+            }
+        }   
+    });
+    
+});
+
+$('.del-post').click(function() {
+    password = prompt("Are you sure you want to delete this Post? Type your master admin account password to confirm.")
+    post_pk = $(this).attr('pk');
+    var formData = {};
+    formData['post_pk'] = post_pk;
+    formData['password'] = password;
+    //If the user cancels (password will be null) then do nothing
+    if (password) {
+        $.ajax({ 
+             url   : API_URLS['delete_admin_post'],
+             type  : "POST",
+             data  : formData, // data to be submitted
+             success : function(returnedQuery)
+             {
+                console.log(returnedQuery);
+                if (returnedQuery.accepted == "YES"){
+                    //Remove it from the user list
+                    $('.blog-posts').find('.content').find('.entry').find('a[pk="'+post_pk+'"]').parent().parent().remove();
+                } else {
+                    alert("The password you entered was wrong!");
+                }
+             },
+            // handle a non-successful response
+            fail : function(xhr,errmsg,err) {
+                console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+            }
+        });   
+    }
+});
+
+
+$('.edit-post').click(function() {
+    //Get the Retunred query data from the server, and fill out the form
+    //For the image, change the background src to the url provided
+    //if unchanged, it will ignore the image, otherwise it will reupload a new one
+    var blogpostData = new FormData();
+    var post_pk = $(this).attr('pk');
+    blogpostData.append("post_pk", post_pk);
+    $.ajax({  url:API_URLS['get_admin_blog_post'], 
+        type:"POST", 
+        data:blogpostData,  
+        processData: false,
+        contentType: false,
+        success: function(returnedQuery){
+            console.log(returnedQuery);
+            $('.new-blog-post').find('.name').val(returnedQuery.name);
+            $('.new-blog-post').find('textarea').val(returnedQuery.content);
+            $('.image-upload').css('background-image', 'url("'+returnedQuery.image_url+'")');
+            $('.image-upload').addClass('editing');
+            $('.save-post').attr('is-new', 'F');
+            $('.save-post').attr('pk', post_pk);
+        }   
+    });
+});
+
+
+$('#image-upload').change(function(){
+    $('.image-upload').addClass('editing');
+    var file = this.files[0];
+    var reader = new FileReader();
+    reader.onloadend = function () {
+       $('.image-upload').css('background-image', 'url("' + reader.result + '")');
+    }
+    if (file) {
+        reader.readAsDataURL(file);
+    }
+    
+
+});
+
+</script>
+{% endblock %}
+

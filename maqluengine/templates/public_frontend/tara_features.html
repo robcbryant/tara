@@ -1,0 +1,178 @@
+{% extends "public_frontend/tara_base.html" %}
+
+
+{% load staticfiles %}
+
+{% block content %}
+<div class="main">
+
+{% include "public_frontend/tara_subheader.html" %}
+
+    <div class="main-content">
+
+    
+    <div id="bulk-content">
+    <div class="tara-page-header">
+        <div class="inner-border">
+            Features
+        </div>
+    </div>
+
+        <div class="feature-block"> 
+            <div class="feature-image"><img class="enki-img-popup" src="{% static 'site-images/publicsite/tara_features_intro.png' %}"></img></div>
+            <div class="feature-info">
+                <span class="feature-title">One stop shop of archaeology project needs</span>
+                <ul>
+                    <li class="feature-item">Backend repository of non-media data(Reposit)</li>
+                    <li class="feature-item">Can link and display outside media(DAMs)</li>
+                    <li class="feature-item">Automated front-end(Publish) to replace a separate “Project website” that’s integrated with the database</li>
+                    <li class="feature-item">Tools to analyze, import, and export the data that’s in it</li>
+                    <li class="feature-item">Can be used for work in the lab and in the field with stable data connections.</li>
+                </ul>
+            </div>
+        </div>
+    
+
+        <div class="feature-block"> 
+            <div class="feature-image"><img class="enki-img-popup" src="{% static 'site-images/publicsite/tara_features_backend.png' %}"></img></div>
+            <div class="feature-info">
+                <span class="feature-title">Online Web-application built on top of Django/MySQL/OpenLayers/Chart/JQuery</span>
+                <ul>
+                <li class="feature-item">Incredibly Generic– but with intended constraints</li>
+                <li class="feature-item">Designed to outwardly mimic existing legacy databases, but drastically different under the hood</li>
+                <li class="feature-item">Pro: Incredibly dynamic with few tables needed to define (any?) data types == less expensive SQL table joins</li>
+                <li class="feature-item">Con: Will never be as ‘fast’ as a customized, highly bespoke SQL design, because of larger tables</li>
+                </ul>
+            </div>
+        </div>
+
+         <div class="feature-block"> 
+            <div class="feature-image"><img class="enki-img-popup" src="{% static 'site-images/publicsite/tara_features_exporttools.png' %}"></img></div>
+            <div class="feature-info">
+                <span class="feature-title">Data Export / Import Tools</span>
+                <ul>
+                <li class="feature-item">Export the entire project or form sets as CSV or JSON with all relations intact</li>
+                <li class="feature-item">Import pre-existing digitized data sets from CSV files</li>
+                <li class="feature-item">Import geoJSON data as a new populated FormType(Entity Type) with all attached metadata and vector information</li>
+                </ul>
+            </div>
+        </div>   
+        
+         <div class="feature-block"> 
+            <div class="feature-image"><img class="enki-img-popup" src="{% static 'site-images/publicsite/tara_features_website.png' %}"></img></div>
+            <div class="feature-info">
+                <span class="feature-title">Optional public facing webpage and blog Manager</span>
+                <ul>
+                <li class="feature-item">Integrates an auto-generated website for the project linked to the same database with the ability to customize a menu and add new pages and content</li>
+                <li class="feature-item">Integrates a simple blog for each project, also tied to the same database</li>
+                <li class="feature-item">Removes the need for an external public-facing website, and keeps it linked to your existing data</li>
+                </ul>
+            </div>
+        </div>           
+        
+        <div class="feature-block"> 
+            <div class="feature-image"><img class="enki-img-popup" src="{% static 'site-images/publicsite/tara_features_template.png' %}"></img></div>
+            <div class="feature-info">
+                <span class="feature-title">Templating System for designing Form layouts</span>
+                <ul>
+                <li class="feature-item">Allows project admins to design layouts for their entity types with a variety of different widgets to represent the data</li>
+                <li class="feature-item">Relational Fields can be shown as dropdown lists, image gallery viewers, and thumbnailed lists</li>
+                <li class="feature-item">Text based fields can be resized as needed</li>
+                <li class="feature-item">All fields can be positioned and saved</li>
+                <li class="feature-item">Future Updates will allow text-based fields to be format enforced, e.g. boolean check boxes, numerical </li>
+
+                </ul>
+            </div>
+        </div>    
+
+         <div class="feature-block"> 
+            <div class="feature-image"><img class="enki-img-popup" src="{% static 'site-images/publicsite/tara_features_trashbin.png' %}"></img></div>
+            <div class="feature-info">
+                <span class="feature-title">Recycling Bin System for Safe Deletion and Restoration of Data</span>
+                <ul>
+                <li class="feature-item">Safely delete data and restore it</li>
+                <li class="feature-item">Data is only stored in a temporary 'recycling bin' where high-level project access is required to permanently delete the data</li>
+                <li class="feature-item">Restored data is immediately put back exactly--with all previous relationships, and meta intact</li>
+                </ul>
+            </div>
+        </div>   
+
+         <div class="feature-block"> 
+            <div class="feature-image"><img class="enki-img-popup" src="{% static 'site-images/publicsite/tara_features_datachange.png' %}"></img></div>
+            <div class="feature-info">
+                <span class="feature-title">Highly Malleable Entity and Field Types</span>
+                <ul>
+                <li class="feature-item">Record Attribute Types, e.g. text-based fields can quickly converted into relation fields, and automated lookups will search for any matching relations of the chosen entity type</li>
+                <li class="feature-item">Record Reference Types, e.g. relation fields, can quickly be converted in to text-based fields</li>
+                <li class="feature-item">Record Attribute Types can be interchanged with a Form Type's  Form IDs at will</li>
+                <li class="feature-item">All fields, entity types, and forms can be renamed at will without affecting the database or its relationships</li>
+                </ul>
+            </div>
+        </div>   
+        
+         <div class="feature-block"> 
+            <div class="feature-image"><img class="enki-img-popup" src="{% static 'site-images/publicsite/tara_features_dam.png' %}"></img></div>
+            <div class="feature-info">
+                <span class="feature-title">Can link to outside media servers and display various media formats</span>
+                <ul>
+                <li class="feature-item">project admins can enter in URIs to an external media server or file server that hosts their media/image content</li>
+                <li class="feature-item">These uris are automatically linked to created media Formtypes with matching form IDs</li>
+                <li class="feature-item">Linkable media that can be viewed: PDF's, Web-friendly Image formats(.png,.jpg,etc), and 3D .obj files</li>
+                </ul>
+            </div>
+        </div>   
+        
+        
+        <div class="feature-block"> 
+            <div class="feature-image"><img class="enki-img-popup" src="{% static 'site-images/publicsite/tara_features_security.png' %}"></img></div>
+            <div class="feature-info">
+                <span class="feature-title">Privacy and Security Restrictions</span>
+                <ul>
+                <li class="feature-item">Project can set public/private access to various levels of data</li>
+                <li class="feature-item">Internal Project user security on an easy 5 stage access level system of data manipulation/creation</li>
+                <li class="feature-item">Currently working on getting longterm HTTPS support for additional external security</li>
+                <li class="feature-item">Leverages Django's existing CSFR security and sessioning</li>
+                <li class="feature-item">Any security flags raised in the system and blocked are immediately logged on the server logs as well as in a database log accessible quickly by the network admin</li>
+                </ul>
+            </div>
+        </div>    
+
+         <div class="feature-block"> 
+            <div class="feature-image"><img class="enki-img-popup" src="{% static 'site-images/publicsite/tara_features_geoengine.png' %}"></img></div>
+            <div class="feature-info">
+                <span class="feature-title">Geospatial Engine for Vector data</span>
+                <ul>
+                <li class="feature-item">Can handle large sets of vector data in the geoJSON format</li>
+                <li class="feature-item">All Formtypes in the system have their own mini GIS interface to manually draw in vector shapes for the Form</li>
+                <li class="feature-item">Both the larger and mini-engine can support viewing multiple layers</li>
+                <li class="feature-item">Basic symbology can be applied to any geospatial vector data--utilizing the linked and related meta data to filter that symbology</li>
+                <li class="feature-item">Ability to manipulate the colors and transperencies of symbology manually, or automatically through randomly generated gradients</li>
+                <li class="feature-item">Multiple allowed projection systems using GDAL</li>
+                <li class="feature-item">base map layers provided freely by ESRI</li>
+                <li class="feature-item">Ability to click on vector features to bring up feature/form attributes</li>
+                </ul>
+            </div>
+        </div>   
+
+         <div class="feature-block"> 
+            <div class="feature-image"><img class="enki-img-popup" src="{% static 'site-images/publicsite/tara_features_feedback.png' %}"></img></div>
+            <div class="feature-info">
+                <span class="feature-title">Responsive user Feedback for longer server processes</span>
+                <ul>
+                <li class="feature-item">all longer processing provide progress bars with asynchronously updated information to user </li>
+                <li class="feature-item">important changes alert the user of a successful 'save' or change of data</li>
+                </ul>
+            </div>
+        </div>           
+    </div>    
+   
+    
+    </div>
+</div>
+
+{% endblock %}
+
+
+{% block footer %}
+    <script src="{% static 'js/enki-thumbnail-popup.js'  %}"></script>  
+{% endblock %}

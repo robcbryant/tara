@@ -1,0 +1,168 @@
+#base-page {
+    display: flex;
+    flex-direction: column;   
+}
+
+
+#base-page #main {
+
+}
+#api-banner {
+    position: absolute;
+    background: black;
+    width: calc(100% - 10px);
+    top: 2em;
+    color: #0cff00;
+    font-size: 1em;
+    font-weight: bold;
+    border: 5px solid #0057b9;
+    font-family: Courier;
+}
+
+.side-links {
+    background: black;
+    flex: 1;
+    border: 3px solid #0057b9;
+    padding: 2%;
+}
+.side-links a {
+    color: white;
+    float: left;
+    width: 100%;
+    font-size: 1.4em;
+    text-align: left;
+    letter-spacing: -2px;
+    font-weight: bold;
+}
+
+.side-links a:hover{
+    color: #0057b9;
+}
+
+.side-links div {
+color: #0be500;
+    float: left;
+    width: 100%;
+    font-size: 1.4em;
+    text-align: left;
+    letter-spacing: -2px;
+    font-weight: bold;
+}
+
+.json {
+    flex: 4;
+    border: 3px solid #0057b9;
+    display: flex;
+    flex-direction: column;
+    background: black;
+    min-width: 0;
+}
+.json .json-header {
+        flex: 1;
+    border: 3px solid #0057b9;
+    padding:2%;
+}
+
+.json-header div {
+    font-size: 1.5em;
+    font-weight:bold;
+    letter-spacing: -3px;
+    float:left;
+    color: white;
+    width: 100%;
+    text-align: left;
+}
+
+.json-header span {
+    color: #00a1ff;
+}
+
+.json pre {
+    overflow: scroll;
+    max-width: 100%;
+    max-height: 100%;
+}
+.json .string { color: green; }
+.json .number { color: darkorange; }
+.json .boolean { color: blue; }
+.json .null { color: magenta; }
+.json .key {color: #00a1ff; font-weight: bold;}
+
+.json .json-code {
+padding: 1%;
+    background: #001856;
+    color: #0aee00;
+    text-align: left;
+    border: 3px solid #0057b9;
+    flex: 6;
+    min-width: 0;
+    min-height: 0;
+}
+
+
+.reference {
+    flex: 2.5;
+    background: #001856;
+    border: 3px solid #0057b9;
+    color: white;
+    padding: 2%;
+    text-align: left;
+    overflow-y: scroll;
+    max-height: 100%;
+}
+
+.ref-header {
+    font-weight: bold;
+    font-size: 2em;
+    letter-spacing: -2px;
+    margin-bottom: 6%;
+}
+
+.description {
+    margin-bottom: 20%;
+color: #00ffee;
+}
+
+.ref-content h3 {
+    margin-bottom: 4%;
+    font-weight: bold;
+    letter-spacing: -1px;
+    margin-top: 6%;
+    border-bottom: 2px solid white;
+}
+
+.ref-content h4 {
+    margin-bottom: 3%;
+    color: #ff008f;
+    font-style: italic;
+}
+
+.ref-content table {
+    table-layout: fixed;
+    display: table;
+    border-collapse: collapse;
+    margin-bottom: 20%;
+}
+.ref-content th {
+    border-bottom: 2px solid #00a1ff;
+    padding: 0% 2% 1% 0%;
+    display: table-cell;
+    font-size: .9em;
+    word-wrap: normal;
+}
+
+.ref-content td {
+    display: table-cell;
+    padding: 0% 2% 1% 0%;
+    font-size: .8em;
+    word-wrap: normal;
+}
+
+.main-api-description {
+    background: #00006c;
+    padding: 1%;
+    color: white;
+    font-size: 1.3em;
+    flex: 6.5;
+    font-weight: bold;
+}

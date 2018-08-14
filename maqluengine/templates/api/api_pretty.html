@@ -1,0 +1,100 @@
+{% extends "public_frontend/tara_base.html" %}
+{% load staticfiles %}
+{% block extra_style %} 
+<link rel="stylesheet" type="text/css" href="{% static 'css/api.css' %}" />
+{% endblock %}
+
+{% block branding %}
+    <div id="api-banner">API Endpoint: <span>{{api_endpoint}}</span> API Version: <span>{{api_version}}</span></div>
+{% endblock %}
+
+{% block content %}
+
+
+<div class="side-links">
+{% for point in endpoints %}
+    {% if current_endpoint == point %}
+    <div>api/ {{point}} <</div>
+    {% else %}
+    <a href="/api/{% if point != "main" %}{{point}}/{% endif %}">api/ {{point}}</a>
+    {% endif %}
+{% endfor %}
+{% block sidelinks %}
+
+{% endblock %}
+</div>
+
+
+<div class="json">
+    <div class="json-header">
+    <div>Status: <span>{{status}}</span></div>
+    <div>Allow: <span>{{allow}}</span></div>
+    <div>Content-Type: <span>{{content_type}}</span></div>
+    {% block jsonheader %}
+    {% endblock %}
+    </div>
+    <div class="json-code">
+        <pre></pre>
+    </div>
+</div>
+
+<div class="reference">
+{% block reference %}
+{% endblock %}
+</div>
+
+
+{% endblock %}
+
+
+{% block footer %}
+<script>
+
+$('.side-links button').click( function() {
+$.get('http://tara.museum.upenn.edu/api/posts/12/', function(data, status, xhr){
+    console.log(data);
+    console.log(status);
+    console.log(xhr);
+});
+ 
+});
+
+
+function syntaxHighlight(json) {
+    json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, function (match) {
+        var cls = 'number';
+        if (/^"/.test(match)) {
+            if (/:$/.test(match)) {
+                cls = 'key';
+            } else {
+                cls = 'string';
+            }
+        } else if (/true|false/.test(match)) {
+            cls = 'boolean';
+        } else if (/null/.test(match)) {
+            cls = 'null';
+        }
+        return '<span class="' + cls + '">' + match + '</span>';
+    });
+}
+
+
+
+window.addEventListener('load', function() {
+    var rawJSON = '{{ json|escapejs }}' ; 
+    //console.log($('.json'));
+    rawJSON = rawJSON.replace(/\n/g, "\\\\n").replace(/\r/g, "\\\\r").replace(/\t/g, "\\\\t");
+    var cleanJSON = JSON.parse(rawJSON);
+    cleanJSON = JSON.stringify(cleanJSON, undefined, 8);
+    $('.json pre').html(  syntaxHighlight(cleanJSON)  );
+
+});
+
+
+
+
+
+</script>
+
+{% endblock %}

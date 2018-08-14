@@ -886,16 +886,18 @@
         $rulesList = $(this).parent().find('.constraints');
         $newRule = $rulesList.children().first().clone(true);
         $newRule.find('.constraint-value').val("");
-        $newRule.find('.andor').atrr('disabled', 'enabled');
-        $newRule.find('.delete-constraint').atrr('disabled', 'enabled');
+        $newRule.find('.andor').removeAttr('disabled').focus();
+        $newRule.find('.delete-constraint').removeAttr('disabled').focus();
+        $newRule.find('.delete-constraint').click(deleteConstraint);
         $rulesList.append($newRule);
+
 
     }
     function deleteConstraint(){
         $(this).parent().remove();
     }
      $('.add-constraint').click(addConstraint);
-     $('.delete-constraint.enabled').click(deleteConstraint);
+     
      
      
     function applySingleClassSymbology(){

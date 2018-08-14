@@ -1,0 +1,15 @@
+
+
+{% extends project_override_template|default:'public_frontend/tara_base.html' %}
+
+
+{% block content %}
+<div class="main">
+{% if not project_override_template %} {% include "public_frontend/tara_subheader.html" %} {% endif %}
+
+    <div class="main-content">
+        <div class="title">{{webpage.name}}</div>
+        <div class="embedded-html">{{webpage.content|safe}}</div>
+    </div>
+</div>
+{% endblock %}

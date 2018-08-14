@@ -455,3 +455,115 @@ function checkAllRequiredFieldsHaveInput(){
         
  }); 
 
+
+ 
+ 
+ 
+ 
+ 
+ 
+ $('.save-page-button').click( function(){
+    page = {};
+    page['name'] = $('.page-content .title').val();
+    page['content'] = $('.page-content .content').val();
+    page['menugroup'] = $('.page-content select option:selected').val();
+    page['NEW'] = $(this).attr('is_new');
+    page['webpage_pk'] = $(this).attr('pk');
+    if (page['menugroup'] == "NEW") page['menu_name'] =  $('.page-content .menu-label').val();
+    $.post( API_URLS.create_new_webpage, page).done(function( data ) {
+        console.log(data);
+        if (data.success == "T"){
+            //Reset our webpage list menu
+             $('.webpage-list').remove();
+             $('.webpages').prepend(data.menu_list);
+             $('.webpage-list a').click(function(){ edit_webpage(this) });
+             $('.webpage-list select').change(function() {save_menugroup_parent_change(this); });
+             $('.webpage-list button').click(function(){ recycle_webpage(this) });
+            //clear the page entry
+             $('.page-content textarea').val("")
+             $('.page-content input').val("")
+             $('.page-content select').val("NONE")
+              if (page['menugroup'] == "NEW") $('.page-content select').append('<option value="'+data.menu_pk+'">'+page['menu_name']+'</option>');
+             $('.save-page-button').attr('is_new', "T");
+             $('.save-page-button').attr('pk', '');
+        } else {
+            alert("Something Went Wrong? " + data);
+        }
+        
+      });   
+    
+     
+     
+ }); 
+ 
+ 
+ $('.tab.project-control').click( function() {
+    //Set z-index of all 'center-pane' 's children to 1
+    $('#center-pane').children().css('z-index', '1');
+    //Remove the 'active' class from all tabs
+    $('.tab.project-control').removeClass('active');
+    //Set the z-index of the parent of this tab to 10
+    $(this).parent().css('z-index', '10');
+    //Add the 'active' class to this clicked tab
+    $(this).addClass('active');
+ });
+ 
+ $('.webpage-list select').change(function() {save_menugroup_parent_change(this);});
+ $('.webpage-list a').click(function(){ edit_webpage(this) });
+ $('.webpage-list button').click(function(){ recycle_webpage(this) });
+ 
+ function save_menugroup_parent_change(select_element) {
+     menu = {};
+     menu['code'] = $(select_element).find('option:selected').val();
+     menu['menugroup_pk'] = $(select_element).parent().attr('pk');
+     menu['name'] = $(select_element).parent().find('input').val();
+     allowed = true;
+     if (menu.code == "DEL"){
+        allowed = confirm("Delete the Menugroup? All subgroups and pages will be kept and moved to the parent level.");
+     }
+        if (allowed){
+         $.post( API_URLS.edit_menugroup, menu).done(function( data ) {
+             $('.webpage-list').remove();
+             $('.webpages').prepend(data.menu_list);
+             $('.webpage-list a').click(function(){ edit_webpage(this) });
+             $('.webpage-list button').click(function(){ recycle_webpage(this) });
+             $('.webpage-list select').change(function() {save_menugroup_parent_change(this); });
+             if (menu.code == "DEL") $('.options-block select option[value="'+menu.menugroup_pk+'"]').remove();
+             else {$('.options-block select').append('<option value="'+data.menu_pk+'">'+ menu['name']+'</option>')}
+         });
+        } else {
+            $(select_element).val('NO_CHANGE');
+        }
+     
+     
+ }
+ 
+ function edit_webpage(page_element){
+     
+     pk = $(page_element).parent().attr('pk');
+
+     $.get( API_URLS.api_webpages+"/"+pk+"/?json").done(function( data ) {
+         console.log(data);
+         $('.page-content textarea').val(data.content)
+         $('.page-content input.title').val(data.name)
+         if (data.menugroup.id) $('.page-content select').val(data.menugroup.id);
+         else $('.page-content select').val(data.menugroup);
+         $('.save-page-button').attr('is_new', "F");
+         $('.save-page-button').attr('pk', data.id);
+         
+     });
+ }
+ 
+ function recycle_webpage(button_element) {
+     page = {};
+     page['webpage_pk'] = $(button_element).parent().attr('pk');
+     if (confirm("Are you Sure you want to delete this webpage?")){
+         $.post( API_URLS.recycle_webpage, page).done(function( data ) {
+             $('.webpage-list').remove();
+             $('.webpages').prepend(data.menu_list);
+             $('.webpage-list a').click(function(){ edit_webpage(this) });
+             $('.webpage-list button').click(function(){ recycle_webpage(this) });
+             $('.webpage-list select').change(function() {save_menugroup_parent_change(this); });
+         });
+     }
+ }

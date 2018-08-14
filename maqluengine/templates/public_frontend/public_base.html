@@ -1,0 +1,157 @@
+{% load i18n static %}<!DOCTYPE html>
+{% get_current_language as LANGUAGE_CODE %}{% get_current_language_bidi as LANGUAGE_BIDI %}
+<html lang="{{ LANGUAGE_CODE|default:"en-us" }}" {% if LANGUAGE_BIDI %}dir="rtl"{% endif %}>
+<head>
+<title>TARA: Toolkit for Archaeological Research & Analysis {% block title %}{% endblock %}</title>
+<link rel="stylesheet" type="text/css" href="{% static 'css/public_base.css' %}" />
+<link rel="stylesheet" href="{% static 'openlayers/ol.css' %}">
+<link rel="icon" href="{% static 'favicon.ico'%}" />
+{% block extra_style %} {% endblock %}
+{% block blockbots %}<meta name="robots" content="NONE,NOARCHIVE" />{% endblock %}
+</head>
+{% load i18n %}
+
+<body>
+
+<!-- Container -->
+<div id="base-page">
+
+
+    <!-- Header -->
+    <div id="header">
+        <div id="branding">
+            <div class="logo-parent">
+                <img class="img-logo" src="{% static 'site-images/tara_logo.png' %}"></img>
+                <span class="main-logo"><a href="/">TARA</a></span>
+                <span class="sub-logo">Toolkit for Archaeological Research and Analysis</span>
+            </div>
+            {% if user.permissions.master_admin %}<div id="tara-admin-project-header">Logged in as MASTER ADMIN | <a href="{% url 'maqlu_admin:index'%}">TARA console</a></div>  {%endif%}
+
+            {% block branding %}{% endblock %}
+            
+            
+            {% if has_permission %}
+            <div id="user-tools">
+                {% block welcome-msg %}
+                    {% trans 'Welcome,' %}
+                    <strong>{% firstof user.get_short_name user.get_username %}</strong>.
+                {% endblock %}
+                {% block userlinks %}
+                    {% if site_url %}
+                        <a href="{{ site_url }}">{% trans 'View site' %}</a> /
+                    {% endif %}
+                    {% if user.is_active and user.is_staff %}
+                        {% url 'django-admindocs-docroot' as docsroot %}
+                        {% if docsroot %}
+                            <a href="{{ docsroot }}">{% trans 'Documentation' %}</a> /
+                        {% endif %}
+                    {% endif %}
+                    {% if user.has_usable_password %}
+                    <a href="{% url 'admin:password_change' %}">{% trans 'Change password' %}</a> /
+                    {% endif %}
+                    <a href="{% url 'admin:logout' %}">{% trans 'Log out' %}</a>
+                {% endblock %}
+            </div>
+            {% else %}
+            <div class="login-access"><a href="{% url 'maqlu_admin:index' %}"><img src="{% static 'site-images/login_key.png' %}"/><span>LOGIN</span></a></div>   
+            {% endif %}  
+        </div>
+
+        <div class="project-title">{{project.name}}</div>
+
+
+        <div class="menu">
+            {% for aWebpage in webpage.project.webpage_set.all %}
+                {% if not aWebpage.flagged_for_deletion and not aWebpage.menuparent %}
+                    <a href="{% url 'maqluengine:webpage' webpage_id=aWebpage.pk%}">{{aWebpage.name}}</a>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% block nav-global %}{% endblock %}
+    </div>
+    <!-- END Header -->
+
+    <!-- Content -->
+    <div id="main">
+        <div class="side-bar">
+               <div class="form-type-group-title">Project Forms</div>
+            {% for aformtype in project.formtype_set.all %}
+                {% if not aformtype.form_type_group and aformtype.flagged_for_deletion == False%}
+                    {% if aformtype.type == 0 %}
+                   
+                 <div class="formtype"><a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqluengine:formtype' formtype_id=aformtype.pk  %}">{{aformtype}}</a></div>
+
+                    {% endif %}
+            {% endif %}
+            {% endfor %}  
+            
+          {% for aformtypegroup in project.formtypegroup_set.all %}
+                
+                   <div class="form-type-group-title">{{aformtypegroup}}</div>
+
+
+                {% for aformtype in aformtypegroup.formtype_set.all %}
+                    {% if aformtype.flagged_for_deletion == False %}
+
+
+                       <div class="formtype"> <a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqluengine:formtype' formtype_id=aformtype.pk %}">{{aformtype}}</a></div>
+                    {% endif %}
+                {% endfor %}
+          {% endfor %}
+          
+
+            <div class="form-type-group-title">Media Types</div>
+
+            {% for aformtype in project.formtype_set.all %}
+                {% if not aformtype.form_type_group and aformtype.flagged_for_deletion == False%}
+                    {% if aformtype.type == 1 %}
+
+                       <div class="formtype"> <a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqluengine:formtype' formtype_id=aformtype.pk  %}">{{aformtype}}</a></div>
+
+
+                    {% endif %}
+                {% endif %}
+            {% endfor %}        
+        
+        </div>
+    
+    
+    
+    
+    
+        {% block content %}{% endblock %}
+    </div>
+
+   
+    <!-- END Content -->
+        
+        <div id="footer">        
+            <div class="project-name"><a href="{% url 'maqluengine:project' project_id=project.pk %}">{{project.name}}</a></div>
+            <div class="footer-logo">
+                <a href="/">
+                <img class="img-logo" src="{% static 'site-images/tara_logo.png' %}"></img>
+                <span class="main-logo">TARA</span>
+                </a>
+            </div>
+            <div class="branding">
+                    <span>designed by</span>
+                    <a href="#">Robert Bryant</a>
+                    <span>powered by</span><a class="logo" href="http://www.djangoproject.com/">               <img class="django" src="{% static 'site-images/django_logo.png' %}" border="0" alt="Powered by Django." title="Powered by Django." /></a>
+                    <span>licensed under</span><a class="logo" href="https://www.gnu.org/licenses/gpl-3.0.en.html"><img class="bg gnu" src="{% static 'site-images/gnu_plv3_logo.png' %}" border="0" alt="GNU Public License v3" title="GNU Public License v3" /></a>
+                    <span>sourcecode on</span><a class="logo" href="https://github.com/robcbryant/tara/">         <img class="bg taragit" src="{% static 'site-images/GitHub_Logo_White.png' %}" border="0" alt="TARA on GitHub." title="TARA on GitHub" /></a>
+                    <span>hosted by</span><a class="logo" href="https://www.penn.museum/">                    <img class="bg upenn" src="{% static 'site-images/upenn_logo_white.png' %}" border="0" alt="UPenn Museum" title="UPenn Museum" /></a>
+            </div>
+            <script src="{% static 'jquery/jquery.js'  %}"></script>
+            <script src="{% static 'openlayers/ol-debug.js'  %}"></script>
+            <script src="{% static 'js/enki_general.js'  %}"></script>
+            <script src="{% static 'bootstrap/js/bootstrap.js'  %}"></script>
+            <script src="{% static 'bootstrap-select/js/bootstrap-select.js' %}"></script>
+            <script src="{% static 'proj4js/proj4.js' %}"> </script>
+            {% block footer %}{% endblock footer%}
+        </div>
+</div>
+<!-- END Container -->
+
+</body>
+</html>
+<!-- EDIT THIS ONE-->

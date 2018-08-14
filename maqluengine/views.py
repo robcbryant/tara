@@ -45,7 +45,9 @@ from django.http import Http404
 
 from time import sleep
 from django.contrib.staticfiles.storage import staticfiles_storage
+
 import json
+from django.core.serializers.json import DjangoJSONEncoder
 
 from django.utils.encoding import smart_text
 
@@ -60,7 +62,9 @@ import zipfile
 import io
 import contextlib
 
-
+from django.urls import resolve
+from django.shortcuts import render
+import inspect #Needed for getting method names
 
 ###########################################################################################################
 #      ERROR / INFO LOGGER SETUP
@@ -3683,28 +3687,46 @@ def run_query_engine(self, request):
 
 
 
-
+##==========================================================================================================================    
 ##==========================================================================================================================    
 ##==========================================================================================================================    
 ##  TEMPLATE VIEWS   ****************************************************************************************************
 ##==========================================================================================================================        
+##==========================================================================================================================    
+##==========================================================================================================================    
 
+
+
+##==========================================================================================================================    
+##==========================================================================================================================    
+## PUBLIC MODEL VIEWS   ****************************************************************************************************
+##==========================================================================================================================  
+
+
+    
 #=====================================================================================#
-#  VIEW_PROJECT() *RECYCLING
+#  BLOGPOST()
 #=====================================================================================#       
-def index(request, **kwargs):
-    logger.debug(request)
-    logger.debug(render_to_response('public_frontend/index.html', kwargs, RequestContext(request)))
-    return HttpResponse(render_to_response('public_frontend/index.html', kwargs, RequestContext(request)))    
-
-    #return HttpResponse("TESTING")    
-
-def test_index(request):
-    return HttpResponse("TESTING")  
+def blogpost(request, **kwargs):
+    logger.info(request)
+    logger.info('RIGHT HERE')
+    blogpost = BlogPost.objects.get(pk=kwargs['post_id'])
+    #Make sure we don't populate our lists below with the current requested post
+    blogposts = BlogPost.objects.filter(project=None).exclude(id=kwargs['post_id']).order_by('-date_created') 
+    recentposts = BlogPost.objects.exclude(id=kwargs['post_id']).order_by('-date_created')[:5]
+    blogposts = blogposts[0:10]
+    kwargs.update({'blogpost':blogpost})
+    kwargs.update({'blogpost_list':blogposts}) 
+    kwargs.update({'recentposts_list':recentposts})     
+    
+    
+    
+    return HttpResponse(render_to_response('public_frontend/blogpost.html', kwargs, RequestContext(request)))  
+    
 #=====================================================================================#
-#  VIEW_PROJECT() *RECYCLING
+#  PROJECT()
 #=====================================================================================#       
-def view_project(self, request, **kwargs):
+def project(request, **kwargs):
     #-----------------------------------------------------------------------------------
     #   This view delivers the project overview of users/stats etc. as well as give
     #       --public users a list of formtypes etc. in the template
@@ -3716,34 +3738,296 @@ def view_project(self, request, **kwargs):
     #Now make sure it's set to public or log the attempted access to the security logs, and give the user a 404 error page
     if project.is_public:
         kwargs.update({'project':project})      
-        return HttpResponse(render_to_response('public_frontend/view_project.html', kwargs, RequestContext(request)))    
+        return HttpResponse(render_to_response('public_frontend/project.html', kwargs, RequestContext(request)))    
     else:
         SECURITY_log_security_issues('views.py - ' + str(sys._getframe().f_code.co_name), "PROJECT IS NOT PUBLIC", request.META)
         raise Http404("Project Does Not Exist!")  
 
     
 #=====================================================================================#
-#  VIEW_FORMTYPE() *RECYCLING
+#  FORMTYPE()
 #=====================================================================================#       
-def view_formtype(self, request, **kwargs):
-     return HttpResponse(render_to_response('public_frontend/index.html', kwargs, RequestContext(request)))
+def formtype(request, **kwargs):
+    return HttpResponse(render_to_response('public_frontend/formtype.html', kwargs, RequestContext(request)))
 #=====================================================================================#
-#   VIEW_FORM() *RECYCLING
+#   FORM()
 #=====================================================================================#       
-def view_form(self, request, **kwargs):
-     return HttpResponse(render_to_response('public_frontend/index.html', kwargs, RequestContext(request)))
+def form(request, **kwargs):
+    return HttpResponse(render_to_response('public_frontend/form.html', kwargs, RequestContext(request)))
 #=====================================================================================#
-#   VIEW_PAGE() *RECYCLING
+#   WEBPAGE()
 #=====================================================================================#       
-def view_page(self, request, **kwargs):
-     return HttpResponse(render_to_response('public_frontend/index.html', kwargs, RequestContext(request)))
+def webpage(request, **kwargs):
+    kwargs['webpage'] = Webpage.objects.get(pk=kwargs['webpage_id'], flagged_for_deletion=False) 
+    if kwargs['webpage'].project: 
+        kwargs['project_override_template'] = "public_frontend/public_base.html"
+        kwargs['project'] = kwargs['webpage'].project
+
+    return HttpResponse(render_to_response('public_frontend/webpage.html', kwargs, RequestContext(request)))
+
+     
+     
+##==========================================================================================================================    
+##==========================================================================================================================    
+## TARA PUBLIC PAGES   ****************************************************************************************************
+##==========================================================================================================================      
+
 #=====================================================================================#
-#   MASTER_QUERY_ENGINE() *RECYCLING
+#  INDEX() 
 #=====================================================================================#       
-def master_query_engine(self, request, **kwargs):
-     return HttpResponse(render_to_response('public_frontend/index.html', kwargs, RequestContext(request)))
+def index(request, **kwargs):
+    logger.info("TESTING PROJECT TENANCY")
+    logger.info(request)
+    logger.debug(render_to_response('public_frontend/index.html', kwargs, RequestContext(request)))
+    return HttpResponse(render_to_response('public_frontend/index.html', kwargs, RequestContext(request)))    
+
+def dev_index(request, **kwargs):
+    logger.info("TESTING PROJECT TENANCY")
+    logger.info(request)
+    logger.debug(render_to_response('public_frontend/dev_index.html', kwargs, RequestContext(request)))
+    
+    projects = FormProject.objects.filter(is_public=True)
+    blogposts = BlogPost.objects.filter(project=None).order_by('-date_created') 
+    recentposts = BlogPost.objects.all().order_by('-date_created')[:5]
+    firstpost = blogposts[0]
+    blogposts = blogposts[1:10]
+    test_post = '16'
+    kwargs = {'test_post':test_post,'firstpost':firstpost,'project_list':projects,'blogpost_list':blogposts,'recentposts_list':recentposts}
+    #kwargs.update({'firstpost':firstpost})
+    #kwargs.update({'project_list':projects})
+    #kwargs.update({'blogpost_list':blogposts}) 
+    #kwargs.update({'recentposts_list':recentposts})     
+    
+    return render(request, 'public_frontend/dev_index.html', kwargs)    
+
+    
 #=====================================================================================#
-#   GEOSPATIAL_ENGINE() *RECYCLING
+#   QUERYENGINE() 
 #=====================================================================================#       
-def geospatial_engine(self, request, **kwargs):
-     return HttpResponse(render_to_response('public_frontend/index.html', kwargs, RequestContext(request)))
+def queryengine( request, **kwargs):
+     return HttpResponse(render_to_response('public_frontend/queryengine.html', kwargs, RequestContext(request)))
+#=====================================================================================#
+#   GEOENGINE() 
+#=====================================================================================#       
+def geoengine( request, **kwargs):
+     return HttpResponse(render_to_response('public_frontend/geoengine.html', kwargs, RequestContext(request)))
+
+#=====================================================================================#
+#   BROWSEENGINE() 
+#=====================================================================================#       
+def browseengine(request, **kwargs):
+     return HttpResponse(render_to_response('public_frontend/browseengine.html', kwargs, RequestContext(request)))
+
+        
+#=====================================================================================#
+#   FEATURES()
+#=====================================================================================#       
+def features(request, **kwargs):
+     return HttpResponse(render_to_response('public_frontend/tara_features.html', kwargs, RequestContext(request)))
+
+        
+#=====================================================================================#
+#   HISTORY()
+#=====================================================================================#       
+def history(request, **kwargs):
+     return HttpResponse(render_to_response('public_frontend/tara_history.html', kwargs, RequestContext(request)))
+
+        
+#=====================================================================================#
+#   DOCUMENTATION()
+#=====================================================================================#       
+def documentation(request, **kwargs):
+     return HttpResponse(render_to_response('public_frontend/tara_documentation.html', kwargs, RequestContext(request)))
+
+        
+#=====================================================================================#
+#   CONTACT()
+#=====================================================================================#       
+def contact(request, **kwargs):
+     return HttpResponse(render_to_response('public_frontend/tara_contact.html', kwargs, RequestContext(request)))
+
+        
+#=====================================================================================#
+#   PROJECT_LIST()
+#=====================================================================================#       
+def project_list(request, **kwargs):
+    project_list = FormProject.objects.filter(is_public=True)
+    kwargs['project_list'] = project_list
+    return HttpResponse(render_to_response('public_frontend/tara_projects.html', kwargs, RequestContext(request)))
+
+                
+     
+     
+     
+##==========================================================================================================================    
+##==========================================================================================================================    
+##  PUBLIC API ENDPOINTS ****************************************************************************************************
+##==========================================================================================================================     
+
+def get_api_endpoint_names():
+    mod = sys.modules[__name__]
+    function_list = [func.__name__ for func in mod.__dict__.values() if inspect.isfunction(func) and inspect.getmodule(func) == mod]
+    final_functions = []
+    for function in function_list: 
+        if 'api_v' in function: final_functions.append(function.split('_')[-1] )
+    return sorted(final_functions)
+
+def api_v1_main(request, **kwargs):    
+    kwargs.update({'endpoint':request.get_full_path()})
+    kwargs.update({'status':'200'})
+    kwargs.update({'allow':'GET'})
+    kwargs.update({'content_type':'application/json'})
+    kwargs.update({'endpoints': get_api_endpoint_names()})
+    kwargs.update({'current_endpoint': sys._getframe().f_code.co_name.split('_')[-1]})
+    kwargs.update({'api_version':sys._getframe().f_code.co_name.split('_')[1]})
+    cleanJSON = '{"welcome_message":"This part of the API isn\'t working yet", "help":"A help message similar to the -h console command will be here at some point"}'
+    if 'json' in request.GET: return HttpResponse(cleanJSON, content_type="application/json")        
+    else: return HttpResponse(render_to_response('api/api_main.html', kwargs, RequestContext(request)))    
+    
+def api_v1_blogposts(request, **kwargs):
+    #Setup API vars
+    kwargs.update({'endpoint':request.get_full_path()})
+    kwargs.update({'status':'200'})
+    kwargs.update({'allow':'GET'})
+    kwargs.update({'content_type':'application/json'})
+    kwargs.update({'endpoints': get_api_endpoint_names()})
+    kwargs.update({'current_endpoint': sys._getframe().f_code.co_name.split('_')[-1]})
+    kwargs.update({'api_version':sys._getframe().f_code.co_name.split('_')[1]})
+    try:
+        post = BlogPost.objects.get(pk=kwargs['blogpost_id'])
+        serialized = post.serialize_to_dictionary()
+    except:
+        posts = BlogPost.objects.all()[:10]
+        serialized = []
+        if posts:#Force the Query Evaluation before the loop
+            for post in posts:
+                serialized.append(post.serialize_to_dictionary())
+    cleanJSON = json.dumps(serialized, cls=DjangoJSONEncoder)
+    kwargs.update({'json':cleanJSON})
+    kwargs.update({'api_endpoint':request.get_full_path()})
+    if 'json' in request.GET: 
+        response = HttpResponse(cleanJSON, content_type="application/json")
+        return response        
+    else: 
+        return HttpResponse(render_to_response('api/api_blogposts.html', kwargs, RequestContext(request)))
+    
+def api_v1_projects(request, **kwargs):
+    #Setup API vars
+    kwargs.update({'endpoint':request.get_full_path()})
+    kwargs.update({'status':'200'})
+    kwargs.update({'allow':'GET'})
+    kwargs.update({'content_type':'application/json'})
+    kwargs.update({'endpoints': get_api_endpoint_names()})
+    kwargs.update({'current_endpoint': sys._getframe().f_code.co_name.split('_')[-1]})
+    kwargs.update({'api_version':sys._getframe().f_code.co_name.split('_')[1]})
+    try:
+        project = FormProject.objects.get(pk=kwargs['project_id'])
+        serialized = project.serialize_to_dictionary()
+    except:
+        projects = FormProject.objects.all()[:10]
+        serialized = []
+        if projects:#Force the Query Evaluation before the loop
+            for project in projects:
+                serialized.append(project.serialize_to_dictionary())
+    cleanJSON = json.dumps(serialized, cls=DjangoJSONEncoder)
+    kwargs.update({'json':cleanJSON})
+    kwargs.update({'api_endpoint':request.get_full_path()})
+    if 'json' in request.GET: 
+        response = HttpResponse(cleanJSON, content_type="application/json")
+        return response        
+    else: 
+        return HttpResponse(render_to_response('api/api_projects.html', kwargs, RequestContext(request)))
+    
+def api_v1_formtypes(request, **kwargs):
+    #Setup API vars
+    kwargs.update({'endpoint':request.get_full_path()})
+    kwargs.update({'status':'200'})
+    kwargs.update({'allow':'GET'})
+    kwargs.update({'content_type':'application/json'})
+    kwargs.update({'endpoints': get_api_endpoint_names()})
+    kwargs.update({'current_endpoint': sys._getframe().f_code.co_name.split('_')[-1]})
+    kwargs.update({'api_version':sys._getframe().f_code.co_name.split('_')[1]})
+    try:
+        formtype = FormType.objects.get(pk=kwargs['formtype_id'])
+        serialized = formtype.serialize_to_dictionary()
+    except:
+        formtypes = FormType.objects.all()[:10]
+        serialized = []
+        if formtypes:#Force the Query Evaluation before the loop
+            for formtype in formtypes:
+                serialized.append(formtype.serialize_to_dictionary())
+    cleanJSON = json.dumps(serialized, cls=DjangoJSONEncoder)
+    kwargs.update({'json':cleanJSON})
+    kwargs.update({'api_endpoint':request.get_full_path()})
+    if 'json' in request.GET: 
+        response = HttpResponse(cleanJSON, content_type="application/json")
+        return response        
+    else: 
+        return HttpResponse(render_to_response('api/api_formtypes.html', kwargs, RequestContext(request)))
+
+def api_v1_forms(request, **kwargs):
+    #Setup API vars
+    kwargs.update({'endpoint':request.get_full_path()})
+    kwargs.update({'status':'200'})
+    kwargs.update({'allow':'GET'})
+    kwargs.update({'content_type':'application/json'})
+    kwargs.update({'endpoints': get_api_endpoint_names()})
+    kwargs.update({'current_endpoint': sys._getframe().f_code.co_name.split('_')[-1]})
+    kwargs.update({'api_version':sys._getframe().f_code.co_name.split('_')[1]})
+    if 'form_id' in kwargs:
+        try:
+            form = Form.objects.get(pk=kwargs['form_id'], is_public=True, flagged_for_deletion=False)
+            serialized = form.serialize_to_dictionary()
+        except:
+            serialized = {"status":"404", "message":"Resource not found in database"}
+            kwargs['status'] = '404'        
+    else:
+        try:
+            forms = Form.objects.all().filter(is_public=True, flagged_for_deletion=False)[:10]
+            serialized = []
+            if forms:#Force the Query Evaluation before the loop
+                for form in forms:
+                    serialized.append(form.serialize_to_dictionary())
+        except:
+            serialized = {"status":"404", "message":"Resource not found in database"}
+            kwargs['status'] = '404'    
+            
+    #Sort the dictionary
+    #serialized = sorted(serialized, key=lambda k: k['name'], reverse=True) 
+    cleanJSON = json.dumps(serialized, cls=DjangoJSONEncoder)
+    kwargs.update({'json':cleanJSON})
+    kwargs.update({'api_endpoint':request.get_full_path()})
+    
+    if 'json' in request.GET: 
+        response = HttpResponse(cleanJSON, content_type="application/json")
+        return response        
+    else: 
+        return HttpResponse(render_to_response('api/api_forms.html', kwargs, RequestContext(request)))
+    
+def api_v1_webpages(request, **kwargs):
+    #Setup API vars
+    kwargs.update({'endpoint':request.get_full_path()})
+    kwargs.update({'status':'200'})
+    kwargs.update({'allow':'GET'})
+    kwargs.update({'content_type':'application/json'})
+    kwargs.update({'endpoints': get_api_endpoint_names()})
+    kwargs.update({'current_endpoint': sys._getframe().f_code.co_name.split('_')[-1]})
+    kwargs.update({'api_version':sys._getframe().f_code.co_name.split('_')[1]})
+    try:
+        webpage = Webpage.objects.get(pk=kwargs['webpage_id'], flagged_for_deletion=False)
+        serialized = webpage.serialize_to_dictionary()
+    except:
+        webpages = Webpage.objects.filter(flagged_for_deletion=False)[:10]
+        serialized = []
+        if webpages:#Force the Query Evaluation before the loop
+            for webpage in webpages:
+                serialized.append(webpage.serialize_to_dictionary())
+    cleanJSON = json.dumps(serialized, cls=DjangoJSONEncoder)
+    kwargs.update({'json':cleanJSON})
+    kwargs.update({'api_endpoint':request.get_full_path()})
+    if 'json' in request.GET: 
+        response = HttpResponse(cleanJSON, content_type="application/json")
+        return response        
+    else: 
+        return HttpResponse(render_to_response('api/api_webpages.html', kwargs, RequestContext(request)))
+     

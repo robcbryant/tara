@@ -1,0 +1,53 @@
+
+
+{% extends project_override_template|default:'public_frontend/tara_base.html' %}
+
+
+{% block content %}
+<div class="main">
+{% if not project_override_template %} {% include "public_frontend/tara_subheader.html" %} {% endif %}
+
+    <div class="main-content">
+
+        <div class="latest-post">
+            
+            <div class="name">{{ blogpost.name|title }}</div>
+            <div class="date">{{ blogpost.date_created }}</div>
+            <div class="author">{{ blogpost.created_by.last_name }}, {{ blogpost.created_by.first_name }}</div>
+            <div class="image" style="background-image:url('{{blogpost.image.url}}')"></div>
+            <div class="content">{{ blogpost.content }}</div>
+            <a href="{% url 'maqluengine:blogpost' post_id=blogpost.id %}"></a>
+            <div class="other-posts">Other TARA Posts</div>
+                <div class="post-list">
+                    {% for post in blogpost_list %}
+                    <div class="recent-post">
+                        <a href="{%url 'maqluengine:blogpost' post_id=post.id %}"><div class="image" style="background-image:url('{{post.image.url}}')"></div></a>
+                        <div class="author">{{post.created_by.last_name}}, {{post.created_by.first_name}}</div>
+                        <div class="name"><a href="{%url 'maqluengine:blogpost' post_id=post.id %}">{{post.name}}</a></div>
+                        <div class="date">{{post.date_created}}</div>
+                    </div>
+                     {% endfor %}
+                </div>    
+                
+            <div class="other-posts">Other Project Posts</div>
+                <div class="post-list">
+                    {% for post in recentposts_list %}
+                    <div class="recent-post">
+                        <a href="{%url 'maqluengine:blogpost' post_id=post.id %}"><div class="image" style="background-image:url('{{post.image.url}}')"></div></a>
+                        <div class="author">{{post.created_by.last_name}}, {{post.created_by.first_name}}</div>
+                        <div class="name"><a href="{%url 'maqluengine:blogpost' post_id=post.id %}">{{post.name}}</a></div>
+                        <div class="date">{{post.date_created}}</div>
+                    </div>
+                     {% endfor %}
+                </div>   
+            
+        </div>   
+
+
+        
+    </div>
+    
+    
+
+</div>
+{% endblock %}

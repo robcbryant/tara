@@ -1,0 +1,21 @@
+{% extends "public_frontend/tara_base.html" %}
+
+
+
+{% block content %}
+<div class="main">
+
+{% include "public_frontend/tara_subheader.html" %}
+
+    <div class="main-content">
+    <div id="bulk-content">
+    {% for project in project_list %}
+        <div>
+        <p>{{project.name}}</p>
+        <p>{{project.description}}</p>
+        </div>
+    {% endfor %}
+    </div>
+    </div>
+</div>
+{% endblock %}

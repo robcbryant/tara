@@ -117,11 +117,17 @@
         $sesID = $('#sesID').val();
         var freq = 500;
         var formData = $("#find-replace-form").serializeArray();
-        console.log(formData);
+        var json = {};
+    
+        $(formData).each( function() {
+            json[this.name] = this.value || '';
+        });
+        console.log(json);
+        json = JSON.stringify(json);
         $.ajax({ 
              url   : API_URLS.save_forms_bulk,
              type  : "POST",
-             data  : formData, // data to be submitted
+             data  : {"form_data" :json}, // data to be submitted
              success : function(returnedQuery)
              {
                 console.log(returnedQuery);
