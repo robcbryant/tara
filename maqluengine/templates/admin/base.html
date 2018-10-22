@@ -93,13 +93,35 @@
     </div>
     <!-- END Content -->
         
-        <div id="footer">        
+        <div id="footer">
+    {% if user_access >= access_level %}   
             <script src="{% static 'jquery/jquery.js'  %}"></script>
             <script src="{% static 'openlayers/ol-debug.js'  %}"></script>
             <script src="{% static 'js/enki_general.js'  %}"></script>
             <script src="{% static 'bootstrap/js/bootstrap.js'  %}"></script>
             <script src="{% static 'bootstrap-select/js/bootstrap-select.js' %}"></script>
             <script src="{% static 'proj4js/proj4.js' %}"> </script>
+            <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+            <script>          
+            //GLOBAL FUNCTIONS//
+            function getAPIEndpoints(){
+                return JSON.parse('{{api_urls|safe}}');
+            }
+            //GLOBALS VARIABLES//
+            var RTYPE_LIST;
+            var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
+            var CURRENT_FORM_PK = '{{form.pk}}';
+            var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
+            var CURRENT_PROJECT_PK = '{{project.pk}}';
+            var INITIALIZATION_CODE = 2;
+            var API_URLS = getAPIEndpoints();
+            var THUMBNAIL_URI = "{{project.uri_thumbnail|safe}}"
+            var FULL_RES_URI = "{{project.uri_img|safe}}"
+            console.log(FULL_RES_URI);
+            console.log('####################################################################################################################################################################################');
+            </script>
+            {% endif %}        
+
             {% block footer %}{% endblock footer%}
         </div>
 </div>

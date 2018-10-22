@@ -712,6 +712,7 @@ class MyAdminSite(AdminSite):
                 theUser.save()
                 theUser.permissions.project = project
                 theUser.permissions.master_admin = is_master
+                theUser.permissions.access_level = 5
                 theUser.save()
                 
                 #Construct our Email
@@ -4390,6 +4391,18 @@ class MyAdminSite(AdminSite):
                             else: currentRTYPE['ref_formtype_pk'] = "None"
                             currentRTYPE['rtype'] = 'FRRT'
                             rtypeList.append(currentRTYPE)
+                        # Let's try getting all the reverse relationships, e.g. the formtypes that reference this requested formtype. E.g. If this is
+                        #   is a set of geospatial grids at a site, there might be an object formtype that contains a reference to it. Rather than add
+                        #   a reference to objects from the grids, let's look for them indirectly
+                        referencingFRRTs = FormRecordReferenceType.objects.filter(form_type_reference__pk=currentFormType.pk, flagged_for_deletion=False)
+                        for FRRT in referencingFRRTs:
+                            currentRTYPE = {}
+                            currentRTYPE['label'] = FRRT.form_type_parent.form_type_name
+                            currentRTYPE['pk'] = FRRT.pk
+                            currentRTYPE['ref_formtype_pk'] = FRRT.form_type_parent.pk
+                            currentRTYPE['rtype'] = 'BACK-FRRT'
+                            rtypeList.append(currentRTYPE)     
+                           
                     else:
                         #***RECYCLING BIN***  Make sure that the returned FRAT AND FRRTS are filtered by their deletion flags. Don't want them returned in the query
                         for FRAT in currentFormType.formrecordattributetype_set.all().filter(flagged_for_deletion=False, is_public=True):
@@ -4407,6 +4420,17 @@ class MyAdminSite(AdminSite):
                             else: currentRTYPE['ref_formtype_pk'] = "None"
                             currentRTYPE['rtype'] = 'FRRT'
                             rtypeList.append(currentRTYPE)
+                        # Let's try getting all the reverse relationships, e.g. the formtypes that reference this requested formtype. E.g. If this is
+                        #   is a set of geospatial grids at a site, there might be an object formtype that contains a reference to it. Rather than add
+                        #   a reference to objects from the grids, let's look for them indirectly
+                        referencingFRRTs = FormRecordReferenceType.objects.filter(form_type_reference__pk=currentFormType.pk, flagged_for_deletion=False)
+                        for FRRT in referencingFRRTs:
+                            currentRTYPE = {}
+                            currentRTYPE['label'] = FRRT.form_type_parent.form_type_name
+                            currentRTYPE['pk'] = FRRT.pk
+                            currentRTYPE['ref_formtype_pk'] = FRRT.form_type_parent.pk
+                            currentRTYPE['rtype'] = 'BACK-FRRT'
+                            rtypeList.append(currentRTYPE)     
                    
                     #sort our rtype list by the label
                     rtypeList = sorted(rtypeList, key=lambda k: k['label']) 
@@ -5117,7 +5141,7 @@ class MyAdminSite(AdminSite):
                                             #probably solve the complexity of looping through to grab it as it stands right now
                                             #****WE also have to check for NULL references
                                             if currentRTYPE.record_reference.all().count() > 0:
-                                                thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
+                                                thumbnailURI = currentRTYPE.record_reference.all()[0].get_ref_thumbnail()
                                             break
                             #Finally--if there aren't any relevant media types in our frrts, let's do a last second check for ANY frrts that are media types
                             #--that AREN'T in our RTYPE list
@@ -5129,7 +5153,7 @@ class MyAdminSite(AdminSite):
                                     #Just get the first one out of the list
                                     if len(currentRVAL[0].record_reference.all()) > 0:
                                         logger.info(currentRVAL[0].record_reference.all()[0].form_name)
-                                        thumbnailURI = currentRVAL[0].record_reference.all()[0].get_thumbnail_type()
+                                        thumbnailURI = currentRVAL[0].record_reference.all()[0].get_ref_thumbnail()
                                         
 
                         formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])                                       
@@ -5350,8 +5374,10 @@ class MyAdminSite(AdminSite):
                             logging.info("TimerD"+ " : " + str(time.clock()))
                             
                             #get the deep values
-                            deepRTYPE, deepPK = currentJSONQuery['RTYPE-DEEP'].split('-')
-                            
+                            try:
+                                deepRTYPE, deepPK = currentJSONQuery['RTYPE-DEEP'].split('-')
+                            except:
+                                deepRTYPE, deepPK = "FORMID",rtypePK
                             for term in currentJSONQuery['TERMS']:
                                 #==========================================================================================================================================================================================
                                 # IF WE ARE JUST LOOKING UP THE RTYPE FORM ID
@@ -5713,6 +5739,7 @@ class MyAdminSite(AdminSite):
                             else:
                                 #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
                                 thumbnailURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
+                                testURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
                                 for record in rowList:            
                                     #if it's a reference
                                     if record[1] == 'frrv' or record[1] == 'frrv-ext':
@@ -5721,15 +5748,18 @@ class MyAdminSite(AdminSite):
                                         if currentRTYPE.record_reference_type.form_type_reference != None:
                                             #If its a reference to a media type
                                             if currentRTYPE.record_reference_type.form_type_reference.type == 1:
-                                                logger.info( "WE GOT A MATCH")
+                                                logger.info( "WE GOT A MATCH------------ " )
+                                                logger.info(record)
                                                 #Because a form record reference value is a ManyToMany relationship, we just grab the first one in the list
                                                 #TODO this may need to be edited later--because you can't order the selections. I may add another ForeignKey called
                                                 #"Thumbnail Reference" which links to a single relation to a form of a media type--this would also
                                                 #probably solve the complexity of looping through to grab it as it stands right now
                                                 #****WE also have to check for NULL references
                                                 if currentRTYPE.record_reference.all().count() > 0:
-                                                    thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
-                                                break
+                                                    thumbnailURI = currentRTYPE.record_reference.all()[0].get_ref_thumbnail()
+                                                if thumbnailURI != testURI: 
+                                                    break
+                                                
                                         
                             #we only want the first 5 values from the final ordered list of attributes
                             rowList = rowList[0:5]
@@ -6037,13 +6067,13 @@ class MyAdminSite(AdminSite):
                                             elif term['QCODE'] == CS_CONTAINS: newQuery = queriedForms.filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
                                             elif term['QCODE'] == EXACT_MATCH: newQuery = queriedForms.filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
                                             elif term['QCODE'] == EXCLUDES: newQuery = queriedForms.exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
-                                            elif term['QCODE'] == IS_NULL: newQuery = queriedForms.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK) | (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=rtypePK))#IS_NULL        
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)
+                                            elif term['QCODE'] == IS_NULL: newQuery = queriedForms.filter(Q(formrecordattributevalue__record_value__isnull=True) | Q(formrecordattributevalue__record_value__iexact="") |  Q(formrecordattributevalue__record_value__iexact=" "), formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL        
+                                            logger.info(masterQuery.query)
+                                            logger.info(newQuery.query)
                                             #save stats and query
                                             term['count'] =  newQuery.count()
                                             termStats.append(term)
-                                            masterQuery = (newQuery & masterQuery)
+                                            masterQuery = masterQuery.filter(id__in=newQuery)
                                             singleQueryStats['intersections'] = masterQuery.count()
                                         else:#Otherwise it's an OR statement
                                             #Now let's figure out the QCODE, e.g. contains, match exact etc.
@@ -6051,9 +6081,7 @@ class MyAdminSite(AdminSite):
                                             elif term['QCODE'] == CS_CONTAINS: newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#ICONTAINS                                   
                                             elif term['QCODE'] == EXACT_MATCH: newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#MATCHES EXACT                                    
                                             elif term['QCODE'] == EXCLUDES: newQuery = (queryFormtype.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#EXCLUDES                                   
-                                            elif term['QCODE'] == IS_NULL: newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)) | (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=rtypePK))#IS_NULL 
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)
+                                            elif term['QCODE'] == IS_NULL: newQuery = (queryFormtype.form_set.all().filter(Q(formrecordattributevalue__record_value__isnull=True) | Q(formrecordattributevalue__record_value__iexact="") | Q(formrecordattributevalue__record_value__iexact=" "), formrecordattributevalue__record_attribute_type__pk=rtypePK))#IS_NULL 
                                             #save stats and query
                                             term['count'] =  newQuery.count()
                                             termStats.append(term)
@@ -6101,13 +6129,13 @@ class MyAdminSite(AdminSite):
                                                 elif term['QCODE'] == CS_CONTAINS: newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK) #ICONTAINS                                   
                                                 elif term['QCODE'] == EXACT_MATCH: newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__exact=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
                                                 elif term['QCODE'] == EXCLUDES: newQuery = queriedForms.exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
-                                                elif term['QCODE'] == IS_NULL: newQuery = queriedForms.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK)#IS_NULL        
+                                                elif term['QCODE'] == IS_NULL: newQuery = queriedForms.filter( Q(ref_to_parent_form__record_reference__isnull=True) | Q(ref_to_parent_form__record_reference__form_name__iexact="") | Q(ref_to_parent_form__record_reference__form_name__exact=" "), ref_to_parent_form__record_reference_type__pk=rtypePK)#IS_NULL        
                                                 #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
                                                 newQuery = newQuery.filter(flagged_for_deletion=False)
                                                 #save stats and query
                                                 term['count'] =  newQuery.count()
                                                 termStats.append(term)
-                                                masterQuery = (newQuery & masterQuery)
+                                                masterQuery = masterQuery.filter(id__in=newQuery)
                                                 singleQueryStats['intersections'] = masterQuery.count()
                                             else:#Otherwise it's an OR statement
                                                 #Now let's figure out the QCODE, e.g. contains, match exact etc.
@@ -6115,7 +6143,7 @@ class MyAdminSite(AdminSite):
                                                 elif term['QCODE'] == CS_CONTAINS: newQuery = (queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#ICONTAINS                                   
                                                 elif term['QCODE'] == EXACT_MATCH: newQuery = (queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__form_name__exact=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#MATCHES EXACT                                    
                                                 elif term['QCODE'] == EXCLUDES: newQuery = (queryFormtype.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK))#EXCLUDES                                   
-                                                elif term['QCODE'] == IS_NULL: newQuery = (queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK))#IS_NULL 
+                                                elif term['QCODE'] == IS_NULL: newQuery = (queryFormtype.form_set.all().filter(Q(ref_to_parent_form__record_reference__isnull=True) | Q(ref_to_parent_form__record_reference__form_name__iexact="") | Q(ref_to_parent_form__record_reference__form_name__iexact=" "), ref_to_parent_form__record_reference_type__pk=rtypePK))#IS_NULL 
                                                 #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
                                                 newQuery = newQuery.filter(flagged_for_deletion=False)
                                                 #save stats and query
@@ -6156,14 +6184,15 @@ class MyAdminSite(AdminSite):
                                                     flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
                                                     newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                 elif term['QCODE'] == IS_NULL: 
-                                                    flattenedSet = list(   (deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK) | deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=deepPK) ).values_list('pk', flat=True)) #IS EMPTY    
+                                                    flattenedSet = deepFormType.form_set.all().filter( Q(formrecordattributevalue__record_value__isnull=True) | Q(formrecordattributevalue__record_value__iexact="") | Q(formrecordattributevalue__record_value__iexact=" "), formrecordattributevalue__record_attribute_type__pk=deepPK)
+                                                    flattenedSet = list( (flattenedSet).values_list('pk', flat=True) )
                                                     newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                 #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
                                                 newQuery = newQuery.filter(flagged_for_deletion=False)
                                                 #save stats and query
                                                 term['count'] =  newQuery.count()
                                                 termStats.append(term)
-                                                masterQuery = (newQuery & masterQuery)
+                                                masterQuery = masterQuery.filter(id__in=newQuery)
                                                 singleQueryStats['intersections'] = masterQuery.count()
                                             #--------------------------------------------------------
                                             # OR STATEMENT FOR a --TERM--
@@ -6182,14 +6211,14 @@ class MyAdminSite(AdminSite):
                                                     flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
                                                     newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                 elif term['QCODE'] == IS_NULL: 
-                                                    flattenedSet = list(   (deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK) | deepFormType.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=deepPK) ).values_list('pk', flat=True)) #IS EMPTY  
+                                                    flattenedSet = list(deepFormType.form_set.all().filter(Q(formrecordattributevalue__record_value__isnull=True) | Q(formrecordattributevalue__record_value__iexact="") | Q(formrecordattributevalue__record_value__iexact=" "), formrecordattributevalue__record_attribute_type__pk=deepPK ).values_list('pk', flat=True) )#IS EMPTY  
                                                     newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                 #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
                                                 newQuery = newQuery.filter(flagged_for_deletion=False)
                                                 #save stats and query
                                                 term['count'] =  newQuery.count()
                                                 termStats.append(term)
-                                                masterQuery = (newQuery | masterQuery)
+                                                masterQuery = masterQuery | newQuery
                                                 singleQueryStats['additions'] = masterQuery.count()                    
                                     #==========================================================================================================================================================================================
                                     # IF WE ARE LOOKING UP THE RELATION'S FRRT(Only form ID allowed)
@@ -6225,14 +6254,14 @@ class MyAdminSite(AdminSite):
                                                     flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=deepPK).values_list('pk', flat=True)) #EXCLUDES   
                                                     newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                 elif term['QCODE'] == IS_NULL: 
-                                                    flattenedSet = list(   (  deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True, ref_to_parent_form__record_reference_type__pk=deepPK) |  deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__iexact="", ref_to_parent_form__record_reference_type__pk=deepPK)    ).values_list('pk', flat=True)    ) #IS NULL  
+                                                    flattenedSet = list(   (  deepFormType.form_set.all().filter(Q(ref_to_parent_form__record_reference__form_name__isnull=True) | Q(ref_to_parent_form__record_reference__form_name__iexact="") | Q(ref_to_parent_form__record_reference__form_name__iexact=" "), ref_to_parent_form__record_reference_type__pk=deepPK) ).values_list('pk', flat=True)    ) #IS NULL  
                                                     newQuery = queriedForms.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                 #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
                                                 newQuery = newQuery.filter(flagged_for_deletion=False)
                                                 #save stats and query
                                                 term['count'] =  newQuery.count()
                                                 termStats.append(term)
-                                                masterQuery = (newQuery & masterQuery)
+                                                masterQuery = masterQuery.filter(id__in=newQuery)
                                                 singleQueryStats['intersections'] = masterQuery.count()
                                             #--------------------------------------------------------
                                             # OR STATEMENT FOR a --TERM--
@@ -6251,7 +6280,7 @@ class MyAdminSite(AdminSite):
                                                     flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=deepPK).values_list('pk', flat=True)) #EXCLUDES 
                                                     newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                 elif term['QCODE'] == IS_NULL: 
-                                                    flattenedSet = list(   (  deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True, ref_to_parent_form__record_reference_type__pk=deepPK) |  deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__iexact="", ref_to_parent_form__record_reference_type__pk=deepPK)    ).values_list('pk', flat=True)    ) #IS NULL  
+                                                    flattenedSet = list(  deepFormType.form_set.all().filter(Q(ref_to_parent_form__record_reference__form_name__isnull=True) | Q(ref_to_parent_form__record_reference__form_name__iexact="") | Q(ref_to_parent_form__record_reference__form_name__iexact=" "), ref_to_parent_form__record_reference_type__pk=deepPK).values_list('pk', flat=True)    ) #IS NULL  
                                                     newQuery = queryFormtype.form_set.all().filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                 #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
                                                 newQuery = newQuery.filter(flagged_for_deletion=False)
@@ -6286,13 +6315,13 @@ class MyAdminSite(AdminSite):
                                                 elif term['QCODE'] == CS_CONTAINS: newQuery = queriedForms.filter(form_name__contains=term['TVAL']) #ICONTAINS                                   
                                                 elif term['QCODE'] == EXACT_MATCH: newQuery = queriedForms.filter(form_name__exact=term['TVAL'])#MATCHES EXACT                                    
                                                 elif term['QCODE'] == EXCLUDES: newQuery = queriedForms.exclude(form_name__contains=term['TVAL'])#EXCLUDES                                   
-                                                elif term['QCODE'] == IS_NULL: newQuery = queriedForms.filter(form_name__isnull=True) #IS_NULL        
+                                                elif term['QCODE'] == IS_NULL: newQuery = queriedForms.filter(Q(form_name__isnull=True) | Q(form_name__ixact="") | Q(form_name__ixact=" ")) #IS_NULL        
                                                 #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
                                                 newQuery = newQuery.filter(flagged_for_deletion=False)
                                                 #save stats and query
                                                 term['count'] =  newQuery.count()
                                                 termStats.append(term)
-                                                masterQuery = (newQuery & masterQuery)
+                                                masterQuery = masterQuery.filter(id__in=newQuery)
                                                 singleQueryStats['intersections'] = masterQuery.count()
                                             else:#Otherwise it's an OR statement
                                                 #Now let's figure out the QCODE, e.g. contains, match exact etc.
@@ -6300,7 +6329,7 @@ class MyAdminSite(AdminSite):
                                                 elif term['QCODE'] == CS_CONTAINS: newQuery = (queryFormtype.form_set.all().filter(form_name__contains=term['TVAL']))#ICONTAINS                                   
                                                 elif term['QCODE'] == EXACT_MATCH: newQuery = (queryFormtype.form_set.all().filter(form_name__exact=term['TVAL']))#MATCHES EXACT                                    
                                                 elif term['QCODE'] == EXCLUDES: newQuery = (queryFormtype.form_set.all().exclude(form_name__contains=term['TVAL']))#EXCLUDES                                   
-                                                elif term['QCODE'] == IS_NULL: newQuery = (queryFormtype.form_set.all().filter(form_name__isnull=True))#IS_NULL 
+                                                elif term['QCODE'] == IS_NULL: newQuery = (queryFormtype.form_set.all().filter(Q(form_name__isnull=True) | Q(form_name__ixact="") | Q(form_name__ixact=" ")))#IS_NULL 
                                                 #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
                                                 newQuery = newQuery.filter(flagged_for_deletion=False)    
                                                 #save stats and query
@@ -6387,14 +6416,14 @@ class MyAdminSite(AdminSite):
                                                 elif constraint['QCODE'] == CS_CONTAINS: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__contains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
                                                 elif constraint['QCODE'] == EXACT_MATCH: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__exact=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
                                                 elif constraint['QCODE'] == EXCLUDES: constraintQuery = newQuery.exclude(formrecordattributevalue__record_value__contains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
-                                                elif constraint['QCODE'] == IS_NULL: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL       
+                                                elif constraint['QCODE'] == IS_NULL: constraintQuery = newQuery.filter(Q(formrecordattributevalue__record_value__isnull=True) | Q(formrecordattributevalue__record_value__iexact="") | Q(formrecordattributevalue__record_value__iexact=" "), formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL       
                                                 logging.info("TimerZ END" + "-- : " + str(time.clock()))  
                                             elif rtype == 'FORMID':
                                                 if   constraint['QCODE'] == CONTAINS: constraintQuery = newQuery.filter(form_name__icontains=P_TVAL) #CONTAINS    
                                                 elif constraint['QCODE'] == CS_CONTAINS: constraintQuery = newQuery.filter(form_name__contains=P_TVAL) #ICONTAINS                                   
                                                 elif constraint['QCODE'] == EXACT_MATCH: constraintQuery = newQuery.filter(form_name__exact=P_TVAL)#MATCHES EXACT                                    
                                                 elif constraint['QCODE'] == EXCLUDES: constraintQuery = newQuery.exclude(form_name__contains=P_TVAL)#EXCLUDES                                   
-                                                elif constraint['QCODE'] == IS_NULL: constraintQuery = newQuery.filter(form_name__isnull=True) #IS_NULL          
+                                                elif constraint['QCODE'] == IS_NULL: constraintQuery = newQuery.filter(Q(form_name__isnull=True) | Q(form_name__iexact="") | Q(form_name__iexact=" ")) #IS_NULL          
                                             elif rtype == 'FRRT':
                                                 deepFormType = FormType.objects.filter(pk=FormRecordReferenceType.objects.get(pk=rtypePK).form_type_reference.pk)
                                                 #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
@@ -6408,7 +6437,7 @@ class MyAdminSite(AdminSite):
                                                     elif constraint['QCODE'] == CS_CONTAINS: constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__form_name__contains=P_TVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#ICONTAINS                                   
                                                     elif constraint['QCODE'] == EXACT_MATCH: constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__form_name__exact=P_TVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
                                                     elif constraint['QCODE'] == EXCLUDES: constraintQuery = newQuery.exclude(ref_to_parent_form__record_reference__form_name__contains=P_TVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
-                                                    elif constraint['QCODE'] == IS_NULL: constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK).count()#IS_NULL                                           
+                                                    elif constraint['QCODE'] == IS_NULL: constraintQuery = newQuery.filter(Q(ref_to_parent_form__record_reference__isnull=True) | Q(ref_to_parent_form__record_reference__form_name__iexact="") | Q(ref_to_parent_form__record_reference__form_name__iexact=" "), ref_to_parent_form__record_reference_type__pk=rtypePK).count()#IS_NULL                                           
                                                 elif deepRTYPE == 'FRRT':
                                                     rtypeLabel = FormRecordReferenceType.objects.get(pk=deepPK).record_type
                                                     if   constraint['QCODE'] == CONTAINS: 
@@ -6424,7 +6453,7 @@ class MyAdminSite(AdminSite):
                                                         flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=P_TVAL).values_list('pk', flat=True)) #ICONTAINS    
                                                         constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                     elif constraint['QCODE'] == IS_NULL: 
-                                                        flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True).values_list('pk', flat=True)) #ICONTAINS    
+                                                        flattenedSet = list(deepFormType.form_set.all().filter(Q(ref_to_parent_form__record_reference__form_name__isnull=True) | Q(ref_to_parent_form__record_reference__form_name__iexact="") | Q(ref_to_parent_form__record_reference__form_name__iexact=" ") ).values_list('pk', flat=True)) #ICONTAINS    
                                                         constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
                                                 elif deepRTYPE == 'FRAT':
                                                     rtypeLabel = FormRecordAttributeType.objects.get(pk=deepPK).record_type
@@ -6441,7 +6470,7 @@ class MyAdminSite(AdminSite):
                                                         flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
                                                         constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                     elif constraint['QCODE'] == IS_NULL: 
-                                                        flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                        flattenedSet = list(deepFormType.form_set.all().filter( Q(formrecordattributevalue__record_value__isnull=True) | Q(formrecordattributevalue__record_value__iexact="") | Q(formrecordattributevalue__record_value__iexact=" "), formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
                                                         constraintQuery = newQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
 
                                             #***RECYCLING BIN*** Make sure our NEW Constraints query is always filtered by recycling bin flags
@@ -6510,13 +6539,13 @@ class MyAdminSite(AdminSite):
                                                             elif secondaryConstraint['QCODE'] == CS_CONTAINS: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__contains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
                                                             elif secondaryConstraint['QCODE'] == EXACT_MATCH: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__exact=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
                                                             elif secondaryConstraint['QCODE'] == EXCLUDES: secondaryConstraintQuery = constraintQuery.exclude(formrecordattributevalue__record_value__contains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
-                                                            elif secondaryConstraint['QCODE'] == IS_NULL: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL      
+                                                            elif secondaryConstraint['QCODE'] == IS_NULL: secondaryConstraintQuery = constraintQuery.filter(Q(formrecordattributevalue__record_value__isnull=True) | Q(formrecordattributevalue__record_value__iexact="") | Q(formrecordattributevalue__record_value__iexact=" "), formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL      
                                                         elif rtype == 'FORMID':
                                                             if   secondaryConstraint['QCODE'] == CONTAINS: secondaryConstraintQuery = constraintQuery.filter(form_name__icontains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK) #CONTAINS    
                                                             elif secondaryConstraint['QCODE'] == CS_CONTAINS: secondaryConstraintQuery = constraintQuery.filter(form_name__contains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK) #ICONTAINS                                   
                                                             elif secondaryConstraint['QCODE'] == EXACT_MATCH: secondaryConstraintQuery = constraintQuery.filter(form_name__exact=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
                                                             elif secondaryConstraint['QCODE'] == EXCLUDES: secondaryConstraintQuery = constraintQuery.exclude(form_name__icontains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
-                                                            elif secondaryConstraint['QCODE'] == IS_NULL: secondaryConstraintQuery = constraintQuery.filter(form_name__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK) #IS_NULL       
+                                                            elif secondaryConstraint['QCODE'] == IS_NULL: secondaryConstraintQuery = constraintQuery.filter( Q(form_name__isnull=True) | Q(form_name__iexact="") | Q(form_name__iexact=" "), ref_to_parent_form__record_reference_type__pk=rtypePK) #IS_NULL       
                                                         elif rtype == 'FRRT':
                                                             deepFormType = FormType.objects.filter(pk=FormRecordReferenceType.objects.get(pk=rtypePK).form_type_parent.pk)
                                                             #***RECYCLING BIN*** Make sure our this Deep query FormType is always filtered by recycling bin flags
@@ -6530,7 +6559,7 @@ class MyAdminSite(AdminSite):
                                                                 elif secondaryConstraint['QCODE'] == CS_CONTAINS: secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__form_name__contains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#ICONTAINS                                   
                                                                 elif secondaryConstraint['QCODE'] == EXACT_MATCH: secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__form_name__exact=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
                                                                 elif secondaryConstraint['QCODE'] == EXCLUDES: secondaryConstraintQuery = constraintQuery.exclude(ref_to_parent_form__record_reference__form_name__contains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
-                                                                elif secondaryConstraint['QCODE'] == IS_NULL: secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK)#IS_NULL                                                
+                                                                elif secondaryConstraint['QCODE'] == IS_NULL: secondaryConstraintQuery = constraintQuery.filter( Q(ref_to_parent_form__record_reference__isnull=True) | Q(ref_to_parent_form__record_reference__form_name__iexact="") | Q(ref_to_parent_form__record_reference__form_name__iexact=" "), ref_to_parent_form__record_reference_type__pk=rtypePK)#IS_NULL                                                
                                                                 logging.info("TimerKK END" + "-- : " + str(time.clock()))   
                                                             elif deepRTYPE == 'FRRT':  
                                                                 rtypeTwoLabel = FormRecordReferenceType.objects.get(pk=deepPK).record_type
@@ -6547,7 +6576,7 @@ class MyAdminSite(AdminSite):
                                                                     flattenedSet = list(deepFormType.form_set.all().exclude(ref_to_parent_form__record_reference__form_name__contains=secondaryTVAL).values_list('pk', flat=True)) #ICONTAINS    
                                                                     secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                                 elif secondaryConstraint['QCODE'] == IS_NULL: 
-                                                                    flattenedSet = list(deepFormType.form_set.all().filter(ref_to_parent_form__record_reference__form_name__isnull=True).values_list('pk', flat=True)) #ICONTAINS    
+                                                                    flattenedSet = list(deepFormType.form_set.all().filter( Q(ref_to_parent_form__record_reference__form_name__isnull=True) | Q(ref_to_parent_form__record_reference__form_name__iexact="") | Q(ref_to_parent_form__record_reference__form_name__iexact=" ")  ).values_list('pk', flat=True)) #ICONTAINS    
                                                                     secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet) 
                                                             elif deepRTYPE == 'FRAT':
                                                                 rtypeTwoLabel = FormRecordAttributeType.objects.get(pk=deepPK).record_type
@@ -6564,7 +6593,7 @@ class MyAdminSite(AdminSite):
                                                                     flattenedSet = list(deepFormType.form_set.all().exclude(formrecordattributevalue__record_value__contains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
                                                                     secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                                 elif secondaryConstraint['QCODE'] == IS_NULL: 
-                                                                    flattenedSet = list(deepFormType.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
+                                                                    flattenedSet = list(deepFormType.form_set.all().filter( Q(formrecordattributevalue__record_value__isnull=True) | Q(formrecordattributevalue__record_value__iexact="") | Q(formrecordattributevalue__record_value__iexact=" ") , formrecordattributevalue__record_attribute_type__pk=deepPK).values_list('pk', flat=True)) #CONTAINS    
                                                                     secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__pk__in=flattenedSet)
                                                        #***RECYCLING BIN*** Make sure our NEW Constraints query is always filtered by recycling bin flags
                                                         constraintQuery = constraintQuery.filter(flagged_for_deletion=False)                             
@@ -6659,7 +6688,10 @@ class MyAdminSite(AdminSite):
                             progressData.jsonString=json.dumps(progressDataMessage)
                             progressData.save()                        
                             #CACHE -- This cache's the query before looping through it
+                            logger.info("BEFORE CACHING QUERY/EVALUATING")
+                            logger.info(masterQuery.query)
                             if masterQuery:
+                                logger.info("AFTER CACHEING QUERY/EVALUATING")
                                 formCounter = 0 
                                 for aForm in masterQuery:
                                     progressDataMessage['message'] = "Running through forms and converting to a usable format for navigation"
@@ -6687,10 +6719,10 @@ class MyAdminSite(AdminSite):
                                                 newFRAV.save()
                                                 rowList.append((rtype[0],'frav',newFRAV.record_value, newFRAV.pk))
                                         else:
-                                            logger.info( aForm.ref_to_parent_form.all().count())
-                                            logger.info( aForm.pk)
-                                            for frrt in aForm.ref_to_parent_form.all():
-                                                logger.info( "" + str(frrt.pk))
+                                            #logger.info( aForm.ref_to_parent_form.all().count())
+                                            #logger.info( aForm.pk)
+                                            #for frrt in aForm.ref_to_parent_form.all():
+                                            #    logger.info( "" + str(frrt.pk))
                                             formRVAL = aForm.ref_to_parent_form.all().filter(record_reference_type__pk=rtype[2])
                                             if formRVAL.exists():
                                                 formRVAL = formRVAL[0]
@@ -6724,7 +6756,7 @@ class MyAdminSite(AdminSite):
                                     if aForm.form_type.type == 1:
                                         thumbnailURI = aForm.get_thumbnail_type()
                                     else:
-                                        logger.info("LOOKING FOR A FRRT")
+                                        #logger.info("LOOKING FOR A FRRT")
                                         #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
                                         thumbnailURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
                                         for record in rowList:            
@@ -6735,26 +6767,26 @@ class MyAdminSite(AdminSite):
                                                 if currentRTYPE.record_reference_type.form_type_reference != None:
                                                     #If its a reference to a media type
                                                     if currentRTYPE.record_reference_type.form_type_reference.type == 1:
-                                                        logger.info( "WE GOT A MATCH")
+                                                        #logger.info( "WE GOT A MATCH")
                                                         #Because a form record reference value is a ManyToMany relationship, we just grab the first one in the list
                                                         #TODO this may need to be edited later--because you can't order the selections. I may add another ForeignKey called
                                                         #"Thumbnail Reference" which links to a single relation to a form of a media type--this would also
                                                         #probably solve the complexity of looping through to grab it as it stands right now
                                                         #****WE also have to check for NULL references
                                                         if currentRTYPE.record_reference.all().count() > 0:
-                                                            thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
+                                                            thumbnailURI = currentRTYPE.record_reference.all()[0].get_ref_thumbnail()
                                                         break
                                         #Finally--if there aren't any relevant media types in our frrts, let's do a last second check for ANY frrts that are media types
                                         #--that AREN'T in our RTYPE list
                                         if thumbnailURI == staticfiles_storage.url("/site-images/no-thumb-missing.png"):
-                                            logger.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    We're TRYING TO GET A THUMBNAIL")
+                                            #logger.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    We're TRYING TO GET A THUMBNAIL")
                                             currentRVAL = aForm.ref_to_parent_form.filter(record_reference_type__form_type_reference__type=1)
-                                            logger.info(currentRVAL)
+                                            #logger.info(currentRVAL)
                                             if currentRVAL.exists():
                                                 #Just get the first one out of the list
                                                 if len(currentRVAL[0].record_reference.all()) > 0:
-                                                    logger.info(currentRVAL[0].record_reference.all()[0].form_name)
-                                                    thumbnailURI = currentRVAL[0].record_reference.all()[0].get_thumbnail_type()
+                                                    #logger.info(currentRVAL[0].record_reference.all()[0].form_name)
+                                                    thumbnailURI = currentRVAL[0].record_reference.all()[0].get_ref_thumbnail()
                                                     
                                     formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])   
                                     formCounter += 1
@@ -6889,7 +6921,7 @@ class MyAdminSite(AdminSite):
             if request.method == 'POST':         
                 currentForm = Form.objects.get(pk=request.POST['form_pk'])
                 #$$$ SECURITY $$$ Make sure form is in the same project space as the user or refuse the request for the list
-                if currentForm.project.pk == request.user.permissions.project.pk:
+                if currentForm.project.pk == request.user.permissions.project.pk or (currentForm.is_public and currentForm.flagged_for_deletion == False):
                     jsonData = {}
                     rtype_list = []
                     jsonData['rtype_list'] = rtype_list
@@ -6903,7 +6935,9 @@ class MyAdminSite(AdminSite):
                     frrv_list = currentForm.ref_to_parent_form.all().filter(flagged_for_deletion=False)
                     
                     #Let's try and grab our backward referencing forms now.
+                    back_frrv_list = None
                     back_frrv_list = currentForm.ref_to_value_form.all().filter(flagged_for_deletion=False)
+                    if back_frrv_list.count() > 100: back_frrv_list = None
                     
                     
                     #If Statement forces evaluation of the query set before the loop
@@ -6922,7 +6956,9 @@ class MyAdminSite(AdminSite):
                             
                     #If Statement forces evaluation of the query set before the loop
                     if frrv_list:
-                        logger.info(frrv_list)
+
+                        
+                        
                         for FRRV in frrv_list:
                             currentRTYPE = {}
                             rvalList = []
@@ -6966,26 +7002,28 @@ class MyAdminSite(AdminSite):
                     #If Statement forces evaluation of the query set before the loop
                     if back_frrv_list:
                         logger.info(back_frrv_list)
+                        flattened_list = back_frrv_list.values('form_parent__pk','form_parent__form_name','form_parent__form_type__pk','form_parent__pk','form_parent__form_type__form_type_name',)
                         formTypeList = {}
-                        for FRRV in back_frrv_list:
+                        for FRRV in flattened_list:
+                            logger.info(FRRV)
                             #Create Our RVAL
                             newRVAL = {}
-                            newRVAL['form_pk'] = FRRV.form_parent.pk
-                            newRVAL['form_name'] = FRRV.form_parent.form_name
-                            newRVAL['thumbnail'] = FRRV.form_parent.get_ref_thumbnail()
-                            newRVAL['url'] =  reverse('maqlu_admin:edit_form',kwargs={'project_pk': request.user.permissions.project.pk, 'form_type_pk':FRRV.form_parent.form_type.pk, 'form_pk': FRRV.form_parent.pk})
+                            newRVAL['form_pk'] = FRRV['form_parent__pk']
+                            newRVAL['form_name'] = FRRV['form_parent__form_name']
+                            newRVAL['thumbnail'] = staticfiles_storage.url("/site-images/no-thumb-file.png") 
+                            newRVAL['url'] =  reverse('maqlu_admin:edit_form',kwargs={'project_pk': request.user.permissions.project.pk, 'form_type_pk':FRRV['form_parent__form_type__pk'], 'form_pk': FRRV['form_parent__pk']})
                             #create Our Back FRRT RTYPE dictionary entry
                             #We only need to create it once--if it already exists, then just add the rval to its existing list 
-                            if FRRV.form_parent.form_type.pk in formTypeList:
-                                formTypeList[FRRV.form_parent.form_type.pk]['rval'].append(newRVAL)
+                            if FRRV['form_parent__form_type__pk'] in formTypeList:
+                                formTypeList[FRRV['form_parent__form_type__pk']]['rval'].append(newRVAL)
                             else:
                                 formRef = {}
                                 formRef['rtype'] = "BACK_FRRT"
-                                formRef['formtype_name'] = FRRV.form_parent.form_type.form_type_name
-                                formRef['formtype_pk'] = FRRV.form_parent.form_type.pk
+                                formRef['formtype_name'] = FRRV['form_parent__form_type__form_type_name']
+                                formRef['formtype_pk'] = FRRV['form_parent__pk']
                                 formRef['rval'] = []
                                 formRef['rval'].append(newRVAL)
-                                formTypeList[FRRV.form_parent.form_type.pk] = formRef
+                                formTypeList[FRRV['form_parent__form_type__pk']] = formRef
                         #Now add it to the format in our rtype_list    
                         for key in formTypeList:
                             rtype_list.append(formTypeList[key])                    

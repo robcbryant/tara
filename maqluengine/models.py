@@ -120,7 +120,7 @@ class FormProject(models.Model):
     #-----------------------------
     # Restrictive Access variables
     is_public = models.BooleanField(default=False)
-    
+
     #----------------------------
     # Read-only Variables
     date_created = models.DateTimeField(auto_now = False, auto_now_add = True,blank=True, null=True)
@@ -197,7 +197,20 @@ class FormProject(models.Model):
         menu_list += "</div>"
         return menu_list
 
-
+    def get_homepage_id(self):
+        #Will grab the flagged homepage from the available pages
+        #If there isn't a flagged homepage, it will just grab the first one it finds in a generic query
+        homepage = self.webpage_set.filter(is_homepage=True, flagged_for_deletion=False)
+        try:
+            homepage = homepage[0]
+        except:
+            homepage = self.webpage_set.filter(flagged_for_deletion=False)
+            if homepage.count() > 0:
+                homepage = homepage[0]
+            else:
+                return -1        
+        return homepage.pk
+        
         
 class FormTypeGroup(models.Model):
     name = models.CharField(max_length=50, blank=True, null=True)
@@ -386,7 +399,7 @@ class Form(models.Model):
     
     #-----------------------------
     # Restrictive Access variables
-    is_public = models.BooleanField(default=False)
+    is_public = models.BooleanField(default=False, null=False, blank=False)
     project = models.ForeignKey(FormProject, on_delete=models.CASCADE)
     
     #----------------------------
@@ -428,7 +441,16 @@ class Form(models.Model):
            return self.get_thumbnail_type()
         else:
            #offer a default to "NO PREVIEW" if not found
-           return staticfiles_storage.url("/site-images/no-thumb-missing.png")
+            thumbnail = staticfiles_storage.url("/site-images/no-thumb-file.png") 
+            frrvs = self.ref_to_parent_form.filter(record_reference_type__form_type_reference__media_type=1)
+            logger.info(frrvs)
+            if frrvs:
+                logger.info(frrvs[0].record_reference)
+                if frrvs[0].record_reference.all().count() > 0:
+                    thumbnail = frrvs[0].record_reference.all()[0].get_thumbnail_type()  
+                    logger.info(thumbnail)
+            return thumbnail
+            
         
     
     def get_hierarchy_label(self):
@@ -454,9 +476,8 @@ class Form(models.Model):
                 return self.form_type.project.uri_thumbnail + self.form_type.uri_prefix + self.form_name  + self.form_type.file_extension  
             else:
                 return self.form_type.project.uri_thumbnail + self.form_name + self.form_type.file_extension  
-        else: #Other File Type
-            return staticfiles_storage.url("/site-images/no-thumb-file.png")   
-            
+        else: #Other File Type so let's look for references
+            return staticfiles_storage.url("/site-images/no-thumb-file.png") 
     def save(self, *args, **kwargs):
         #This save() override makes sure that every form has the same project as its formtype
         #   UUID: This function additionally creates the unique index value for sorting. Because we can't
@@ -546,6 +567,7 @@ class FormRecordAttributeValue(models.Model):
     #----------------------------
     # Recycling Bin Flag
     flagged_for_deletion = models.BooleanField(default=False, null=False, blank=False)
+    is_public = models.BooleanField(default=False, null=False, blank=False)
         
     def __str__(self):
         if self.record_value is not None:
@@ -598,6 +620,7 @@ class FormRecordReferenceValue(models.Model):
     #----------------------------
     # Recycling Bin Flag
     flagged_for_deletion = models.BooleanField(default=False, null=False, blank=False)
+    is_public = models.BooleanField(default=False, null=False, blank=False)
             
     def save(self, *args, **kwargs):
         self.project = self.form_parent.project
@@ -733,6 +756,9 @@ class Webpage(models.Model):
     #----------------------------
     # Recycling Bin Flag
     flagged_for_deletion = models.BooleanField(default=False, null=False, blank=False)
+    is_public = models.BooleanField(default=True, null=False, blank=False)
+    is_homepage = models.BooleanField(default=False, null=False, blank=False)
+    
     
     def __str__(self):
         return self.name   

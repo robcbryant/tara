@@ -2403,14 +2403,13 @@ padding-left: 5%;
     display: inline-flex;
     width: 100%;
     overflow-x: hidden;
-    height: 65px;
+    height: 40px;
     margin-bottom: 2%;
 }
 
 .widget-FRRT div.frrv-list div.frrv-container img{
     float: left;
     height: 100%;
-    width: 68px; 
     padding: 8px;
 }
     
@@ -3085,6 +3084,7 @@ This 'should' all be related to the form-type template engine
     border-radius: 24px 24px 4px 4px;
     padding: 4px 0px 0px 28px;
     margin: 0px 0px 10px 0px;
+    display: flex;
 }
 
 #master-query-engine .main-query-frame {
@@ -3598,18 +3598,16 @@ This 'should' all be related to the form-type template engine
 
 
 #master-query-engine .search-title .tool-label{
-    float: left;
-    width: 50%;    
+    flex: 2;
 }
 
 #master-query-engine .search-title .user-query-management {
-    font-size: .3em;
+font-size: .3em;
     color: black;
-    width: 50%;
-    float: left;
+    flex: 1;
     padding-top: 1%;
     padding-right: 1%;
-    text-align: right;    
+    text-align: right; 
 }
 
 #master-query-engine .search-title .user-query-management .save-query{
@@ -5678,8 +5676,64 @@ button.btn.save-palette-button {
 
 
 
+#back-rtypes {
+    height: 10em;
+    overflow-y: scroll;
+    background: #074572;
+    border: 3px solid #0057b9;
+    border-radius: 20px 20px 18px 18px;
+}
 
+#back-rtypes .back-title {
+    color: white;
+    text-align: center;
+    font-size: 2em;
+    font-weight: bold;
+}
 
+#back-rtypes .details-frrt{
+    margin-top: 0%;
+    font-size: 1em;
+    font-weight: bold;
+    width: 100%;
+    background: #2eb2ff;
+    color: white;
+    border-radius: 16px;
+    padding: .5em .5em .5em 0.5em;
+}
+
+#back-rtypes .details-frrt .header{
+    text-align: center;
+    text-align-last: center;
+    font-weight: bold;
+    margin-bottom: 3%;
+}
+
+#back-rtypes .details-frrt .frrt-list{
+    font-size: 1em;
+}
+
+#back-rtypes  .details-frrt .frrt-entry{
+    border: 2px solid #5959c7;
+    border-radius: 20px;
+    padding: 1%;
+    padding-left: 4%;
+    background: #0057b9;
+    color: white;
+    margin-bottom: 2%;
+}
+
+#back-rtypes  .details-frrt .frrt-entry img{
+    height: 2em;
+    width: 2em;  
+    border-radius: 16px;    
+}
+
+#back-rtypes  .details-frrt .frrt-entry a{
+    font-size: 1em;
+    font-weight: bold;
+    color: white;       
+}
 
 
 /*   BLOG MANAGER */
