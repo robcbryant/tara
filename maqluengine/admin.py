@@ -712,6 +712,7 @@ class MyAdminSite(AdminSite):
                 theUser.save()
                 theUser.permissions.project = project
                 theUser.permissions.master_admin = is_master
+                theUser.permissions.access_level = 5
                 theUser.save()
                 
                 #Construct our Email
@@ -5117,7 +5118,7 @@ class MyAdminSite(AdminSite):
                                             #probably solve the complexity of looping through to grab it as it stands right now
                                             #****WE also have to check for NULL references
                                             if currentRTYPE.record_reference.all().count() > 0:
-                                                thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
+                                                thumbnailURI = currentRTYPE.record_reference.all()[0].get_ref_thumbnail()
                                             break
                             #Finally--if there aren't any relevant media types in our frrts, let's do a last second check for ANY frrts that are media types
                             #--that AREN'T in our RTYPE list
@@ -5129,7 +5130,7 @@ class MyAdminSite(AdminSite):
                                     #Just get the first one out of the list
                                     if len(currentRVAL[0].record_reference.all()) > 0:
                                         logger.info(currentRVAL[0].record_reference.all()[0].form_name)
-                                        thumbnailURI = currentRVAL[0].record_reference.all()[0].get_thumbnail_type()
+                                        thumbnailURI = currentRVAL[0].record_reference.all()[0].get_ref_thumbnail()
                                         
 
                         formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])                                       
@@ -5350,8 +5351,10 @@ class MyAdminSite(AdminSite):
                             logging.info("TimerD"+ " : " + str(time.clock()))
                             
                             #get the deep values
-                            deepRTYPE, deepPK = currentJSONQuery['RTYPE-DEEP'].split('-')
-                            
+                            try:
+                                deepRTYPE, deepPK = currentJSONQuery['RTYPE-DEEP'].split('-')
+                            except:
+                                deepRTYPE, deepPK = "FORMID",rtypePK
                             for term in currentJSONQuery['TERMS']:
                                 #==========================================================================================================================================================================================
                                 # IF WE ARE JUST LOOKING UP THE RTYPE FORM ID
@@ -5713,6 +5716,7 @@ class MyAdminSite(AdminSite):
                             else:
                                 #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
                                 thumbnailURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
+                                testURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
                                 for record in rowList:            
                                     #if it's a reference
                                     if record[1] == 'frrv' or record[1] == 'frrv-ext':
@@ -5721,15 +5725,18 @@ class MyAdminSite(AdminSite):
                                         if currentRTYPE.record_reference_type.form_type_reference != None:
                                             #If its a reference to a media type
                                             if currentRTYPE.record_reference_type.form_type_reference.type == 1:
-                                                logger.info( "WE GOT A MATCH")
+                                                logger.info( "WE GOT A MATCH------------ " )
+                                                logger.info(record)
                                                 #Because a form record reference value is a ManyToMany relationship, we just grab the first one in the list
                                                 #TODO this may need to be edited later--because you can't order the selections. I may add another ForeignKey called
                                                 #"Thumbnail Reference" which links to a single relation to a form of a media type--this would also
                                                 #probably solve the complexity of looping through to grab it as it stands right now
                                                 #****WE also have to check for NULL references
                                                 if currentRTYPE.record_reference.all().count() > 0:
-                                                    thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
-                                                break
+                                                    thumbnailURI = currentRTYPE.record_reference.all()[0].get_ref_thumbnail()
+                                                if thumbnailURI != testURI: 
+                                                    break
+                                                
                                         
                             #we only want the first 5 values from the final ordered list of attributes
                             rowList = rowList[0:5]
@@ -6038,8 +6045,8 @@ class MyAdminSite(AdminSite):
                                             elif term['QCODE'] == EXACT_MATCH: newQuery = queriedForms.filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
                                             elif term['QCODE'] == EXCLUDES: newQuery = queriedForms.exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
                                             elif term['QCODE'] == IS_NULL: newQuery = queriedForms.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK) | (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=rtypePK))#IS_NULL        
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)
+                                            logger.info(masterQuery.query)
+                                            logger.info(newQuery.query)
                                             #save stats and query
                                             term['count'] =  newQuery.count()
                                             termStats.append(term)
@@ -6052,8 +6059,6 @@ class MyAdminSite(AdminSite):
                                             elif term['QCODE'] == EXACT_MATCH: newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#MATCHES EXACT                                    
                                             elif term['QCODE'] == EXCLUDES: newQuery = (queryFormtype.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#EXCLUDES                                   
                                             elif term['QCODE'] == IS_NULL: newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)) | (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=rtypePK))#IS_NULL 
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)
                                             #save stats and query
                                             term['count'] =  newQuery.count()
                                             termStats.append(term)
@@ -6659,7 +6664,10 @@ class MyAdminSite(AdminSite):
                             progressData.jsonString=json.dumps(progressDataMessage)
                             progressData.save()                        
                             #CACHE -- This cache's the query before looping through it
+                            logger.info("BEFORE CACHING QUERY/EVALUATING")
+                            logger.info(masterQuery.query)
                             if masterQuery:
+                                logger.info("AFTER CACHEING QUERY/EVALUATING")
                                 formCounter = 0 
                                 for aForm in masterQuery:
                                     progressDataMessage['message'] = "Running through forms and converting to a usable format for navigation"
@@ -6687,10 +6695,10 @@ class MyAdminSite(AdminSite):
                                                 newFRAV.save()
                                                 rowList.append((rtype[0],'frav',newFRAV.record_value, newFRAV.pk))
                                         else:
-                                            logger.info( aForm.ref_to_parent_form.all().count())
-                                            logger.info( aForm.pk)
-                                            for frrt in aForm.ref_to_parent_form.all():
-                                                logger.info( "" + str(frrt.pk))
+                                            #logger.info( aForm.ref_to_parent_form.all().count())
+                                            #logger.info( aForm.pk)
+                                            #for frrt in aForm.ref_to_parent_form.all():
+                                            #    logger.info( "" + str(frrt.pk))
                                             formRVAL = aForm.ref_to_parent_form.all().filter(record_reference_type__pk=rtype[2])
                                             if formRVAL.exists():
                                                 formRVAL = formRVAL[0]
@@ -6724,7 +6732,7 @@ class MyAdminSite(AdminSite):
                                     if aForm.form_type.type == 1:
                                         thumbnailURI = aForm.get_thumbnail_type()
                                     else:
-                                        logger.info("LOOKING FOR A FRRT")
+                                        #logger.info("LOOKING FOR A FRRT")
                                         #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
                                         thumbnailURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
                                         for record in rowList:            
@@ -6735,26 +6743,26 @@ class MyAdminSite(AdminSite):
                                                 if currentRTYPE.record_reference_type.form_type_reference != None:
                                                     #If its a reference to a media type
                                                     if currentRTYPE.record_reference_type.form_type_reference.type == 1:
-                                                        logger.info( "WE GOT A MATCH")
+                                                        #logger.info( "WE GOT A MATCH")
                                                         #Because a form record reference value is a ManyToMany relationship, we just grab the first one in the list
                                                         #TODO this may need to be edited later--because you can't order the selections. I may add another ForeignKey called
                                                         #"Thumbnail Reference" which links to a single relation to a form of a media type--this would also
                                                         #probably solve the complexity of looping through to grab it as it stands right now
                                                         #****WE also have to check for NULL references
                                                         if currentRTYPE.record_reference.all().count() > 0:
-                                                            thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
+                                                            thumbnailURI = currentRTYPE.record_reference.all()[0].get_ref_thumbnail()
                                                         break
                                         #Finally--if there aren't any relevant media types in our frrts, let's do a last second check for ANY frrts that are media types
                                         #--that AREN'T in our RTYPE list
                                         if thumbnailURI == staticfiles_storage.url("/site-images/no-thumb-missing.png"):
-                                            logger.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    We're TRYING TO GET A THUMBNAIL")
+                                            #logger.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    We're TRYING TO GET A THUMBNAIL")
                                             currentRVAL = aForm.ref_to_parent_form.filter(record_reference_type__form_type_reference__type=1)
-                                            logger.info(currentRVAL)
+                                            #logger.info(currentRVAL)
                                             if currentRVAL.exists():
                                                 #Just get the first one out of the list
                                                 if len(currentRVAL[0].record_reference.all()) > 0:
-                                                    logger.info(currentRVAL[0].record_reference.all()[0].form_name)
-                                                    thumbnailURI = currentRVAL[0].record_reference.all()[0].get_thumbnail_type()
+                                                    #logger.info(currentRVAL[0].record_reference.all()[0].form_name)
+                                                    thumbnailURI = currentRVAL[0].record_reference.all()[0].get_ref_thumbnail()
                                                     
                                     formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])   
                                     formCounter += 1
@@ -6889,7 +6897,7 @@ class MyAdminSite(AdminSite):
             if request.method == 'POST':         
                 currentForm = Form.objects.get(pk=request.POST['form_pk'])
                 #$$$ SECURITY $$$ Make sure form is in the same project space as the user or refuse the request for the list
-                if currentForm.project.pk == request.user.permissions.project.pk:
+                if currentForm.project.pk == request.user.permissions.project.pk or (currentForm.is_public and currentForm.flagged_for_deletion == False):
                     jsonData = {}
                     rtype_list = []
                     jsonData['rtype_list'] = rtype_list
@@ -6903,7 +6911,9 @@ class MyAdminSite(AdminSite):
                     frrv_list = currentForm.ref_to_parent_form.all().filter(flagged_for_deletion=False)
                     
                     #Let's try and grab our backward referencing forms now.
+                    back_frrv_list = None
                     back_frrv_list = currentForm.ref_to_value_form.all().filter(flagged_for_deletion=False)
+                    if back_frrv_list.count() > 100: back_frrv_list = None
                     
                     
                     #If Statement forces evaluation of the query set before the loop
@@ -6922,7 +6932,9 @@ class MyAdminSite(AdminSite):
                             
                     #If Statement forces evaluation of the query set before the loop
                     if frrv_list:
-                        logger.info(frrv_list)
+
+                        
+                        
                         for FRRV in frrv_list:
                             currentRTYPE = {}
                             rvalList = []
@@ -6966,26 +6978,28 @@ class MyAdminSite(AdminSite):
                     #If Statement forces evaluation of the query set before the loop
                     if back_frrv_list:
                         logger.info(back_frrv_list)
+                        flattened_list = back_frrv_list.values('form_parent__pk','form_parent__form_name','form_parent__form_type__pk','form_parent__pk','form_parent__form_type__form_type_name',)
                         formTypeList = {}
-                        for FRRV in back_frrv_list:
+                        for FRRV in flattened_list:
+                            logger.info(FRRV)
                             #Create Our RVAL
                             newRVAL = {}
-                            newRVAL['form_pk'] = FRRV.form_parent.pk
-                            newRVAL['form_name'] = FRRV.form_parent.form_name
-                            newRVAL['thumbnail'] = FRRV.form_parent.get_ref_thumbnail()
-                            newRVAL['url'] =  reverse('maqlu_admin:edit_form',kwargs={'project_pk': request.user.permissions.project.pk, 'form_type_pk':FRRV.form_parent.form_type.pk, 'form_pk': FRRV.form_parent.pk})
+                            newRVAL['form_pk'] = FRRV['form_parent__pk']
+                            newRVAL['form_name'] = FRRV['form_parent__form_name']
+                            newRVAL['thumbnail'] = staticfiles_storage.url("/site-images/no-thumb-file.png") 
+                            newRVAL['url'] =  reverse('maqlu_admin:edit_form',kwargs={'project_pk': request.user.permissions.project.pk, 'form_type_pk':FRRV['form_parent__form_type__pk'], 'form_pk': FRRV['form_parent__pk']})
                             #create Our Back FRRT RTYPE dictionary entry
                             #We only need to create it once--if it already exists, then just add the rval to its existing list 
-                            if FRRV.form_parent.form_type.pk in formTypeList:
-                                formTypeList[FRRV.form_parent.form_type.pk]['rval'].append(newRVAL)
+                            if FRRV['form_parent__form_type__pk'] in formTypeList:
+                                formTypeList[FRRV['form_parent__form_type__pk']]['rval'].append(newRVAL)
                             else:
                                 formRef = {}
                                 formRef['rtype'] = "BACK_FRRT"
-                                formRef['formtype_name'] = FRRV.form_parent.form_type.form_type_name
-                                formRef['formtype_pk'] = FRRV.form_parent.form_type.pk
+                                formRef['formtype_name'] = FRRV['form_parent__form_type__form_type_name']
+                                formRef['formtype_pk'] = FRRV['form_parent__pk']
                                 formRef['rval'] = []
                                 formRef['rval'].append(newRVAL)
-                                formTypeList[FRRV.form_parent.form_type.pk] = formRef
+                                formTypeList[FRRV['form_parent__form_type__pk']] = formRef
                         #Now add it to the format in our rtype_list    
                         for key in formTypeList:
                             rtype_list.append(formTypeList[key])                    

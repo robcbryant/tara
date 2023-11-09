@@ -10,12 +10,34 @@
     <div class="main-content">
     <div id="bulk-content">
     {% for project in project_list %}
-        <div>
-        <p>{{project.name}}</p>
-        <p>{{project.description}}</p>
-        </div>
+        <a href="{% url 'maqluengine:webpage' webpage_id=project.get_homepage_id %}" class="project">
+            <p class="title">{{project.name}}</p>
+            <p class="description">{{project.description}}</p>
+        </a>
     {% endfor %}
     </div>
     </div>
 </div>
+{% endblock %}
+
+
+{% block footer %}
+<script>
+
+$('#bulk-content a.project').hover( 
+    function(){
+        $(this).find('p').addClass('hovering');
+    },
+    function(){
+        $(this).find('p').removeClass('hovering');    
+    }
+);
+
+</script>
+
+
+
+
+
+
 {% endblock %}

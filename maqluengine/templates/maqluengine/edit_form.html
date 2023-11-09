@@ -29,7 +29,7 @@
 
                 {% if user_access >= access_level %}{% csrf_token %}{% endif %}
                 <div id="nav-container">
-                    <div class="spacer"></div>
+                    <!--<div class="spacer"></div>-->
                     <div id="form-navigation">
                     
                         <div class="span-container"><a id="previous-form-link"><span class="glyphicon glyphicon-backward"></span></a></div>
@@ -39,7 +39,7 @@
                         </div>
                         <div class="span-container"><a id="next-form-link"><span class="glyphicon glyphicon-forward"></span></a></div>
                     </div>
-                    <div class="spacer"> 
+                    <!-- <div class="spacer"> -->
                     
                     {% if user_access >= access_level %}
                     <div class="btn-group btn-group-sm save-delete-buttons" role="group">
@@ -50,7 +50,7 @@
                     </div>  
                    {% endif %} 
                        
-                    </div>
+                    <!--</div>-->
                 </div>
                 <input type="submit" autocomplete="off" hidden/>    
              </form>
@@ -66,29 +66,8 @@
               
                     <div class="">
                         <div class="row header-container">
-                            <div class="col-md-6">
-                             {% if formtype.media_type == 3 %}
-                                <div id="three-viewer">
-                                    <a id="three-viewer-link" title="{% static 'Temp Files/untitled.jpg'  %}" href="{% static 'Temp Files/untitled.obj'  %}">Download Link</a>
-                                </div>
-                                
-                                <script src="{% static 'three/three.min.js'  %}"></script>
-                                <script src="{% static 'three/js/loaders/OBJLoader.js'  %}"></script>
-                                <script src="{% static 'three/js/controls/OrbitControls.js'  %}"></script>
-                                <script src="{% static 'three/js/Detector.js'  %}"></script>
-                                <script src="{% static 'three/js/libs/stats.min.js'  %}"></script>
-                                <script src="{% static 'js/enki_3dviewer.js'  %}"></script> 
-                                
-                             {% else %}
-                                <div id="geospatial" style="min-height:400px;">
-                                    <!--geospatial stuff goes here-->
-                                    <div id="gis-help-text-box" class="col-md-12"></div>
-                                    <div style="display:none;"><strong>GeoJSON Data</strong></div>
-                                    <div style="display:none;"><textarea id="id_geojson_string" name ="form_geojson_string">{{form.form_geojson_string}}</textarea></div>
-                                </div>
-                             {%endif%}
-                            </div>
-                                                      
+                        
+                        
                             <!-- FormType Name Entry for Editing-->
                             <div id="form-properties" class="col-md-6">
                                 <div id="form-info" class="panel">
@@ -136,8 +115,39 @@
                                             </div>
                                         {% endif %}
                                     </div>
+                                    <div id="back-rtypes">
+                                        <div class="back-title">Backward References</div>
+                                    </div>
                                 </div>   
+                            </div>                        
+                        
+                        
+                        
+                        
+                            <div class="col-md-6">
+                             {% if formtype.media_type == 3 %}
+                                <div id="three-viewer">
+                                    <a id="three-viewer-link" title="{% static 'Temp Files/untitled.jpg'  %}" href="{% static 'Temp Files/untitled.obj'  %}">Download Link</a>
+                                </div>
+                                
+                                <script src="{% static 'three/three.min.js'  %}"></script>
+                                <script src="{% static 'three/js/loaders/OBJLoader.js'  %}"></script>
+                                <script src="{% static 'three/js/controls/OrbitControls.js'  %}"></script>
+                                <script src="{% static 'three/js/Detector.js'  %}"></script>
+                                <script src="{% static 'three/js/libs/stats.min.js'  %}"></script>
+                                <script src="{% static 'js/enki_3dviewer.js'  %}"></script> 
+                                
+                             {% else %}
+                                <div id="geospatial" style="min-height:400px;">
+                                    <!--geospatial stuff goes here-->
+                                    <div id="gis-help-text-box" class="col-md-12"></div>
+                                    <div style="display:none;"><strong>GeoJSON Data</strong></div>
+                                    <div style="display:none;"><textarea id="id_geojson_string" name ="form_geojson_string">{{form.form_geojson_string}}</textarea></div>
+                                </div>
+                             {%endif%}
                             </div>
+                                                      
+
                     
                         </div>
                     </div>
@@ -227,7 +237,13 @@
                     <div class="frrv-container image-view-item"><input name="" value="" hidden></input><div class="frrv-label"><a href="">Label</a></div><img class="enki-img-popup" src=""></img><button class="btn btn-danger" type="button" onclick="removeReferenceFromFRRV(this)"><span class="glyphicon glyphicon-remove"></span></button></div>
     </div>
     
-    
+     <div class="details-frrt TEMPLATE" style="display:none;">
+        <div class="header"></div>
+        <div class="frrt-list">
+            
+        </div>
+
+    </div>   
     
     <select id="geo-bglayer-select" style="display:none; width: 40%; float:right;">
         <option value="none">No Background Layer</option>
@@ -272,10 +288,7 @@
     }
     //GLOBALS VARIABLES//
     var RTYPE_LIST;
-    var CURRENT_TEMPLATE = '{{formtype.template_json|escapejs}}';
-    var CURRENT_FORM_PK = '{{form.pk}}';
-    var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
-    var CURRENT_PROJECT_PK = '{{project.pk}}';
+
     var INITIALIZATION_CODE = 2;
     var API_URLS = getAPIEndpoints();
     </script>

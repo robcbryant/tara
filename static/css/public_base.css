@@ -110,21 +110,26 @@ font-size: 1.12em;
     top: 30px;
 }
 
-#header .menu div{
-    color: white;
-    flex: 1;
-    font-size: 1.2em;
-    font-weight: bold;
-    height: 30px;
-    top: 4px;
-    position: relative;
-    text-transform: lowercase;
-    font-family: "Arial", sans-serif;
-    letter-spacing: -1px;
-        margin-right: 3%;
+#header .page-list {
+    display: flex;
+    flex-direction: column;
+    background: #0057b9;
+    padding: 10%;
+    border-radius: 0px 0px 8px 8px;
+    border: 3px solid #00a1ff;
+    border-top: 0px;
 }
 
-#header .menu a{
+#header .menu .menu-container .active-title {
+    color:#00a1ff;
+}
+
+#header .menu .menu-container a {
+    padding-bottom: 8%;
+        font-size: 1em;
+}
+
+#header .menu a, #header .menu-container{
     color: white;
     flex: 1;
     font-size: 1.2em;
@@ -268,18 +273,31 @@ font-size: 1.12em;
     height: 15px;
 }
 
-#main .main {
-    display: flex;
-    flex-direction: column;
-    width: 80%;
-    margin-top: 2%;
-    margin-left: 3%;
+
+#main {
+    position:relative;
 }
-#main #sub-header {
+
+#main .main {
+display: flex;
+    flex-direction: column;
+    width: 70%;
+    height: 97%;
+    margin-top: 1%;
+    position: absolute;
+    left: 27%;
+}
+#sub-header {
         width: 100%;
     height: 29px;
     display: flex;
     background: #00a1ff;
+}
+
+
+.main-content .formtype-label {
+    font-size: 2em;
+    font-weight: bold;
 }
 
 #main #sub-header .geospatial-engine{
@@ -366,7 +384,6 @@ font-size: 1.12em;
 
 
 .main-content {
-    padding: 3% 2% 10% 2%;
     height: 100%;
     background: #000000c2;
     color: white;
@@ -500,7 +517,7 @@ border-top: 3px solid white;
     margin-top: 8%;
     padding-top: 1%;
     margin-bottom: 2%;
-        font-size: 1.5em;
+    font-size: 1.5em;
     font-weight: bold;
 }
 
@@ -512,6 +529,7 @@ border-top: 3px solid white;
     background: #0085e5;
     height: fit-content;
     border-radius: 0px 0px 12px 0px;
+    margin-right: 2%;
 }
 
 .form-type-group-title {
@@ -532,4 +550,315 @@ border-top: 3px solid white;
     background: #0057b9;
     font-weight: bold;
     letter-spacing: -1px;
+}
+
+.main-content .title {
+    font-weight: bold;
+    font-size: 2em;
+}
+
+.embedded-html {
+    padding: 5%;
+}
+
+#header-tools {
+    height: 4%;
+    background: #5959c7;
+    margin: 1% 2% 0% 2%;
+    width: 96%;
+    border: 6px solid #5959c7;
+    border-bottom: 0;
+    border-radius: 20px 20px 0px 0px;
+    display: flex;
+}
+
+
+#form-list {
+width: 96%;
+    overflow: scroll;
+    background: rgba(0, 87, 185, 0.51);
+    margin: 0% 2% 0% 2%;
+    border: 6px solid #5959c7;
+    border-radius: 0px 0px 8px 8px;
+    height: 87%;
+}
+
+#form-list table {
+    border-collapse: collapse;
+    border-spacing: 0;
+}
+
+#form-list table tr:nth-child(1) {
+    background: #0057b9;
+}
+
+#form-list tr:nth-child(even) td.values {
+    background: rgba(0, 87, 185, 0.52);
+}
+
+#form-list td.values {
+    border: 2px solid #0057b9;
+    padding: 6px 0px 6px 0px;
+}
+
+#form-list td.values img {
+    width: 20%;
+}
+.enki-img-popup {
+    cursor: url(/static/enki/zoom-cursor.png), auto;
+}
+
+.IMG-POPUP {
+    cursor: url(/static/enki/zoomout-cursor.png), auto;
+}
+#form-list td.header {
+    min-width: 15em;
+    font-weight: bold;
+}
+
+#form-list td.header.preview {
+    min-width: 5em;
+}
+
+#form-list td.values.big-cell {
+    min-width: 70em;
+    text-align: left;
+    padding-left: 11px;
+}
+
+#form-list td a {
+    color: #25f6a7;
+    font-weight: bold;
+    font-size: 1.2em;
+    border: 1px solid #44caa3;
+    border-radius: 4px;
+    padding: 0px 10px 0px 10px;
+}
+#form-list td a:hover {
+    background: #00a1ff;
+    color: white;
+}
+
+
+#branding #sub-header {
+width: 60%;
+    height: 100%;
+    display: flex;
+    background: #000000;
+    float: left;
+}
+
+#branding #sub-header .geospatial-engine{
+    flex:1;
+    border-left: 4px solid #00a1ff;
+    border-radius: 0px 0px 0px 24px;
+}
+
+#branding #sub-header .query-engine{
+    flex: 1;
+    border-right: 4px solid #00a1ff;
+    border-left: 4px solid #00a1ff;
+}
+
+#branding #sub-header .browse{
+    flex: 1;
+    border-right: 4px solid #00a1ff;
+    border-radius: 0px 0px 24px 0px;
+}
+
+#branding #sub-header a:hover {
+    background: #5959c7;
+    border-radius: 0px 0px 24px 24px;
+}
+
+#branding #sub-header a {
+    display: flex;
+}
+
+#branding #sub-header  span {
+    color: white;
+    font-size: 1em;
+    display: flex;
+    font-weight: bold;
+    margin: 0 auto;
+}
+
+#branding #sub-header  span div:nth-child(2) {
+    letter-spacing: -3px;
+    font-size: .8em;
+    line-height: 1.3em;
+    margin-right: 1%;
+}
+
+#branding #sub-header  span div:nth-child(3) {
+    letter-spacing: -3px;
+    font-weight: bold;
+    font-family: arial;
+    line-height: 1.05em;
+}
+
+#branding #sub-header  span div:nth-child(4) {
+    letter-spacing: -3px;
+    margin-left: 4%;
+    font-size: .8em;
+    line-height: 1.3em;
+}
+#branding #sub-header .icon {
+    width: 22px;
+    height: 50%;
+    background-size: cover;
+    border: 2px solid white;
+    border-radius: 12px;
+    margin: 0 auto;
+    margin-top: 1px;
+}
+#branding #sub-header .geospatial-engine .icon {
+    background-image: url(/static/site-images/ki_gis_icon.png);
+}
+
+#branding #sub-header .query-engine .icon {
+    background-image: url(/static/site-images/murgu_query_icon.png);
+}
+
+#branding #sub-header .info .browse .icon {
+    background-image: url(/static/site-images/sa_browse_icon.png);
+}
+
+
+
+.pagination {
+    flex: 5;
+    display: flex;
+    font-size: .8em;
+}
+
+.search {
+    flex: 1;
+    position:relative;
+}
+
+a.page-button {
+    border: 3px solid #0057b9;
+    border-radius: 8px;
+    padding: .5em;
+    font-weight: bold;
+    background: #00a1ff;
+    margin-right: 4px;
+}
+
+a.page-button.page-CONTROL {
+    background: #25f6a7;
+    border-color: #0057b9;
+    color: #0057b9;
+}
+
+a.page-button.page-CURRENT {
+    background: white;
+    color: black;
+    border-color: rgb(0, 161, 255);
+    font-size: 1.8em;
+    padding: .2em;
+    line-height: .7em;
+}
+
+a.page-button.page-EMPTY {
+    border: 0;
+    padding: 3px;
+    background: #0057b9;
+    line-height: 2em;
+}
+
+#form-quick-search-tool {
+    display: flex;
+    margin-top: 5%;
+    position: relative;
+}
+#form-quick-search-tool span {
+    border-radius: 0px 12px 12px 0px;
+    background: #0057b9;
+    padding: 1px 10px 1px 10px;
+    font-weight: bold;
+}
+
+.admin-search-list {
+    position: absolute;
+    background: white;
+    top: 20px;
+    width: 69%;
+    color: #0057b9;
+    font-weight: bold;
+}
+
+.admin-search-list a:hover{
+    border:2px solid red;
+}
+
+#form-quick-search-tool a {
+    width: 100%;
+    display: block;
+}
+
+#form-quick-search-tool  input[type="text"] {
+    width: 8em;
+}
+
+
+
+#form-view {
+    height: 94%;
+    overflow-y: scroll; 
+}
+
+#form-view .title {
+
+font-weight: bold;
+    font-size: 3em;
+    float: left;
+    padding-left: 2em;    
+    
+}
+
+#form-view .thumbnail img {
+        height: 14em;
+}
+
+#form-view table {
+    width: 100%;
+}
+
+#form-view tr {
+    background: #0057b9;
+}
+
+#form-view tr:nth-child(even) {
+    background: rgba(0,60,136,.7);
+}
+
+.img-popup-bg {
+     background-color: rgba(0, 0, 0, 0.57);
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    z-index: 90;
+}
+
+tr td:nth-child(2) {
+    padding: 6px 6px 6px 22px;
+    text-align: left;
+}
+
+tr td:nth-child(1) {
+    font-size: 1.2em;
+    font-weight: bold;
+    text-align: left;
+    padding: 5px 5px 5px 15px;
+    letter-spacing: 0px;
+}
+
+.pagination-info{
+    display:flex;
+}
+
+.pagination-info div {
+    padding: 0px 6px 0px 6px;
 }

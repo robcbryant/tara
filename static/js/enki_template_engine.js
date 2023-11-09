@@ -674,7 +674,7 @@
                     $newImageView.attr('pk', widget.id);
                     $newImageView.attr('ref_pk', widget.ref_pk);
                     //Only add the listener if we aren't editing a template
-                    if(INITIALIZATION_CODE != 0)$newImageView.find('.search-box input')[0].addEventListener("input", function(){lookForReferenceForms(this, CURRENT_PROJECT_PK, $(this).parent().parent().parent().attr('ref_pk'),CURRENT_FORMTYPE_PK)});
+                    if(INITIALIZATION_CODE != 0)$newImageView.find('.search-box input')[0].addEventListener("input", function(){lookForReferenceForms(this, CURRENT_PROJECT_PK, $(this).parent().parent().parent().attr('ref_pk'),$(this).attr('parent_rtype'))});
                     $newImageView.find('.LABEL').html(widget.label);
 
                     break;
@@ -689,7 +689,7 @@
                     $newThumbView.attr('pk', widget.id);
                     $newThumbView.attr('ref_pk', widget.ref_pk);
                     //Only add the listener if we aren't editing a template
-                    if(INITIALIZATION_CODE != 0)$newThumbView.find('.search-box input')[0].addEventListener("input", function(){lookForReferenceForms(this, CURRENT_PROJECT_PK, $(this).parent().parent().parent().attr('ref_pk'),CURRENT_FORMTYPE_PK);});
+                    if(INITIALIZATION_CODE != 0)$newThumbView.find('.search-box input')[0].addEventListener("input", function(){lookForReferenceForms(this, CURRENT_PROJECT_PK, $(this).parent().parent().parent().attr('ref_pk'),$(this).attr('parent_rtype'));});
                     $newThumbView.find('.LABEL').html(widget.label);
 
                     break;
@@ -1006,8 +1006,25 @@
     
     function loadRVALSIntoWidgets(rtype_list){
         for (i = 0; i < rtype_list.length; i++){
+
             currentRTYPE = rtype_list[i];
-           
+
+            if (currentRTYPE.rtype == "BACK_FRRT"){
+                console.log(currentRTYPE);
+                $parent = $('#back-rtypes');
+                
+                $newFRRT = $('.details-frrt.TEMPLATE').clone(true);
+                $newFRRT.removeClass('TEMPLATE');
+                $newFRRT.show();
+                $newFRRT.find('.header').html("References By: " + currentRTYPE.formtype_name);
+                for (var b in currentRTYPE.rval){
+                    var rval = currentRTYPE.rval[b];
+                    $newFRRT.find('.frrt-list').append("<div class='frrt-entry'><img class='enki-img-popup' src='"+rval.thumbnail+"'></img><a href='"+rval.url+"'><span>"+rval.form_name+"</span></a></div>");
+                }
+                $parent.append($newFRRT);    
+            }
+
+            
             //We have to separate between frat and frrt when looking for the PK #'s -- Why do you ask? Well because they are 2 different Django Models
             //  --with 2 different tables, they can potentially have the same PK value--especially a new project setting up stuff. Originally I used
             //  --the ID attribute of the element, but then I didn't realize the pk values are potentially not unique in this scope
@@ -1105,7 +1122,7 @@
                     //If we're editing a form we need to also load the RVALS and not just the RTYPES
                     //  --which requires a separate endpoint
                     if(INITIALIZATION_CODE == 2){
-                        var jsonData = {"form_pk" : CURRENT_FORM_PK};
+                        var jsonData = {"form_pk" : CURRENT_FORM_PK, 'no_back_refs' : "T"};
                         $.ajax({ 
                                  url   : API_URLS.get_form_rtypes,
                                  type  : "POST",
