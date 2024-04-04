@@ -20,7 +20,7 @@ import os
 from django.db import models
 from django.contrib.auth.models import User
 from django.contrib.staticfiles.storage import staticfiles_storage
-from django.contrib.staticfiles.templatetags.staticfiles import static
+from django.templatetags.static import static
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 import uuid

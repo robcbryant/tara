@@ -24,7 +24,7 @@ import sys
 from django.db.models import Q, Count, Max
 import re
 from django.contrib.contenttypes.models import ContentType
-from django.shortcuts import render_to_response
+from django.shortcuts import render
 from django.template import RequestContext
 import urllib
 from django.conf import settings
@@ -39,7 +39,7 @@ from django.urls import resolve
 from django.utils.functional import cached_property
 from django.contrib.admin import AdminSite
 from django.http import HttpResponse
-from django.conf.urls import url, include
+from django.urls import re_path, include
 from django.views import generic
 from django.http import Http404
 
@@ -49,7 +49,7 @@ from django.contrib.staticfiles.storage import staticfiles_storage
 import json
 from django.core.serializers.json import DjangoJSONEncoder
 
-from django.utils.encoding import smart_text
+#DEPRECATED  -- Probably safe to delete -- from django.utils.encoding import smart_text
 
 from django.shortcuts import redirect
 import random
@@ -671,7 +671,7 @@ def get_form_rtypes(request, **kwargs):
                 newRVAL = {}
                 newRVAL['form_pk'] = FRRV['form_parent__pk']
                 newRVAL['form_name'] = FRRV['form_parent__form_name']
-                newRVAL['thumbnail'] = staticfiles_storage.url("/site-images/no-thumb-file.png") 
+                newRVAL['thumbnail'] = staticfiles_storage.re_path("/site-images/no-thumb-file.png") 
                 newRVAL['url'] =  reverse('maqlu_admin:edit_form',kwargs={'project_pk': request.user.permissions.project.pk, 'form_type_pk':FRRV['form_parent__form_type__pk'], 'form_pk': FRRV['form_parent__pk']})
                 #create Our Back FRRT RTYPE dictionary entry
                 #We only need to create it once--if it already exists, then just add the rval to its existing list 
@@ -900,25 +900,25 @@ def navigate_master_query_pagination(request, **kwargs):
         logger.info( endIndex)
 
         masterQuery = masterQuery[startIndex:endIndex]
-        logger.info( "TIMER RR"+ " : " + str(time.clock()))
+        logger.info( "TIMER RR"+ " : " + str(time.process_time()))
         #count the query so we only make one database hit before looping(otherwise each loop would be another hit)
 
         for form_pk in masterQuery:
             aForm = Form.objects.get(pk=form_pk)
-            logger.info( "TIMER S"+ " : " + str(time.clock()))
+            logger.info( "TIMER S"+ " : " + str(time.process_time()))
             rowList = []
             #Let's loop through each item in the queryRTYPE list and match up the frav's in each queried form so the headers match the form attribute values
             for rtype in queryRTYPElist:
                 if rtype[1] == 'frat':
                     #logger.info( str(rtype[2]) + '  ' + str(aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2]).count()))
-                    logger.info( "TIMER X"+ " : " + str(time.clock()))
+                    logger.info( "TIMER X"+ " : " + str(time.process_time()))
                     formRVAL = aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2], is_public=True, flagged_for_deletion=False)
                     #We need to check for NULL FRAV's here. When a user manually creates new forms, they don't always have FRAVS created for them if they leave it blank
                     if formRVAL.exists():
                         rowList.append((rtype[0],'frav',formRVAL[0].record_value, formRVAL[0].pk))
                     else:
                         logger.info( "Whoops--something happened. There are no RVALS for 'frats' using: " + str(rtype[2]))
-                    logger.info( "TIMER Y"+ " : " + str(time.clock()))
+                    logger.info( "TIMER Y"+ " : " + str(time.process_time()))
                 else:
                     #for frrt in aForm.ref_to_parent_form.all():
                         #logger.info( "" + str(frrt.pk))
@@ -960,7 +960,7 @@ def navigate_master_query_pagination(request, **kwargs):
             else:
                 logger.info("LOOKING FOR A FRRT")
                 #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
-                thumbnailURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
+                thumbnailURI = staticfiles_storage.re_path("/site-images/no-thumb-missing.png")
                 for record in rowList:            
                     #if it's a reference
                     if record[1] == 'frrv' or record[1] == 'frrv-ext':
@@ -980,7 +980,7 @@ def navigate_master_query_pagination(request, **kwargs):
                                 break
                 #Finally--if there aren't any relevant media types in our frrts, let's do a last second check for ANY frrts that are media types
                 #--that AREN'T in our RTYPE list
-                if thumbnailURI == staticfiles_storage.url("/site-images/no-thumb-missing.png"):
+                if thumbnailURI == staticfiles_storage.re_path("/site-images/no-thumb-missing.png"):
                     logger.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    We're TRYING TO GET A THUMBNAIL")
                     currentRVAL = aForm.ref_to_parent_form.filter(record_reference_type__form_type_reference__type=1)
                     logger.info(currentRVAL)
@@ -1487,7 +1487,7 @@ def run_master_query_engine(request, **kwargs):
                             singleQueryStats['rtype'] = rtype
                             termStats = []
                             singleQueryStats['all_terms'] = termStats
-                            logging.info("TimerD"+ " : " + str(time.clock()))
+                            logging.info("TimerD"+ " : " + str(time.process_time()))
 
                             #Now begin modifying the SQL query which each term of each individual query
                             #skip the term if the field was left blank
@@ -1594,13 +1594,13 @@ def run_master_query_engine(request, **kwargs):
                                 rtypeLabel = ""
                                 logger.info(rtype + " :======RTYPE==================>  " + term['TVAL']   + "  using term: " + P_TVAL)
                                 if rtype == 'FRAT':
-                                    logging.info("TimerZ START" + " : " + str(time.clock()))
+                                    logging.info("TimerZ START" + " : " + str(time.process_time()))
                                     if   constraint['QCODE'] == CONTAINS: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__icontains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK) 
                                     elif constraint['QCODE'] == CS_CONTAINS: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__contains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
                                     elif constraint['QCODE'] == EXACT_MATCH: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__exact=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
                                     elif constraint['QCODE'] == EXCLUDES: constraintQuery = newQuery.exclude(formrecordattributevalue__record_value__contains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
                                     elif constraint['QCODE'] == IS_NULL: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL       
-                                    logging.info("TimerZ END" + "-- : " + str(time.clock()))  
+                                    logging.info("TimerZ END" + "-- : " + str(time.process_time()))  
                                 elif rtype == 'FORMID':
                                     if   constraint['QCODE'] == CONTAINS: constraintQuery = newQuery.filter(form_name__icontains=P_TVAL) #CONTAINS    
                                     elif constraint['QCODE'] == CS_CONTAINS: constraintQuery = newQuery.filter(form_name__contains=P_TVAL) #ICONTAINS                                   
@@ -1714,7 +1714,7 @@ def run_master_query_engine(request, **kwargs):
                                             rtypePK = secondaryConstraint['pk']
                                             rtypeTwoLabel = ""
                                             if rtype == 'FRAT':
-                                                logging.info("TimerKK START" + " : " + str(time.clock()))
+                                                logging.info("TimerKK START" + " : " + str(time.process_time()))
                                                 if   secondaryConstraint['QCODE'] == CONTAINS: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__icontains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)
                                                 elif secondaryConstraint['QCODE'] == CS_CONTAINS: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__contains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
                                                 elif secondaryConstraint['QCODE'] == EXACT_MATCH: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__exact=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
@@ -1740,7 +1740,7 @@ def run_master_query_engine(request, **kwargs):
                                                     elif secondaryConstraint['QCODE'] == EXACT_MATCH: secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__form_name__exact=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
                                                     elif secondaryConstraint['QCODE'] == EXCLUDES: secondaryConstraintQuery = constraintQuery.exclude(ref_to_parent_form__record_reference__form_name__contains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
                                                     elif secondaryConstraint['QCODE'] == IS_NULL: secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK)#IS_NULL                                                
-                                                    logging.info("TimerKK END" + "-- : " + str(time.clock()))   
+                                                    logging.info("TimerKK END" + "-- : " + str(time.process_time()))   
                                                 elif deepRTYPE == 'FRRT':  
                                                     rtypeTwoLabel = FormRecordReferenceType.objects.get(pk=deepPK).record_type
                                                     if   secondaryConstraint['QCODE'] == CONTAINS: 
@@ -1793,7 +1793,7 @@ def run_master_query_engine(request, **kwargs):
                                         currentConstraintCount+=1    
                                      
                                     
-                                    logging.info("TimerG"+ " : " + str(time.clock()))
+                                    logging.info("TimerG"+ " : " + str(time.process_time()))
                             currentConstraintCount+=1
                     #Increment our progressData stats counter for the term
                     #We've been modifying it in the constraints--so let's round it down before incrementing it a full step
@@ -1943,7 +1943,7 @@ def run_master_query_engine(request, **kwargs):
                         else:
                             logger.info("LOOKING FOR A FRRT")
                             #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
-                            thumbnailURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
+                            thumbnailURI = staticfiles_storage.re_path("/site-images/no-thumb-missing.png")
                             for record in rowList:            
                                 #if it's a reference
                                 if record[1] == 'frrv' or record[1] == 'frrv-ext':
@@ -1963,7 +1963,7 @@ def run_master_query_engine(request, **kwargs):
                                             break
                             #Finally--if there aren't any relevant media types in our frrts, let's do a last second check for ANY frrts that are media types
                             #--that AREN'T in our RTYPE list
-                            if thumbnailURI == staticfiles_storage.url("/site-images/no-thumb-missing.png"):
+                            if thumbnailURI == staticfiles_storage.re_path("/site-images/no-thumb-missing.png"):
                                 logger.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    We're TRYING TO GET A THUMBNAIL")
                                 currentRVAL = aForm.ref_to_parent_form.filter(record_reference_type__form_type_reference__type=1)
                                 logger.info(currentRVAL)
@@ -2101,7 +2101,7 @@ def blogpost(request, **kwargs):
     
     
     
-    return HttpResponse(render_to_response('public_frontend/blogpost.html', kwargs, RequestContext(request)))  
+    return HttpResponse(render(request, 'public_frontend/blogpost.html', kwargs, RequestContext(request)))  
     
 #=====================================================================================#
 #  PROJECT()
@@ -2118,7 +2118,7 @@ def project(request, **kwargs):
     #Now make sure it's set to public or log the attempted access to the security logs, and give the user a 404 error page
     if project.is_public:
         kwargs.update({'project':project})      
-        return HttpResponse(render_to_response('public_frontend/project.html', kwargs, RequestContext(request)))    
+        return HttpResponse(render(request, 'public_frontend/project.html', kwargs, RequestContext(request)))    
     else:
         SECURITY_log_security_issues('views.py - ' + str(sys._getframe().f_code.co_name), "PROJECT IS NOT PUBLIC", request.META)
         raise Http404("Project Does Not Exist!")  
@@ -2194,7 +2194,7 @@ def formtype(request, **kwargs):
         divs.append({"url":reverse("maqluengine:formtype", kwargs={"formtype_id":formtype.pk,"page_num":pagination['last_page']}),"class":"page-CONTROL",  "page_num":">|"})
         
         
-        return HttpResponse(render_to_response('public_frontend/formtype.html', kwargs, RequestContext(request)))
+        return HttpResponse(render(request, 'public_frontend/formtype.html', kwargs, RequestContext(request)))
     else:
         SECURITY_log_security_issues(request.user, 'views.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         return Http404("Project Does Not Exist!")   
@@ -2218,7 +2218,7 @@ def form(request, **kwargs):
         kwargs['fravs'] = form.formrecordattributevalue_set.filter(is_public=True, flagged_for_deletion=False).values('record_attribute_type__record_type','record_value')
         kwargs['frrvs'] = form.ref_to_parent_form.filter(is_public=True, flagged_for_deletion=False).values('record_reference_type__record_type','record_reference')
         logger.info("LOADING FORM AND PASSING TO TEMPLATE")
-        return HttpResponse(render_to_response('public_frontend/form.html', kwargs, RequestContext(request)))
+        return HttpResponse(render(request, 'public_frontend/form.html', kwargs, RequestContext(request)))
     else:
         SECURITY_log_security_issues(request.user, 'views.py - ' + str(sys._getframe().f_code.co_name), ERROR_MESSAGE, request.META)
         return Http404("Project Does Not Exist!")  
@@ -2239,7 +2239,7 @@ def webpage(request, **kwargs):
                 ftgs.append(formtypegroup)
         kwargs['formtypegroups'] = ftgs
         logger.info(ftgs)
-    return HttpResponse(render_to_response('public_frontend/webpage.html', kwargs, RequestContext(request)))
+    return HttpResponse(render(request, 'public_frontend/webpage.html', kwargs, RequestContext(request)))
 
      
      
@@ -2254,13 +2254,13 @@ def webpage(request, **kwargs):
 def index(request, **kwargs):
     logger.info("TESTING PROJECT TENANCY")
     logger.info(request)
-    logger.debug(render_to_response('public_frontend/index.html', kwargs, RequestContext(request)))
-    return HttpResponse(render_to_response('public_frontend/index.html', kwargs, RequestContext(request)))    
+    logger.debug(render(request, 'public_frontend/index.html', kwargs, RequestContext(request)))
+    return HttpResponse(render(request, 'public_frontend/index.html', kwargs, RequestContext(request)))    
 
 def dev_index(request, **kwargs):
     logger.info("TESTING PROJECT TENANCY")
     logger.info(request)
-    logger.debug(render_to_response('public_frontend/dev_index.html', kwargs, RequestContext(request)))
+    logger.debug(render(request, 'public_frontend/dev_index.html', kwargs, RequestContext(request)))
     
     projects = FormProject.objects.filter(is_public=True)
     blogposts = BlogPost.objects.filter(project=None).order_by('-date_created') 
@@ -2283,46 +2283,46 @@ def dev_index(request, **kwargs):
       
 def queryengine( request, **kwargs):
     kwargs['api_urls'] = get_api_endpoints()
-    return HttpResponse(render_to_response('public_frontend/queryengine.html', kwargs, RequestContext(request)))
+    return HttpResponse(render(request, 'public_frontend/queryengine.html', kwargs, RequestContext(request)))
 #=====================================================================================#
 #   GEOENGINE() 
 #=====================================================================================#       
 def geoengine( request, **kwargs):
-    return HttpResponse(render_to_response('public_frontend/geoengine.html', kwargs, RequestContext(request)))
+    return HttpResponse(render(request, 'public_frontend/geoengine.html', kwargs, RequestContext(request)))
 
 #=====================================================================================#
 #   BROWSEENGINE() 
 #=====================================================================================#       
 def browseengine(request, **kwargs):
-    return HttpResponse(render_to_response('public_frontend/browseengine.html', kwargs, RequestContext(request)))
+    return HttpResponse(render(request, 'public_frontend/browseengine.html', kwargs, RequestContext(request)))
 
         
 #=====================================================================================#
 #   FEATURES()
 #=====================================================================================#       
 def features(request, **kwargs):
-    return HttpResponse(render_to_response('public_frontend/tara_features.html', kwargs, RequestContext(request)))
+    return HttpResponse(render(request, 'public_frontend/tara_features.html', kwargs, RequestContext(request)))
 
         
 #=====================================================================================#
 #   HISTORY()
 #=====================================================================================#       
 def history(request, **kwargs):
-    return HttpResponse(render_to_response('public_frontend/tara_history.html', kwargs, RequestContext(request)))
+    return HttpResponse(render(request, 'public_frontend/tara_history.html', kwargs, RequestContext(request)))
 
         
 #=====================================================================================#
 #   DOCUMENTATION()
 #=====================================================================================#       
 def documentation(request, **kwargs):
-    return HttpResponse(render_to_response('public_frontend/tara_documentation.html', kwargs, RequestContext(request)))
+    return HttpResponse(render(request, 'public_frontend/tara_documentation.html', kwargs, RequestContext(request)))
 
         
 #=====================================================================================#
 #   CONTACT()
 #=====================================================================================#       
 def contact(request, **kwargs):
-    return HttpResponse(render_to_response('public_frontend/tara_contact.html', kwargs, RequestContext(request)))
+    return HttpResponse(render(request, 'public_frontend/tara_contact.html', kwargs, RequestContext(request)))
 
         
 #=====================================================================================#
@@ -2335,7 +2335,7 @@ def project_list(request, **kwargs):
         if project.webpage_set.filter(is_public=True).count() > 0 or project.is_public == True:
             projects.append(project)
     kwargs['project_list'] = projects
-    return HttpResponse(render_to_response('public_frontend/tara_projects.html', kwargs, RequestContext(request)))
+    return HttpResponse(render(request, 'public_frontend/tara_projects.html', kwargs, RequestContext(request)))
 
                 
      
@@ -2364,7 +2364,7 @@ def api_v1_main(request, **kwargs):
     kwargs.update({'api_version':sys._getframe().f_code.co_name.split('_')[1]})
     cleanJSON = '{"welcome_message":"This part of the API isn\'t working yet", "help":"A help message similar to the -h console command will be here at some point"}'
     if 'json' in request.GET: return HttpResponse(cleanJSON, content_type="application/json")        
-    else: return HttpResponse(render_to_response('api/api_main.html', kwargs, RequestContext(request)))    
+    else: return HttpResponse(render(request, 'api/api_main.html', kwargs, RequestContext(request)))    
     
 def api_v1_blogposts(request, **kwargs):
     #Setup API vars
@@ -2391,7 +2391,7 @@ def api_v1_blogposts(request, **kwargs):
         response = HttpResponse(cleanJSON, content_type="application/json")
         return response        
     else: 
-        return HttpResponse(render_to_response('api/api_blogposts.html', kwargs, RequestContext(request)))
+        return HttpResponse(render(request, 'api/api_blogposts.html', kwargs, RequestContext(request)))
     
 def api_v1_projects(request, **kwargs):
     #Setup API vars
@@ -2418,7 +2418,7 @@ def api_v1_projects(request, **kwargs):
         response = HttpResponse(cleanJSON, content_type="application/json")
         return response        
     else: 
-        return HttpResponse(render_to_response('api/api_projects.html', kwargs, RequestContext(request)))
+        return HttpResponse(render(request, 'api/api_projects.html', kwargs, RequestContext(request)))
     
 def api_v1_formtypes(request, **kwargs):
     #Setup API vars
@@ -2445,7 +2445,7 @@ def api_v1_formtypes(request, **kwargs):
         response = HttpResponse(cleanJSON, content_type="application/json")
         return response        
     else: 
-        return HttpResponse(render_to_response('api/api_formtypes.html', kwargs, RequestContext(request)))
+        return HttpResponse(render(request, 'api/api_formtypes.html', kwargs, RequestContext(request)))
 
 def api_v1_forms(request, **kwargs):
     #Setup API vars
@@ -2484,7 +2484,7 @@ def api_v1_forms(request, **kwargs):
         response = HttpResponse(cleanJSON, content_type="application/json")
         return response        
     else: 
-        return HttpResponse(render_to_response('api/api_forms.html', kwargs, RequestContext(request)))
+        return HttpResponse(render(request, 'api/api_forms.html', kwargs, RequestContext(request)))
     
 def api_v1_webpages(request, **kwargs):
     #Setup API vars
@@ -2511,5 +2511,5 @@ def api_v1_webpages(request, **kwargs):
         response = HttpResponse(cleanJSON, content_type="application/json")
         return response        
     else: 
-        return HttpResponse(render_to_response('api/api_webpages.html', kwargs, RequestContext(request)))
+        return HttpResponse(render(request, 'api/api_webpages.html', kwargs, RequestContext(request)))
      
