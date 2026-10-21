@@ -11,8 +11,7 @@ function updateImagePopup(){
     $('.enki-img-popup').click( function() {
         //Make sure this el
         //Only make a popup if there isn't one already--otherwise we might get duplicates for some reason
-
-        if ($('.IMG-POPUP').length == 0 && !$(this).hasClass('IMG-404')){
+        if ($('.IMG-POPUP').length == 0 && !$(this).hasClass('IMG-404') && $(this).attr('src').substring(0,8) != "/static/"){
             //duplicate this img element, 
             $newImg = $(this).clone();
             //make it a higher z-level index
@@ -35,7 +34,13 @@ function updateImagePopup(){
             //add a custom class so we can id it later
             $newImg.addClass('IMG-POPUP');
             $newImg.removeClass('enki-img-popup');
-            
+            if (FULL_RES_URI){
+                console.log($newImg.prop('src'));
+                console.log(THUMBNAIL_URI);
+                var imageResourceID = $newImg.prop('src').replace(THUMBNAIL_URI,'');
+                var fullResImage = FULL_RES_URI + imageResourceID;
+                $newImg.prop('src', fullResImage)
+            }
             //add it to the body 
             $('body').append($newImg);
 

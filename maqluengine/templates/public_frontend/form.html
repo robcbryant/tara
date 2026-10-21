@@ -1,14 +1,165 @@
-{% extends "public_frontend/tara_base.html" %}
-
+{% extends project_override_template|default:'public_frontend/tara_base.html' %}
 
 
 {% block content %}
 <div class="main">
 
-{% include "public_frontend/tara_subheader.html" %}
+
 
     <div class="main-content">
-        Coming Soon!
+
+        <div id="form-view">
+            <div class="title">{{formtype.form_type_name}} : {{form.form_name}}</div>
+            <div class="thumbnail"><img class="enki-img-popup" src="{{thumbnail}}"/></div>
+            <table>
+                <tbody>
+                    {% for frav in fravs %}
+                    <tr>
+                    <td>{{frav.record_attribute_type__record_type}}</td>
+                    <td class="values{% if frav.record_value.50 %} big-cell{% endif %}">{{frav.record_value}}</td>
+                    </tr>
+                    {% endfor %}
+                    
+                    {% for frrv in frrvs %}
+                    <tr>
+                    <td>{{frrv.record_reference_type__record_type}}</td>
+                    <td class="values">{{frrv.record_reference}}</td>
+                    </tr>
+                    {% endfor %}
+
+                    
+                
+                </tbody>
+                </table>    
+        </div>
+    
     </div>
 </div>
 {% endblock %}
+
+
+
+{% block footer %}
+
+
+   <!--   
+    //================================================================================================================
+    //
+    //  This script acts as a standarized set of functions and variables that all templates in the maqlu engine need
+    //  --to access and utilize. e.g. Because these scripts access the back-end API outside of a template, I needed
+    //  --a way to access the API endpoint URIs so I store a list of the URIs and pass them as a template variables
+    //  --that the rest of the included javascripts can utilize. I had contemplated just adding all the javascript to
+    //  --each <template>.html file within <script> tags, but that will increase the file template size, and there will
+    //  --be redundant code that can't be cached, nor edited easily in the future.
+    //
+    //  These global variables and Endpoints should be on every main admin template page 
+    //
+    //  It additionally, adds a CSRF token reader for the scripts to use POST AJAX with.
+    //================================================================================================================
+    -->
+ 
+    <script>          
+    //GLOBAL FUNCTIONS//
+    function getAPIEndpoints(){
+        return JSON.parse('{{api_urls|safe}}');
+    }
+    //GLOBALS VARIABLES//
+    var RTYPE_LIST;
+    var API_URLS = getAPIEndpoints();
+    </script>
+
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->
+    <!-- ======================================================================================================== -->   
+
+
+<script>
+
+//===================================================================================================================================================================================
+//
+//  This essentially adds an API/AJAX based search bar to locate forms by their name/ID
+//
+//  --As the user types letters into the search box, it will automatically query the server for a list of forms of that formtype (the first 5 results)
+//  --using a case-insensitive 'icontains' filter. It displays them in a pop up drown down that when clicked on, links the user to the appropriate form page by its given ID
+//
+//===================================================================================================================================================================================
+
+
+$('#form-nav-search-form').submit(function(e){
+     e.preventDefault();
+     $target = $('#search-box-list').children().first();
+     if (typeof $target.children().first().attr('href') !== "undefined") window.location.href = $target.children().first().attr('href');
+    //Else do nothing
+});
+
+
+ function queryServerForMatchingForms(searchbox, projectID, formtypeID){
+    //First get all the associated data we'll need to send to the server
+    var searchString = $(searchbox).val();
+    var jsonData = {"projectID" : projectID, "formtypeID" : formtypeID, "query" : searchString};
+    console.log(jsonData);
+    //Send and AJAX Request
+    $.ajax({ 
+             url   : API_URLS.get_forms_search,
+             type  : "GET",
+             data  : jsonData, // data to be submitted 
+             success : function(returnedQuery)
+             {
+                //$("#search-box-list").show();
+                console.log(returnedQuery.form_list);
+                //Create a dropdown of no more than 5 items
+                $newSelect = $($(searchbox).parent().children().first());
+                console.log($newSelect);
+                $newSelect.empty();
+                $newSelect.hide();
+                //Only do something if "form_list" is in the json data
+                if(returnedQuery['form_list'] != null){
+                    for (i=0; i< returnedQuery.form_list.length; i++){
+                        var currentForm = returnedQuery.form_list[i];
+                        if (currentForm.label.length > 24){ 
+                            if (i == 0) $newListItem = $('<div class="search-box-item first-result"><a style="font-size:10px;" href="'+currentForm.url+'">'+ currentForm.label +'</a></div>');
+                            else        $newListItem = $('<div class="search-box-item"><a style="font-size:10px;" href="'+currentForm.url+'">'+ currentForm.label +'</a></div>');
+                        } else {
+                            if (i == 0) $newListItem = $('<div class="search-box-item first-result"><a href="'+currentForm.url+'">'+ currentForm.label +'</a></div>');
+                            else        $newListItem = $('<div class="search-box-item"><a href="'+currentForm.url+'">'+ currentForm.label +'</a></div>');                           
+                        }
+                        $newSelect.append($newListItem);
+                    }
+                    //For another robust solution--let's modify the text size to be smaller if it's longer than 30 characterSet
+                    $newSelect.children().each( function() {
+                       if ($(this).children().first().text().length > 30) $(this).children().first().addClass('form-nav-search-sml-txt'); 
+                    });
+                    $newSelect.show();
+                }
+             },
+
+            // handle a non-successful response
+            fail : function(xhr,errmsg,err) {
+                console.log(xhr.status + ": " + xhr.responseText); // provide a bit more info about the error to the console
+            }
+        });    
+    
+}
+ 
+
+
+
+ $(document).mouseup(function(e) 
+{
+    var container = $("#search-box-list");
+    var adminToolBarContainer = $('#form-quick-search-tool .admin-search-list');
+    // if the target of the click isn't the container nor a descendant of the container
+    if ((!container.is(e.target) || !adminToolBarContainer.is(e.target) ) && (container.has(e.target).length === 0 || adminToolBarContainer.has(e.target).length == 0)) 
+    {
+        container.hide();
+        adminToolBarContainer.hide();
+    }
+    
+    
+}); 
+
+
+</script>
+
+{% endblock %}
+

@@ -1,6 +1,6 @@
 
 {% extends "admin/base.html" %}
-{% load staticfiles %}
+{% load static %}
 
 {% load enki_tags %}
 {% block title %}Maqlu Engine{% endblock %}
@@ -210,6 +210,7 @@
                 </table>
             </div>
             <div class="stats-graphic">
+				<button class="btn download-results" type="button" title="Download Queried Forms" onclick="downloadQueriedForms(this)"><span>DOWNLOAD CSV OF RELEVANT FORMS</span></button>
                 <a class="download-stats">DOWNLOAD QUERY STATS AS CSV</a>
                 <textarea class="csv-export-container" value="" hidden disabled></textarea>
                 <div class="form-preview" hidden></div>
@@ -1672,6 +1673,40 @@ function gen_uuid() {
     $('#add-query').click( function(){addNewProjectQuery()});
 
 
+
+	function projectSelectChange(select_element){
+            $formtype_select = $(select_element).parent().parent().find('.formtype-list');
+            $formtype_select.empty();
+            $formtype_select.prop('disabled', true);
+            $rtype_select = $(select_element).parent().parent().find('.rtype-list');
+            $rtype_select.prop('disabled', true);
+            $rtype_select.empty();
+            //Only do an ajax request IF they've selected an actual project, otherwise disable the formtype select
+			console.log($(select_element).val());
+            if ($(select_element).val() != "none" && $(select_element).val() != null){
+                //Load the FormTypes
+                $.ajax({ url   : API_URLS['get_formtypes'], type  : "POST", data  : [{name:"project_pk", value:$(select_element).val()}], // data to be submitted
+                     success : function(returnedQuery){
+                        console.log("QUERY WITH OUR ERROR???");
+						console.log(returnedQuery);
+                        //First add the formtypes to the list when finished
+                        for (var i = 0; i < returnedQuery.formtype_list.length; i++){
+                            $formtype_select.append('<option value="'+returnedQuery.formtype_list[i].pk+'">'+returnedQuery.formtype_list[i].name+'</option>');
+                        }
+                        //Now enabled the select box
+                        $formtype_select.prop('disabled', false);
+                        $formtype_select.change();
+                        console.log("Just loaded all the formtypes in the select");
+                        QUERY_LOAD_FINISHED = true;
+                     }
+                });
+            } else {
+                
+            }
+        }
+
+
+
     function addNewProjectQuery(){
         $newQuery = $('.single-query-clone').clone(true);
         var randomColor = "rgb("+Math.floor((Math.random() * 255) + 50)+","+Math.floor((Math.random() * 255) + 50)+","+Math.floor((Math.random() * 255) + 50)+")";
@@ -1690,42 +1725,25 @@ function gen_uuid() {
                 console.log(returnedQuery);
                 //First add the projects to the list when finished
                 for (var i = 0; i < returnedQuery.project_list.length; i++){
-                    $newQuery.find('.project-list').append('<option value="'+returnedQuery.project_list[i].pk+'">'+returnedQuery.project_list[i].name+'</option>');
-                }
+					if (CURRENT_PROJECT_PK != null && returnedQuery.project_list[i].pk == CURRENT_PROJECT_PK) {
+						console.log("TRYING TO SELECT OUR Project");
+						$newQuery.find('.project-list').append('<option value="'+returnedQuery.project_list[i].pk+'" selected>'+returnedQuery.project_list[i].name+'</option>');
+						projectSelectChange($newQuery.find('.project-list'))
+					}else {
+						console.log("Just adding a deselected option now");
+						$newQuery.find('.project-list').append('<option value="'+returnedQuery.project_list[i].pk+'">'+returnedQuery.project_list[i].name+'</option>');
+					}
+				}
+				
+				
+
                 QUERY_LOAD_FINISHED = true;
                 console.log("Just loaded all the projects for the select");
              }
         });
         
         //Next, add the onchange listener for the select, so that it starts the ajax request to populate the form types for the selected project
-        $newQuery.find('.project-list').change( function(){
-            $formtype_select = $(this).parent().parent().find('.formtype-list');
-            $formtype_select.empty();
-            $formtype_select.prop('disabled', true);
-            $rtype_select = $(this).parent().parent().find('.rtype-list');
-            $rtype_select.prop('disabled', true);
-            $rtype_select.empty();
-            //Only do an ajax request IF they've selected an actual project, otherwise disable the formtype select
-            if ($(this).val() != "none"){
-                //Load the FormTypes
-                $.ajax({ url   : API_URLS['get_formtypes'], type  : "POST", data  : [{name:"project_pk", value:$(this).val()}], // data to be submitted
-                     success : function(returnedQuery){
-                        //console.log(returnedQuery);
-                        //First add the formtypes to the list when finished
-                        for (var i = 0; i < returnedQuery.formtype_list.length; i++){
-                            $formtype_select.append('<option value="'+returnedQuery.formtype_list[i].pk+'">'+returnedQuery.formtype_list[i].name+'</option>');
-                        }
-                        //Now enabled the select box
-                        $formtype_select.prop('disabled', false);
-                        $formtype_select.change();
-                        console.log("Just loaded all the formtypes in the select");
-                        QUERY_LOAD_FINISHED = true;
-                     }
-                });
-            } else {
-                
-            }
-        });
+        $newQuery.find('.project-list').change(projectSelectChange($newQuery.find('.project-list')));
         
         //Next, add the onchange listener for the formtype select, so that it starts the ajax request to populate the rtypes for the selected project
         $newQuery.find('.formtype-list').change( function(){
@@ -1927,6 +1945,100 @@ function gen_uuid() {
     {% endif %}
     
     });
+	
+	
+	//----------------------------------------------------------------------------------------------------------------
+	// **** Added 10/7/2026 -- Adding a new function to export the formtype provided in our finished query--limited to the pks in that query and not the entire Formtype
+	//----------------------------------------------------------------------------------------------------------------
+	function downloadQueriedForms(button_being_pressed) {
+	form_type_pk = $(button_being_pressed).closest('.project-results').find('.query-stats').attr("formtype_pk");
+	pk_list = $(button_being_pressed).closest('.project-results').find('.pagination-results-list').val();
+    //show load bar
+    showBusyLoadbar();
+    var uuid = gen_uuid();
+    var urlToUse = "{% url 'maqlu_admin:export_formtype' %}";
+    var data =  new URLSearchParams();
+	data.append('subset', pk_list );
+	data.append('id', form_type_pk);
+	data.append('export_format', "CSV");
+	data.append('uuid', uuid);
+	
+	
+    
+
+    var xmlhttp;
+
+    console.log(uuid);
+    // compatible with IE7+, Firefox, Chrome, Opera, Safari
+    xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("POST", urlToUse, true);
+    xmlhttp.responseType = "blob";
+    xmlhttp.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+    xmlhttp.setRequestHeader('X-CSRFToken', "{{ csrf_token }}");
+    xmlhttp.onload = function(e) {
+        if (this.status == 200) {
+            // Create a new Blob object using the 
+            //response data of the onload object
+            var blob;
+            var filename;
+            if (export_format == "CSV"){ blob = new Blob([this.response], {type: 'text/csv'});filename = '{{project}}__{{formtype}}_export.csv';}   
+            //Create a link element, hide it, direct 
+            //it towards the blob, and then 'click' it programatically
+            let a = document.createElement("a");
+            a.style = "display: none";
+            document.body.appendChild(a);
+            //Create a DOMString representing the blob 
+            //and point the link element towards it
+            let url = window.URL.createObjectURL(blob);
+            a.href = url;
+            a.download = filename;
+            //programatically click the link to trigger the download
+            a.click();
+            //release the reference to the file by revoking the Object URL
+            window.URL.revokeObjectURL(url);
+        }else{
+            //deal with your error state here
+        }    
+    };
+    
+    xmlhttp.send(data);
+
+    function update_progress_info() {
+        var  updatedata = "uuid="+uuid;
+        //console.log(updatedata);
+        var updatexml;
+
+        // compatible with IE7+, Firefox, Chrome, Opera, Safari
+        updatexml = new XMLHttpRequest();
+        updatexml.onreadystatechange = function(){
+            if (updatexml.readyState == 4 && updatexml.status == 200){
+                var progress = JSON.parse(updatexml.responseText);
+                console.log(progress)
+                if (progress.is_complete == "False"){
+                    window.setTimeout(update_progress_info, 1000);
+                    document.getElementById('busy-load-bar-message').innerHTML = progress.percent_done + "%     :  Currently Processing Form: " + progress.current_form + "  of FormType:  " + progress.current_formtype;
+                    document.getElementById('busy-load-bar-width').style.width = progress.percent_done + "%";
+                } else {
+                    document.getElementById('busy-load-bar-message').innerHTML = "100%     : Completed Export  of FormType";
+                    document.getElementById('busy-load-bar-width').style.width = "100%"; 
+                    window.setTimeout(removeBusyLoadbar, 1000);                    
+                }
+            }
+        }
+        updatexml.open("POST", "{% url 'maqlu_admin:check_progress' %}", true);
+        updatexml.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+        updatexml.setRequestHeader('X-CSRFToken', "{{ csrf_token }}");
+        updatexml.send(updatedata);
+        
+        
+
+    }
+    window.setTimeout(update_progress_info, 1000);
+}
+	
+	
+	
+	
     // ***************************************END OF MASTER QUERY ENGINE ******************************************* 
     //----------------------------------------------------------------------------------------------------------------
     </script>    

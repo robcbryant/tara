@@ -25,6 +25,23 @@
                 <span class="main-logo"><a href="/">TARA</a></span>
                 <span class="sub-logo">Toolkit for Archaeological Research and Analysis</span>
             </div>
+            
+            <div id="sub-header"> 
+                <div class="geospatial-engine">
+                    <a href="{% url 'maqluengine:geoengine' %}">
+                        
+                        <span>
+                            <div class="icon"></div><div>ki</div><div>GIS</div><div> engine</div>
+                        </span>
+                    </a>
+                </div>
+                <div class="query-engine">
+                    <a href="{% url 'maqluengine:queryengine' %}"><span><div class="icon"></div><div>QUERY</div><div></div><div>engine</div></span></a>
+                </div>
+                <div class="browse">
+                    <a href="{% url 'maqluengine:browseengine' %}"><span><div class="icon"></div><div>BROWSE</div><div></div><div>data</div></span></a>
+                </div>
+            </div>
             {% if user.permissions.master_admin %}<div id="tara-admin-project-header">Logged in as MASTER ADMIN | <a href="{% url 'maqlu_admin:index'%}">TARA console</a></div>  {%endif%}
 
             {% block branding %}{% endblock %}
@@ -61,10 +78,24 @@
 
 
         <div class="menu">
-            {% for aWebpage in webpage.project.webpage_set.all %}
-                {% if not aWebpage.flagged_for_deletion and not aWebpage.menuparent %}
+            {% for aWebpage in webpage_list %}
+                {% if not aWebpage.menugroup %}
                     <a href="{% url 'maqluengine:webpage' webpage_id=aWebpage.pk%}">{{aWebpage.name}}</a>
                 {% endif %}
+                
+            {% endfor %}
+            
+            {% for aMenuGroup in menugroups %}
+                <div class="menu-container">
+                    <div class="title">{{aMenuGroup.name}}</div>
+                    <div class="page-list" style="display:none;">
+                    {% for aWebpage in aMenuGroup.webpage_set.all %}
+                        {% if aWebpage.is_public %}
+                            <a href="{% url 'maqluengine:webpage' webpage_id=aWebpage.pk%}">{{aWebpage.name}}</a>
+                        {% endif %}
+                    {% endfor %}
+                    </div>
+                </div>
             {% endfor %}
         </div>
         {% block nav-global %}{% endblock %}
@@ -73,40 +104,37 @@
 
     <!-- Content -->
     <div id="main">
-        <div class="side-bar">
+        <div class="side-bar" style="display:none;">
                <div class="form-type-group-title">Project Forms</div>
-            {% for aformtype in project.formtype_set.all %}
-                {% if not aformtype.form_type_group and aformtype.flagged_for_deletion == False%}
+            {% for aformtype in formtypes %}
+                {% if not aformtype.form_type_group%}
                     {% if aformtype.type == 0 %}
                    
-                 <div class="formtype"><a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqluengine:formtype' formtype_id=aformtype.pk  %}">{{aformtype}}</a></div>
+                 <div class="formtype"><a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqluengine:formtype' formtype_id=aformtype.pk page_num='1' %}">{{aformtype}}</a></div>
 
                     {% endif %}
             {% endif %}
             {% endfor %}  
             
-          {% for aformtypegroup in project.formtypegroup_set.all %}
-                
-                   <div class="form-type-group-title">{{aformtypegroup}}</div>
+          {% for aformtypegroup in formtypegroups %}
 
+                       <div class="form-type-group-title">{{aformtypegroup}}</div>
+                    {% for aformtype in aformtypegroup.formtype_set.all %}
+                        {% if aformtype.flagged_for_deletion == False and aformtype.is_public == True %}
+                           <div class="formtype"> <a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqluengine:formtype' formtype_id=aformtype.pk page_num='1'%}">{{aformtype}}</a></div>
+                        {% endif %}
+                    {% endfor %}
 
-                {% for aformtype in aformtypegroup.formtype_set.all %}
-                    {% if aformtype.flagged_for_deletion == False %}
-
-
-                       <div class="formtype"> <a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqluengine:formtype' formtype_id=aformtype.pk %}">{{aformtype}}</a></div>
-                    {% endif %}
-                {% endfor %}
           {% endfor %}
           
 
             <div class="form-type-group-title">Media Types</div>
 
-            {% for aformtype in project.formtype_set.all %}
-                {% if not aformtype.form_type_group and aformtype.flagged_for_deletion == False%}
+            {% for aformtype in formtypes %}
+                {% if not aformtype.form_type_group and aformtype.flagged_for_deletion == False and aformtype.is_public == True %}
                     {% if aformtype.type == 1 %}
 
-                       <div class="formtype"> <a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqluengine:formtype' formtype_id=aformtype.pk  %}">{{aformtype}}</a></div>
+                       <div class="formtype"> <a class="btn btn-primary side-panel-link" role="button" href="{% url 'maqluengine:formtype' formtype_id=aformtype.pk page_num='1' %}">{{aformtype}}</a></div>
 
 
                     {% endif %}
@@ -144,9 +172,15 @@
             <script src="{% static 'jquery/jquery.js'  %}"></script>
             <script src="{% static 'openlayers/ol-debug.js'  %}"></script>
             <script src="{% static 'js/enki_general.js'  %}"></script>
+            <script src="{% static 'js/enki-thumbnail-popup.js'  %}"></script>
             <script src="{% static 'bootstrap/js/bootstrap.js'  %}"></script>
             <script src="{% static 'bootstrap-select/js/bootstrap-select.js' %}"></script>
             <script src="{% static 'proj4js/proj4.js' %}"> </script>
+            <script src="{% static 'js/enki-public-site.js'  %}"></script>
+            <script>
+                var THUMBNAIL_URI = "{{project.uri_thumbnail|safe}}"
+                var FULL_RES_URI = "{{project.uri_img|safe}}"
+            </script>
             {% block footer %}{% endblock footer%}
         </div>
 </div>

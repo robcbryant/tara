@@ -23,7 +23,7 @@ import sys
 from django.db.models import Q, Count, Max
 import re
 from django.contrib.contenttypes.models import ContentType
-from django.shortcuts import render_to_response, render
+from django.shortcuts import render
 from django.template import RequestContext
 import urllib
 from django.conf import settings
@@ -36,7 +36,7 @@ from django.urls import resolve
 from django.utils.functional import cached_property
 from django.contrib.admin import AdminSite
 from django.http import HttpResponse
-from django.conf.urls import url, include
+from django.urls import re_path, include
 from django.views import generic
 from django.http import Http404
 
@@ -54,7 +54,6 @@ from time import sleep
 from django.contrib.staticfiles.storage import staticfiles_storage
 import json
 
-from django.utils.encoding import smart_text
 
 from django.shortcuts import redirect
 import random
@@ -317,7 +316,7 @@ def get_api_endpoints():
     
     
     #Run Various Tools Endpoints
-    jsonData['run_formtype_query_engine'] = ""
+    jsonData['run_formtype_query_engine'] = reverse('maqlu_admin:run_master_query_engine')
     jsonData['run_master_query_engine'] = reverse('maqlu_admin:run_master_query_engine')
     jsonData['run_formtype_query_pagination'] = reverse('maqlu_admin:navigate_query_pagination')
     jsonData['run_master_query_pagination'] = reverse('maqlu_admin:navigate_master_query_pagination')
@@ -607,9 +606,9 @@ class MyAdminSite(AdminSite):
             if request.method == 'POST':   
                 if request.user.check_password(request.POST['password']):
                     project = FormProject.objects.get(pk=request.POST['project_pk'])
+                    SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), "This user just deleted this project: " + project.name + "  XX  ",request.META)
                     project.delete()
-                    #SUCCESS!!
-                    SECURITY_log_security_issues(request.user, 'admin.py - ' + str(sys._getframe().f_code.co_name), "This user just deleted this project", request.META)
+                    #SUCCESS!!  
                     return HttpResponse('{"MESSAGE":"SUCCESS","accepted":"YES"}',content_type="application/json") 
                 else:
                     ERROR_MESSAGE += "Error: You gave the incorrect password to delete this project."
@@ -712,6 +711,7 @@ class MyAdminSite(AdminSite):
                 theUser.save()
                 theUser.permissions.project = project
                 theUser.permissions.master_admin = is_master
+                theUser.permissions.access_level = 5
                 theUser.save()
                 
                 #Construct our Email
@@ -818,7 +818,7 @@ class MyAdminSite(AdminSite):
                 #Make the AJAX Request Data Model for subsequent AJAX calls
                 progressData = AJAXRequestData(uuid=request.POST.get('uuid'), jsonString='{"row_index":"0","row_total":"0","is_complete":"False","row_timer":"0"}')
                 progressData.save()                
-                keepAliveTimer = time.clock()
+                keepAliveTimer = time.process_time()
                 
                 all_dicts = []
                 all_formTypes = FormType.objects.all().filter(project__pk=project.pk)
@@ -868,11 +868,11 @@ class MyAdminSite(AdminSite):
                                 #   --every 1 second. I've set it to 5 seconds here to account for any delays that might occur over the network.
                                 #   --Every 5 seconds, this script resets the keep_alive variable to 'False', if it is already False--that means the user exited
                                 #   --the process on their AJAX end so we should stop adding this to the database and delete what we've already done.
-                                #logger.info( str(time.clock()) + "  - " + str(keepAliveTimer) + "    :    " + str(progressData.keep_alive))
-                                if time.clock() - keepAliveTimer > 5:
-                                    logger.info( str (time.clock() - keepAliveTimer) + "  : We are at the 5 second interval!  " + str(formCounter) )
+                                #logger.info( str(time.process_time()) + "  - " + str(keepAliveTimer) + "    :    " + str(progressData.keep_alive))
+                                if time.process_time() - keepAliveTimer > 5:
+                                    logger.info( str (time.process_time() - keepAliveTimer) + "  : We are at the 5 second interval!  " + str(formCounter) )
                                     #restart the keepAlive timer to the current time
-                                    keepAliveTimer = time.clock()
+                                    keepAliveTimer = time.process_time()
                                     #delete the data if the user's AJAX end is unresponsive
                                     if progressData.keep_alive == False:
                                         logger.info( "We are deleting our progress now--wish us luck!")
@@ -1009,7 +1009,11 @@ class MyAdminSite(AdminSite):
         #   This is essentially a list of forms with column headings a direct 1:1 copy of FRATs. The FRRTs are a little more complex. Each FRRT is given in
         #   --2 columns to provide both a comma separated list of referenced form names, and a comma seperated list of their database PK values. The names
         #   --might be enough, but I like to have both for completion sake.
-        
+        #
+        #
+        #   ***10/7/26 -- Adding a new feature for Steve Renette: He wants a subset of a formtype queried in the query engine for export, e.g. all of the
+        #                   base formtypes that are found with the query are put in a csv for download. The header JSON form POST will look for a new variable
+        #                   called "subset" which will 
         
         ERROR_MESSAGE = ""
         logger.info( request)
@@ -1021,10 +1025,17 @@ class MyAdminSite(AdminSite):
                 #Make the AJAX Request Data Model for subsequent AJAX calls
                 progressData = AJAXRequestData(uuid=request.POST.get('uuid'), jsonString='{"row_index":"0","row_total":"0","is_complete":"False","row_timer":"0"}')
                 progressData.save()                
-                keepAliveTimer = time.clock()
+                keepAliveTimer = time.process_time()
             
                 csv_string = ""
-                all_forms = formtype.form_set.all().filter(flagged_for_deletion=False)
+                # 10/7/26 --This is our new addition that determines if we're asking for a set of forms, or 'all' forms
+                all_forms = None
+                if "subset" in request.POST:
+                    logger.info("We're trying to export a subset of forms from a formtype")
+                    pk_list = [int(x.strip()) for x in request.POST["subset"].split(",")]
+                    all_forms = formtype.form_set.all().filter(id__in=pk_list).filter(flagged_for_deletion=False)                
+                else:
+                    all_forms = formtype.form_set.all().filter(flagged_for_deletion=False)
                 # Load all of our FRATs and FRRTs
                 all_FRATs = formtype.formrecordattributetype_set.all()
                 all_FRRTs = formtype.ref_to_parent_formtype.all()
@@ -1051,11 +1062,11 @@ class MyAdminSite(AdminSite):
                         #   --every 1 second. I've set it to 5 seconds here to account for any delays that might occur over the network.
                         #   --Every 5 seconds, this script resets the keep_alive variable to 'False', if it is already False--that means the user exited
                         #   --the process on their AJAX end so we should stop adding this to the database and delete what we've already done.
-                        logger.info( str(time.clock()) + "  - " + str(keepAliveTimer) + "    :    " + str(progressData.keep_alive))
-                        if time.clock() - keepAliveTimer > 5:
-                            logger.info( str (time.clock() - keepAliveTimer) + "  : We are at the 5 second interval!  " + str(formCounter) )
+                        logger.info( str(time.process_time()) + "  - " + str(keepAliveTimer) + "    :    " + str(progressData.keep_alive))
+                        if time.process_time() - keepAliveTimer > 5:
+                            logger.info( str (time.process_time() - keepAliveTimer) + "  : We are at the 5 second interval!  " + str(formCounter) )
                             #restart the keepAlive timer to the current time
-                            keepAliveTimer = time.clock()
+                            keepAliveTimer = time.process_time()
                             #delete the data if the user's AJAX end is unresponsive
                             if progressData.keep_alive == False:
                                 logger.info( "We are deleting our progress now--wish us luck!")
@@ -1999,6 +2010,8 @@ class MyAdminSite(AdminSite):
                         else:
                             formTypeToEdit.is_hierarchical = False
                      
+   
+                    
                     
                     #Save the formtype
                     formTypeToEdit.save()
@@ -2092,7 +2105,14 @@ class MyAdminSite(AdminSite):
                                         #Add the user information
                                         switchFRAT.modified_by = request.user
                                         switchFRAT.save()
-                                            
+                                    #--------------------------------------------------------------------------------------------------------------
+                                    #If we're flagging one of our FRATS as a controlled field appended desciption, we'll do that here with the proper instruction
+                                    #--------------------------------------------------------------------------------------------------------------
+                                    elif code== "frat" and instruction == "controlfieldesc-id":                                           
+                                        #Let's check if the user has provided a controlled field appended description (a checkbox for one of the FRATS)
+                                        formTypeToEdit.controlled_field_descriptor = type_pk
+                                        formTypeToEdit.save()
+                                        
                             #--------------------------------------------------------------------------------------------------------
                             #Update all of the form's FormRecordReferenceTypes
                             #--------------------------------------------------------------------------------------------------------
@@ -2396,17 +2416,17 @@ class MyAdminSite(AdminSite):
                 featureCounter = 0
                 counterIncrement = 100.0 / totalFeatures #0.00135
                 
-                startTimer = time.clock()
-                endTimer = time.clock()
+                startTimer = time.process_time()
+                endTimer = time.process_time()
                 for aFeature in geojson['features']:
                     #get current percentage of completion
-                    endTimer = time.clock()
+                    endTimer = time.process_time()
                     
                     #logger.info( "New Form   : " + str(featureCounter) + " out of " +str(totalFeatures)+ "  rows finished!   " + str(counterIncrement))
                     progressData.jsonString = '{"row_index":"'+str(featureCounter)+'","is_complete":"False", "row_timer":"'+str(endTimer-startTimer)+'", "row_total":"'+str(totalFeatures)+'", "percent_done":"'+str(int(featureCounter*counterIncrement))+'"}'
                     progressData.is_complete = False
                     progressData.save()
-                    startTimer = time.clock()
+                    startTimer = time.process_time()
                     featureCounter += 1
                     
                     newForm = Form()
@@ -2487,7 +2507,7 @@ class MyAdminSite(AdminSite):
                 post_data = request.POST
                 
                 
-                #timerA = time.clock()
+                #timerA = time.process_time()
                 #logger.info( "Starting Clock: " + str(timerA))
                 #Make sure we escape the newline characters from the json string--jscript didn't do it automatically when concatenating the rows together in the clinet-side script
                 #We also have to replace all \t 's  in the json strings before loading them because JSON doesn't allow literal TABS --we need to escape them with a "\\"
@@ -2505,7 +2525,10 @@ class MyAdminSite(AdminSite):
                 
                 #Get our current FormType
                 currentFormType = FormType.objects.all().filter(project=request.user.permissions.project, pk=request.POST['formtype_pk'])[0]
-                
+                # !!! 10/9/26 -- Added a new variable to our formtypes that we update ANY time one of its forms have been updated. If it has
+                #                   Then the server will schedule that formtype to be backed up again into CSVs and JSON on schedule
+                #                   when we save it-- we only update our new field, rather than the entire model which would change the modified by date
+                currentFormType.form_type.save(update_fields=["last_edited_for_backup"]) 
 
                 #Each row in the CSV file represents a new 'Form' of the 'currentFormType'
                 #Let's make a 'row' counter to help with indexing through the CSV file
@@ -2520,12 +2543,12 @@ class MyAdminSite(AdminSite):
                 
                 logger.info( "Just making sure things are working still....where's the stop point?")
                 main_ID_Field = ""
-                keepAliveTimer = time.clock()
+                keepAliveTimer = time.process_time()
                 #logger.info( "Starting row loop: " + str(timerB) + "   Time elapsed = " + str(timerB-timerA))
                 #For each row of the CSV
                 for row in csv_json:
                     logger.info( "222 Just making sure things are working still....where's the stop point?")
-                    timerBeginRow = time.clock()
+                    timerBeginRow = time.process_time()
                     #logger.info( "Starting a new row: " + str(timerBeginRow))
                     #If we are past index '0' then let's continue with the rest of the importer
 
@@ -2650,7 +2673,7 @@ class MyAdminSite(AdminSite):
                                 #imported through this tool
                                 #save the RecordReferenceValue
                                 newFormRecordReferenceValue.save()    
-                                #timerE = time.clock()
+                                #timerE = time.process_time()
                                 #logger.info( "Ending ref lookup: " + str(timerE) + "   Time elapsed = " + str(timerE-timerD)    )
                             #If it is not a reference type, then we are adding an attribute type instead
                             else:
@@ -2703,7 +2726,7 @@ class MyAdminSite(AdminSite):
 
                     row_index += 1
                     #Upload our progress data object with the current row
-                    timerFinishRow = time.clock()
+                    timerFinishRow = time.process_time()
                     #logger.info( "Ending a row: " + str(timerF) + "   Time elapsed since row start = " + str(timerF-timerC))
                     #We need to update the progessData model because it is updated by another thread as well
                     #--Otherwise this will just ignore the  'keep_alive' flag and quit after 2 timer checks
@@ -2717,11 +2740,11 @@ class MyAdminSite(AdminSite):
                     #   --every 1 second. I've set it to 5 seconds here to account for any delays that might occur over the network.
                     #   --Every 5 seconds, this script resets the keep_alive variable to 'False', if it is already False--that means the user exited
                     #   --the process on their AJAX end so we should stop adding this to the database and delete what we've already done.
-                    #logger.info( str(time.clock()) + "  - " + str(keepAliveTimer) + "    :    " + str(progressData.keep_alive))
-                    if time.clock() - keepAliveTimer > 5:
-                        logger.info( str (time.clock() - keepAliveTimer) + "  : We are at the 5 second interval!  " + str(row_index) )
+                    #logger.info( str(time.process_time()) + "  - " + str(keepAliveTimer) + "    :    " + str(progressData.keep_alive))
+                    if time.process_time() - keepAliveTimer > 5:
+                        logger.info( str (time.process_time() - keepAliveTimer) + "  : We are at the 5 second interval!  " + str(row_index) )
                         #restart the keepAlive timer to the current time
-                        keepAliveTimer = time.clock()
+                        keepAliveTimer = time.process_time()
                         #delete the data if the user's AJAX end is unresponsive
                         if progressData.keep_alive == False:
                             logger.info( "We are deleting our progress now--wish us luck!")
@@ -2824,7 +2847,7 @@ class MyAdminSite(AdminSite):
                 post_data = request.POST
                 
                 
-                #timerA = time.clock()
+                #timerA = time.process_time()
                 #logger.info( "Starting Clock: " + str(timerA))
                 #Make sure we escape the newline characters from the json string--jscript didn't do it automatically when concatenating the rows together in the clinet-side script
                 #We also have to replace all \t 's  in the json strings before loading them because JSON doesn't allow literal TABS --we need to escape them with a "\\"
@@ -2893,12 +2916,12 @@ class MyAdminSite(AdminSite):
                 
                 logger.info( "Just making sure things are working still....where's the stop point?")
                 
-                keepAliveTimer = time.clock()
+                keepAliveTimer = time.process_time()
                 #logger.info( "Starting row loop: " + str(timerB) + "   Time elapsed = " + str(timerB-timerA))
                 #For each row of the CSV
                 for row in csv_json:
                     #logger.info( "222 Just making sure things are working still....where's the stop point?")
-                    timerBeginRow = time.clock()
+                    timerBeginRow = time.process_time()
                     #logger.info( "Starting a new row: " + str(timerBeginRow))
                     #If we are past index '0' then let's continue with the rest of the importer
                     
@@ -2918,7 +2941,7 @@ class MyAdminSite(AdminSite):
                     #--if we don't find a primary id by the time we end the list, set the form's name to the current row counter number
                     foundAMainID = False
                     for key, value in row.items():
-                        #timerJ = time.clock()
+                        #timerJ = time.process_time()
                         #logger.info( "Starting col loop: " + str(timerJ))
                         #First check if this column is the unique ID for this form
                         #we'll see if it is by checking the POST_DATA if 'record__(n)__ismainID' exists
@@ -3021,7 +3044,7 @@ class MyAdminSite(AdminSite):
                             #imported through this tool
                             #save the RecordReferenceValue
                             newFormRecordReferenceValue.save()    
-                            #timerE = time.clock()
+                            #timerE = time.process_time()
                             #logger.info( "Ending ref lookup: " + str(timerE) + "   Time elapsed = " + str(timerE-timerD)    )
                         #If it is not a reference type, then we are adding an attribute type instead
                         else:
@@ -3059,7 +3082,7 @@ class MyAdminSite(AdminSite):
                             newFormRecordAttributeValue.record_attribute_type = typeList[key]
                             #save the RecordAttributeValue
                             newFormRecordAttributeValue.save()
-                        #timerK = time.clock()
+                        #timerK = time.process_time()
                         #logger.info( "End of col loop: " + str(timerK) + "   Time elapsed = " + str(timerK-timerJ))
                     #If we didn't find a primary key for this row/form, then add the rox index as the incremental form name/number
                     if foundAMainID == False:
@@ -3069,7 +3092,7 @@ class MyAdminSite(AdminSite):
                         foundAMainID = False
                     row_index += 1
                     #Upload our progress data object with the current row
-                    timerFinishRow = time.clock()
+                    timerFinishRow = time.process_time()
                     #logger.info( "Ending a row: " + str(timerF) + "   Time elapsed since row start = " + str(timerF-timerC))
                     #We need to update the progessData model because it is updated by another thread as well
                     #--Otherwise this will just ignore the  'keep_alive' flag and quit after 2 timer checks
@@ -3083,11 +3106,11 @@ class MyAdminSite(AdminSite):
                     #   --every 1 second. I've set it to 5 seconds here to account for any delays that might occur over the network.
                     #   --Every 5 seconds, this script resets the keep_alive variable to 'False', if it is already False--that means the user exited
                     #   --the process on their AJAX end so we should stop adding this to the database and delete what we've already done.
-                    #logger.info( str(time.clock()) + "  - " + str(keepAliveTimer) + "    :    " + str(progressData.keep_alive))
-                    if time.clock() - keepAliveTimer > 5:
-                        logger.info( str (time.clock() - keepAliveTimer) + "  : We are at the 5 second interval!  " + str(row_index) )
+                    #logger.info( str(time.process_time()) + "  - " + str(keepAliveTimer) + "    :    " + str(progressData.keep_alive))
+                    if time.process_time() - keepAliveTimer > 5:
+                        logger.info( str (time.process_time() - keepAliveTimer) + "  : We are at the 5 second interval!  " + str(row_index) )
                         #restart the keepAlive timer to the current time
-                        keepAliveTimer = time.clock()
+                        keepAliveTimer = time.process_time()
                         #delete the data if the user's AJAX end is unresponsive
                         if progressData.keep_alive == False:
                             logger.info( "We are deleting our progress now--wish us luck!")
@@ -3195,15 +3218,21 @@ class MyAdminSite(AdminSite):
                 
                 post_data = request.POST
                 
+                encoded_str = post_data.get('csv_json').replace('\t', '\\t').replace('\r', '\\r').replace('\n', '\\n').encode('utf-8').decode('utf-8')
+
+                csv_json = json.loads(encoded_str)
                 
-                #timerA = time.clock()
+                
+                #timerA = time.process_time()
                 #logger.info( "Starting Clock: " + str(timerA))
                 #Make sure we escape the newline characters from the json string--jscript didn't do it automatically when concatenating the rows together in the clinet-side script
                 #We also have to replace all \t 's  in the json strings before loading them because JSON doesn't allow literal TABS --we need to escape them with a "\\"
-                #logger.info( post_data.get('csv_json').encode('utf-8').replace('\t', '\\t').replace('\r', '\\r').replace('\n', '\\n'))
-                logger.info( request.POST['csv_json'][0:1000])
-                logger.info( request.POST['csv_json'][7932427:7934427] + " : " + request.POST['csv_json'][7933427])
-                csv_json = json.loads(post_data.get('csv_json').encode('utf-8').replace('\t', '\\t').replace('\r', '\\r').replace('\n', '\\n'))
+                logger.info( encoded_str)
+                #logger.info( request.POST['csv_json'][0:1000])
+                #logger.info( request.POST['csv_json'][7932427:7934427] + " : " + request.POST['csv_json'][7933427])
+
+                
+
                 #response = HttpResponse(post_data.get('csv_json'), content_type='text/plain')
                 #response['Content-Disposition'] = 'attachment; filename="test__'+request.user.username+'.txt"'
                 #return response
@@ -3216,7 +3245,12 @@ class MyAdminSite(AdminSite):
                 selfReferenceList = []
                 
                 currentFormType = FormType.objects.get(pk=request.POST['formtype_pk'])
-                
+                # !!! 10/9/26 -- Added a new variable to our formtypes that we update ANY time one of its forms have been updated. If it has
+                #                   Then the server will schedule that formtype to be backed up again into CSVs and JSON on schedule
+                #                   when we save it-- we only update our new field, rather than the entire model which would change the modified by date
+                currentFormType.form_type.save(update_fields=["last_edited_for_backup"]) 
+
+ 
                 availableFRATs = currentFormType.formrecordattributetype_set.all()
                 availableFRRTs = currentFormType.ref_to_parent_formtype.all()
                 
@@ -3247,13 +3281,13 @@ class MyAdminSite(AdminSite):
                     #Let's make an incremental counter for record type orders
                     order_counter = 1                   
                     logger.info( "Just making sure things are working still....where's the stop point?")
-                    keepAliveTimer = time.clock()
+                    keepAliveTimer = time.process_time()
                     try:
                         #For each row of the CSV
                         for row in csv_json:
                             row_index += 1
                             #logger.info( "222 Just making sure things are working still....where's the stop point?")
-                            timerBeginRow = time.clock()
+                            timerBeginRow = time.process_time()
                             #logger.info( "Starting a new row: " + str(timerBeginRow))
                             #If we are past index '0' then let's continue with the rest of the importer
                             
@@ -3278,7 +3312,7 @@ class MyAdminSite(AdminSite):
                             foundAMainID = False
                             for key, value in row.items():
                                 col_index += 1
-                                #timerJ = time.clock()
+                                #timerJ = time.process_time()
                                 #logger.info( "Starting col loop: " + str(key) + " : " + str(value))
                                 #First check if this column is the unique ID for this form
                                 #we'll see if it is by checking the POST_DATA if 'record__(n)__ismainID' exists
@@ -3348,7 +3382,7 @@ class MyAdminSite(AdminSite):
                                 col_index += 1                                                            
                                 
                                 #Upload our progress data object with the current row
-                                timerFinishRow = time.clock()
+                                timerFinishRow = time.process_time()
                                 #logger.info( "Ending a row: " + str(timerF) + "   Time elapsed since row start = " + str(timerF-timerC))
                                 #We need to update the progessData model because it is updated by another thread as well
                                 #--Otherwise this will just ignore the  'keep_alive' flag and quit after 2 timer checks
@@ -3362,11 +3396,11 @@ class MyAdminSite(AdminSite):
                                 #   --every 1 second. I've set it to 5 seconds here to account for any delays that might occur over the network.
                                 #   --Every 5 seconds, this script resets the keep_alive variable to 'False', if it is already False--that means the user exited
                                 #   --the process on their AJAX end so we should stop adding this to the database and delete what we've already done.
-                                #logger.info( str(time.clock()) + "  - " + str(keepAliveTimer) + "    :    " + str(progressData.keep_alive))
-                                if time.clock() - keepAliveTimer > 5:
-                                    logger.info( str (time.clock() - keepAliveTimer) + "  : We are at the 5 second interval!  " + str(row_index) )
+                                #logger.info( str(time.process_time()) + "  - " + str(keepAliveTimer) + "    :    " + str(progressData.keep_alive))
+                                if time.process_time() - keepAliveTimer > 5:
+                                    logger.info( str (time.process_time() - keepAliveTimer) + "  : We are at the 5 second interval!  " + str(row_index) )
                                     #restart the keepAlive timer to the current time
-                                    keepAliveTimer = time.clock()
+                                    keepAliveTimer = time.process_time()
                                     #delete the data if the user's AJAX end is unresponsive
                                     if progressData.keep_alive == False:
                                         logger.info( "We are deleting our progress now--wish us luck!")
@@ -3447,6 +3481,10 @@ class MyAdminSite(AdminSite):
                                 #Add the user information
                                 currentFRAV.modified_by = request.user
                                 currentFRAV.save()
+                                # !!! 10/9/26 -- Added a new variable to our formtypes that we update ANY time one of its forms have been updated. If it has
+                                #                   Then the server will schedule that formtype to be backed up again into CSVs and JSON on schedule
+                                #                   when we save it-- we only update our new field, rather than the entire model which would change the modified by date
+                                currentFRAV.form_type.save(update_fields=["last_edited_for_backup"])
                             else:
                                 logger.info( "POST SPLIT ELSE")
                                 #Sometimes, if 
@@ -3462,6 +3500,10 @@ class MyAdminSite(AdminSite):
                                         new_external_key += str(reference) + ","
                                 #remove the trailing comma
                                 external_key_reference[:-1]
+                                # !!! 10/9/26 -- Added a new variable to our formtypes that we update ANY time one of its forms have been updated. If it has
+                                #                   Then the server will schedule that formtype to be backed up again into CSVs and JSON on schedule
+                                #                   when we save it-- we only update our new field, rather than the entire model which would change the modified by date
+                                currentFRRV.form_type.save(update_fields=["last_edited_for_backup"])
                             counter += 1
                     return HttpResponse('{"message":"Succesfully updated:'+ str(counter) +' field(s) in the database"}', content_type="application/json")
             except Exception as e:
@@ -3685,6 +3727,10 @@ class MyAdminSite(AdminSite):
                 formToEdit = Form.objects.get(pk=post_data['form_id'])
                 if formToEdit.project.pk == request.user.permissions.project.pk:
                     form_type = formToEdit.form_type
+                    # !!! 10/9/26 -- Added a new variable to our formtypes that we update ANY time one of its forms have been updated. If it has
+                    #                   Then the server will schedule that formtype to be backed up again into CSVs and JSON on schedule
+                    #                   when we save it-- we only update our new field, rather than the entire model which would change the modified by date
+                    form_type.save(update_fields=["last_edited_for_backup"])
                     #Update the form's basic attributes
                     #Figure out if the input field is a number(int) or a string label
                     #*I'm not particulary fond of using try/catch's to control logic, but apparently it is the
@@ -4201,27 +4247,30 @@ class MyAdminSite(AdminSite):
         
             #We need to return a json list of all formtype RTYPES that match the provided formtype pk
             if request.method == "POST":
-                #Let's get all available public formtypes not in recycling--unless the formtypes are from the users current, project.
-                #If it is the users current project, then don't use a is_public filter
-                logger.info( request.POST['project_pk']  + "  :  ")
-                if str(request.user.permissions.project.pk) == request.POST['project_pk']:
-                    logger.info( "What...?" + str(request.user.permissions.project.pk))
-                    allFormTypes = FormType.objects.filter(project__pk=request.POST['project_pk'], flagged_for_deletion=False)
-                else:
-                    allFormTypes = FormType.objects.filter(is_public=True, project__pk=request.POST['project_pk'], flagged_for_deletion=False)
-                    
-                if allFormTypes:
-                    finalJSON = {}
-                    formtype_list = []
-
-                    for aFormType in allFormTypes:
-                       formtype_list.append({"name":aFormType.form_type_name, "pk":aFormType.pk})
+                if request.POST['project_pk'] != "":
+                    #Let's get all available public formtypes not in recycling--unless the formtypes are from the users current, project.
+                    #If it is the users current project, then don't use a is_public filter
+                    logger.info( request.POST['project_pk']  + "  :  ")
+                    if str(request.user.permissions.project.pk) == request.POST['project_pk']:
+                        logger.info( "What...?" + str(request.user.permissions.project.pk))
+                        allFormTypes = FormType.objects.filter(project__pk=request.POST['project_pk'], flagged_for_deletion=False)
+                    else:
+                        allFormTypes = FormType.objects.filter(is_public=True, project__pk=request.POST['project_pk'], flagged_for_deletion=False)
                         
-                    finalJSON['formtype_list'] = formtype_list
-                    finalJSON = json.dumps(finalJSON)
-                    return HttpResponse(finalJSON, content_type="application/json" )
+                    if allFormTypes:
+                        finalJSON = {}
+                        formtype_list = []
+
+                        for aFormType in allFormTypes:
+                           formtype_list.append({"name":aFormType.form_type_name, "pk":aFormType.pk})
+                            
+                        finalJSON['formtype_list'] = formtype_list
+                        finalJSON = json.dumps(finalJSON)
+                        return HttpResponse(finalJSON, content_type="application/json" )
                     
-                else: ERROR_MESSAGE += "Error: no form types were found for this project"
+                    else: ERROR_MESSAGE += "Error: no form types were found for this project"
+                else: ERROR_MESSAGE += "Error: no project id queried"
+                    
             else: ERROR_MESSAGE += "Error: You have not submitted through POST"
             
         else: ERROR_MESSAGE += "Error: You do not have permission to access modifying user information"
@@ -5033,33 +5082,33 @@ class MyAdminSite(AdminSite):
                     else:
                         #We are asking for ALL results of this query--could take longer to load
                         requestedPageNumber = "ALL"
-                        resultsPerPage = request.POST['numberOfResults']
+                        resultsPerPage = int(request.POST['numberOfResults'])#FIX: 10/6/26 -- needs to be forced into an int as the above if true condition
                         startIndex = 0
-                        endIndex = request.POST['numberOfResults']
+                        endIndex = int(request.POST['numberOfResults']) #FIX: 10/6/26 -- needs to be forced into an int as the above if true condition
                     
-                    logger.info( startIndex)
-                    logger.info( endIndex)
+                    logger.info( type(startIndex))
+                    logger.info( type(endIndex))
 
                     masterQuery = masterQuery[startIndex:endIndex]
-                    logger.info( "TIMER RR"+ " : " + str(time.clock()))
+                    logger.info( "TIMER RR"+ " : " + str(time.process_time()))
                     #count the query so we only make one database hit before looping(otherwise each loop would be another hit)
 
                     for form_pk in masterQuery:
                         aForm = Form.objects.get(pk=form_pk)
-                        logger.info( "TIMER S"+ " : " + str(time.clock()))
+                        logger.info( "TIMER S"+ " : " + str(time.process_time()))
                         rowList = []
                         #Let's loop through each item in the queryRTYPE list and match up the frav's in each queried form so the headers match the form attribute values
                         for rtype in queryRTYPElist:
                             if rtype[1] == 'frat':
                                 #logger.info( str(rtype[2]) + '  ' + str(aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2]).count()))
-                                logger.info( "TIMER X"+ " : " + str(time.clock()))
+                                logger.info( "TIMER X"+ " : " + str(time.process_time()))
                                 formRVAL = aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2])
                                 #We need to check for NULL FRAV's here. When a user manually creates new forms, they don't always have FRAVS created for them if they leave it blank
                                 if formRVAL.exists():
                                     rowList.append((rtype[0],'frav',formRVAL[0].record_value, formRVAL[0].pk))
                                 else:
                                     logger.info( "Whoops--something happened. There are no RVALS for 'frats' using: " + str(rtype[2]))
-                                logger.info( "TIMER Y"+ " : " + str(time.clock()))
+                                logger.info( "TIMER Y"+ " : " + str(time.process_time()))
                             else:
                                 #for frrt in aForm.ref_to_parent_form.all():
                                     #logger.info( "" + str(frrt.pk))
@@ -5117,7 +5166,7 @@ class MyAdminSite(AdminSite):
                                             #probably solve the complexity of looping through to grab it as it stands right now
                                             #****WE also have to check for NULL references
                                             if currentRTYPE.record_reference.all().count() > 0:
-                                                thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
+                                                thumbnailURI = currentRTYPE.record_reference.all()[0].get_ref_thumbnail()
                                             break
                             #Finally--if there aren't any relevant media types in our frrts, let's do a last second check for ANY frrts that are media types
                             #--that AREN'T in our RTYPE list
@@ -5129,7 +5178,7 @@ class MyAdminSite(AdminSite):
                                     #Just get the first one out of the list
                                     if len(currentRVAL[0].record_reference.all()) > 0:
                                         logger.info(currentRVAL[0].record_reference.all()[0].form_name)
-                                        thumbnailURI = currentRVAL[0].record_reference.all()[0].get_thumbnail_type()
+                                        thumbnailURI = currentRVAL[0].record_reference.all()[0].get_ref_thumbnail()
                                         
 
                         formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])                                       
@@ -5295,7 +5344,7 @@ class MyAdminSite(AdminSite):
                             if uniqueQuery: queryRTYPElist.append((rtypeCounter,'frat',rtypePK,currentJSONQuery['LABEL'])) 
                             rtypeCounter += 1
                             tCounter = 0
-                            logging.info("TimerA"+ " : " + str(time.clock()))
+                            logging.info("TimerA"+ " : " + str(time.process_time()))
                             for term in currentJSONQuery['TERMS']:
                                 #Now begin modifying the SQL query which each term of each individual query
                                 #skip the term if the field was left blank
@@ -5321,7 +5370,7 @@ class MyAdminSite(AdminSite):
                                         #save stats and query
                                         
                                         queriedForms = (newQuery | queriedForms)
-                                logging.info("TimerB"+ " : " + str(time.clock()))
+                                logging.info("TimerB"+ " : " + str(time.process_time()))
                                 #We'll calculate percent by claiming finishing the query is at 50% when complete and at 20% when starting this section.
                                 logging.info(rtypeCounter)
                                 logging.info(len(masterQueryJSON['query_list']))
@@ -5330,7 +5379,7 @@ class MyAdminSite(AdminSite):
                                 progressData.jsonString = '{"message":"Performing Query # '+ str(rtypeCounter-1) + ' on term: '+term['TVAL']+'","current_query":"'+ currentJSONQuery['RTYPE'] + '","current_term":"'+term['TVAL']+'","percent_done":"'+ str(int(percentDone)) +'","is_complete":"False"}'
                                 progressData.save() 
                                 tCounter += 1
-                                logging.info("TimerC"+ " : " + str(time.clock()))
+                                logging.info("TimerC"+ " : " + str(time.process_time()))
                         #########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     
                         # (FRRT) FormRecordReferenceType Lookups            
                         # This is where things can get complicated. I've added a 'deep' search -- or the ability to search fields from a related model
@@ -5347,11 +5396,13 @@ class MyAdminSite(AdminSite):
                             if uniqueQuery: queryRTYPElist.append((rtypeCounter,'frrt',rtypePK,currentJSONQuery['LABEL'])) 
                             rtypeCounter += 1
                             tCounter = 0
-                            logging.info("TimerD"+ " : " + str(time.clock()))
+                            logging.info("TimerD"+ " : " + str(time.process_time()))
                             
                             #get the deep values
-                            deepRTYPE, deepPK = currentJSONQuery['RTYPE-DEEP'].split('-')
-                            
+                            try:
+                                deepRTYPE, deepPK = currentJSONQuery['RTYPE-DEEP'].split('-')
+                            except:
+                                deepRTYPE, deepPK = "FORMID",rtypePK
                             for term in currentJSONQuery['TERMS']:
                                 #==========================================================================================================================================================================================
                                 # IF WE ARE JUST LOOKING UP THE RTYPE FORM ID
@@ -5495,7 +5546,7 @@ class MyAdminSite(AdminSite):
                         #########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&########################################&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&
                         elif rtype == "FORMID":
                             tCounter = 0
-                            logging.info("TimerD"+ " : " + str(time.clock()))
+                            logging.info("TimerD"+ " : " + str(time.process_time()))
                             for term in currentJSONQuery['TERMS']:
                                 #Now begin modifying the SQL query which each term of each individual query
                                 #skip the term if the field was left blank
@@ -5608,9 +5659,9 @@ class MyAdminSite(AdminSite):
                         #Finally let's organize all of our reference and attribute values to match their provided order number
                         #We want to find all the forms that have no parent element first--these are the top of the nodes
                         #Then we'll organize the forms by hierarchy--which can then be put through the normal ordered query
-                        logger.info( "TIMER R"+ " : " + str(time.clock()))
+                        logger.info( "TIMER R"+ " : " + str(time.process_time()))
                         masterQuery = masterQuery.filter(hierarchy_parent=None).exclude(form_number=None, form_name=None)[startIndex:endIndex]
-                        logger.info( "TIMER RR"+ " : " + str(time.clock()))
+                        logger.info( "TIMER RR"+ " : " + str(time.process_time()))
                         if masterQuery:
                             total = masterQuery.count()
                             for aForm in masterQuery: 
@@ -5631,33 +5682,33 @@ class MyAdminSite(AdminSite):
                         #reset our masterQuery to our new hierachical list!
                         masterQuery = hierarchyFormList
                     else:             
-                        logger.info( "TIMER R"+ " : " + str(time.clock()))
+                        logger.info( "TIMER R"+ " : " + str(time.process_time()))
                         #sort the formlist by their sort_index
                         logger.info(startIndex)
                         logger.info(endIndex)
                         masterQuery = masterQuery.order_by('sort_index')
                         masterQuery = masterQuery[startIndex:endIndex]
-                    logger.info( "TIMER RR"+ " : " + str(time.clock()))
+                    logger.info( "TIMER RR"+ " : " + str(time.process_time()))
                     #count the query so we only make one database hit before looping(otherwise each loop would be another hit)
                     if masterQuery:
                         total = masterQuery.count()
-                        logger.info( "TIMER RRR"+ " : " + str(time.clock()))
+                        logger.info( "TIMER RRR"+ " : " + str(time.process_time()))
                         for aForm in masterQuery:
-                            logger.info( "TIMER S"+ " : " + str(time.clock()))
+                            logger.info( "TIMER S"+ " : " + str(time.process_time()))
                             queryCounter += 1
                             Qpercent = ( queryCounter * (30/(total*1.0)))
                             finalPercent = (60 + int(Qpercent))
                             progressData.jsonString = '{"SQL":"True","message":"Loading Queried Forms!","current_query":"'+ str(queryCounter) +'","current_term":"'+ str(total) +'","percent_done":"' + str(finalPercent) + '","is_complete":"False","stats":"none"}'
-                            logger.info( "TIMER RRRR"+ " : " + str(time.clock()))
+                            logger.info( "TIMER RRRR"+ " : " + str(time.process_time()))
                             progressData.save()
-                            logger.info( "TIMER RRRRR"+ " : " + str(time.clock()))
+                            logger.info( "TIMER RRRRR"+ " : " + str(time.process_time()))
                            # logger.info( str(aForm.pk) + ":  <!-- Current Form Pk")
                             rowList = []
                             #Let's loop through each item in the queryRTYPE list and match up the frav's in each queried form so the headers match the form attribute values
                             for rtype in queryRTYPElist:
                                 if rtype[1] == 'frat':
                                     #logger.info( str(rtype[2]) + '  ' + str(aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2]).count()))
-                                    logger.info( "TIMER X"+ " : " + str(time.clock()))
+                                    logger.info( "TIMER X"+ " : " + str(time.process_time()))
                                     formRVAL = aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=rtype[2])
                                     #We need to check for NULL FRAV's here. When a user manually creates new forms, they don't always have FRAVS created for them if they leave it blank
                                     if formRVAL.exists():
@@ -5672,7 +5723,7 @@ class MyAdminSite(AdminSite):
                                         newFRAV.record_value = ""
                                         newFRAV.save()
                                         rowList.append((rtype[0],'frav',newFRAV.record_value, newFRAV.pk))
-                                    logger.info( "TIMER Y"+ " : " + str(time.clock()))
+                                    logger.info( "TIMER Y"+ " : " + str(time.process_time()))
                                 else:
                                     #for frrt in aForm.ref_to_parent_form.all():
                                         #logger.info( "" + str(frrt.pk))
@@ -5702,7 +5753,7 @@ class MyAdminSite(AdminSite):
                                         #Store the external key value instead and change it to a frrv-null for the AJAX callable
                                         rowList.append((rtype[0],'frrv-null',"", ""))
 
-                            logger.info( "TIMER Z"+ " : " + str(time.clock()))
+                            logger.info( "TIMER Z"+ " : " + str(time.process_time()))
                             #sort the new combined reference ad attribute type list combined
                             rowList = sorted(rowList, key=lambda att: att[0])
                             # logger.info( str(rowList))
@@ -5713,6 +5764,7 @@ class MyAdminSite(AdminSite):
                             else:
                                 #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
                                 thumbnailURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
+                                testURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
                                 for record in rowList:            
                                     #if it's a reference
                                     if record[1] == 'frrv' or record[1] == 'frrv-ext':
@@ -5721,22 +5773,25 @@ class MyAdminSite(AdminSite):
                                         if currentRTYPE.record_reference_type.form_type_reference != None:
                                             #If its a reference to a media type
                                             if currentRTYPE.record_reference_type.form_type_reference.type == 1:
-                                                logger.info( "WE GOT A MATCH")
+                                                logger.info( "WE GOT A MATCH------------ " )
+                                                logger.info(record)
                                                 #Because a form record reference value is a ManyToMany relationship, we just grab the first one in the list
                                                 #TODO this may need to be edited later--because you can't order the selections. I may add another ForeignKey called
                                                 #"Thumbnail Reference" which links to a single relation to a form of a media type--this would also
                                                 #probably solve the complexity of looping through to grab it as it stands right now
                                                 #****WE also have to check for NULL references
                                                 if currentRTYPE.record_reference.all().count() > 0:
-                                                    thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
-                                                break
+                                                    thumbnailURI = currentRTYPE.record_reference.all()[0].get_ref_thumbnail()
+                                                if thumbnailURI != testURI: 
+                                                    break
+                                                
                                         
                             #we only want the first 5 values from the final ordered list of attributes
                             rowList = rowList[0:5]
 
 
                             formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])   
-                            logger.info( "TIMER ZZ"+ " : " + str(time.clock()))
+                            logger.info( "TIMER ZZ"+ " : " + str(time.process_time()))
                     form_att_type_list, form_list = form_att_type_list, formList
                     
                     #update our progress bar
@@ -5859,6 +5914,9 @@ class MyAdminSite(AdminSite):
         #
         #   TODO: I've also moved this into an API Endpoint rather than as a process of the view itself. There may be some strange code decisions left in here
         #   --as a function of that transition
+        #
+        #   EXTRA: I also switched the old formtype query endpoint to this same query engine, but limit the project/formtype selectors to that formtype and project
+        #       --This shouldn't alter this code at all--it's more on the templates and JS to figure out and handle
 
         ERROR_MESSAGE = ""
         
@@ -5978,6 +6036,7 @@ class MyAdminSite(AdminSite):
                             termTotalPercent = 60.0
                             termCount = len(query['terms'])
                             termMinPercent = 10.0
+                            empty_terms = ""
                             for index,term in enumerate(query['terms']):
                                 progressDataMessage['current_term'] = term['TVAL']
                                
@@ -6031,6 +6090,7 @@ class MyAdminSite(AdminSite):
                                     if term['TVAL'] != "" or term['QCODE'] == '4':
                                         logger.info("WE MADE IT!!!!   => QCODE = " + term['QCODE'])
                                         newQuery = None
+                                        empty_terms += "0"
                                         if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
                                             #Now let's figure out the QCODE, e.g. contains, match exact etc.
                                             if   term['QCODE'] == CONTAINS: newQuery = queriedForms.filter(formrecordattributevalue__record_value__icontains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#CONTAINS    
@@ -6038,8 +6098,8 @@ class MyAdminSite(AdminSite):
                                             elif term['QCODE'] == EXACT_MATCH: newQuery = queriedForms.filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
                                             elif term['QCODE'] == EXCLUDES: newQuery = queriedForms.exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
                                             elif term['QCODE'] == IS_NULL: newQuery = queriedForms.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK) | (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=rtypePK))#IS_NULL        
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)
+                                            logger.info(masterQuery.query)
+                                            logger.info(newQuery.query)
                                             #save stats and query
                                             term['count'] =  newQuery.count()
                                             termStats.append(term)
@@ -6052,14 +6112,12 @@ class MyAdminSite(AdminSite):
                                             elif term['QCODE'] == EXACT_MATCH: newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__exact=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#MATCHES EXACT                                    
                                             elif term['QCODE'] == EXCLUDES: newQuery = (queryFormtype.form_set.all().exclude(formrecordattributevalue__record_value__contains=term['TVAL'], formrecordattributevalue__record_attribute_type__pk=rtypePK))#EXCLUDES                                   
                                             elif term['QCODE'] == IS_NULL: newQuery = (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)) | (queryFormtype.form_set.all().filter(formrecordattributevalue__record_value__icontains="", formrecordattributevalue__record_attribute_type__pk=rtypePK))#IS_NULL 
-                                            #***RECYCLING BIN*** Make sure our NEW query is always filtered by recycling bin flags--All OR statements will need this filter
-                                            newQuery = newQuery.filter(flagged_for_deletion=False)
                                             #save stats and query
                                             term['count'] =  newQuery.count()
                                             termStats.append(term)
                                             masterQuery = (newQuery | masterQuery)
                                             singleQueryStats['additions'] = masterQuery.count()
-                                            logging.info("TimerB"+ " : " + str(time.clock()))
+                                            logging.info("TimerB"+ " : " + str(time.process_time()))
                                 #########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$#########################################$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$     
                                 # (FRRT) FormRecordReferenceType Lookups            
                                 # This is where things can get complicated. I've added a 'deep' search -- or the ability to search fields from a related model
@@ -6095,6 +6153,7 @@ class MyAdminSite(AdminSite):
                                         #skip the term if the field was left blank
                                         if term['TVAL'] != "" or term['QCODE'] == '4':
                                             newQuery = None
+                                            empty_terms += "0"
                                             if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
                                                 #Now let's figure out the QCODE, e.g. contains, match exact etc.
                                                 if   term['QCODE'] == CONTAINS: newQuery = queriedForms.filter(ref_to_parent_form__record_reference__form_name__icontains=term['TVAL'], ref_to_parent_form__record_reference_type__pk=rtypePK) #CONTAINS    
@@ -6137,6 +6196,7 @@ class MyAdminSite(AdminSite):
                                         #skip the term if the field was left blank
                                         if term['TVAL'] != "" or term['QCODE'] == '4':
                                             newQuery = None
+                                            empty_terms += "0"
                                             #----------------------------------------------------------
                                             # AND STATEMENT FOR A --TERM--
                                             if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
@@ -6206,6 +6266,7 @@ class MyAdminSite(AdminSite):
                                         #skip the term if the field was left blank
                                         if term['TVAL'] != "" or term['QCODE'] == '4':
                                             newQuery = None
+                                            empty_terms += "0"
                                             #----------------------------------------------------------
                                             # AND STATEMENT FOR A --TERM--
                                             if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
@@ -6272,12 +6333,13 @@ class MyAdminSite(AdminSite):
                                         singleQueryStats['rtype'] = rtype
                                         termStats = []
                                         singleQueryStats['all_terms'] = termStats
-                                        logging.info("TimerD"+ " : " + str(time.clock()))
+                                        logging.info("TimerD"+ " : " + str(time.process_time()))
 
                                         #Now begin modifying the SQL query which each term of each individual query
                                         #skip the term if the field was left blank
                                         if term['TVAL'] != "" or term['QCODE'] == '4':
                                             newQuery = None
+                                            empty_terms += "0"
                                             logger.info( str(queryFormtype.form_set.all().filter(form_name__contains=term['TVAL'])))
                                             if term['ANDOR'] != 'or':#We can assume it is an AND like addition if it's anything but 'or'
                                                 logger.info( "Is it working?")
@@ -6340,7 +6402,7 @@ class MyAdminSite(AdminSite):
                                 logger.info(str(float(primaryCount)) + "    :    " + str(secondaryCount))
                                 currentConstraintCount = 0.0
                                 
-                                if 'primary_constraints' in query:
+                                if 'primary_constraints' in query and empty_terms != "":
                                     constraint = query['primary_constraints']
                                     p_terms = constraint['terms']
                                     logger.info("OUR TERMS BELOW")
@@ -6382,13 +6444,13 @@ class MyAdminSite(AdminSite):
                                             rtypeLabel = ""
                                             logger.info(rtype + " :======RTYPE==================>  " + term['TVAL']   + "  using term: " + P_TVAL)
                                             if rtype == 'FRAT':
-                                                logging.info("TimerZ START" + " : " + str(time.clock()))
+                                                logging.info("TimerZ START" + " : " + str(time.process_time()))
                                                 if   constraint['QCODE'] == CONTAINS: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__icontains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK) 
                                                 elif constraint['QCODE'] == CS_CONTAINS: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__contains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
                                                 elif constraint['QCODE'] == EXACT_MATCH: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__exact=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
                                                 elif constraint['QCODE'] == EXCLUDES: constraintQuery = newQuery.exclude(formrecordattributevalue__record_value__contains=P_TVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#EXCLUDES                                   
                                                 elif constraint['QCODE'] == IS_NULL: constraintQuery = newQuery.filter(formrecordattributevalue__record_value__isnull=True, formrecordattributevalue__record_attribute_type__pk=rtypePK)#IS_NULL       
-                                                logging.info("TimerZ END" + "-- : " + str(time.clock()))  
+                                                logging.info("TimerZ END" + "-- : " + str(time.process_time()))  
                                             elif rtype == 'FORMID':
                                                 if   constraint['QCODE'] == CONTAINS: constraintQuery = newQuery.filter(form_name__icontains=P_TVAL) #CONTAINS    
                                                 elif constraint['QCODE'] == CS_CONTAINS: constraintQuery = newQuery.filter(form_name__contains=P_TVAL) #ICONTAINS                                   
@@ -6505,7 +6567,7 @@ class MyAdminSite(AdminSite):
                                                         rtypePK = secondaryConstraint['pk']
                                                         rtypeTwoLabel = ""
                                                         if rtype == 'FRAT':
-                                                            logging.info("TimerKK START" + " : " + str(time.clock()))
+                                                            logging.info("TimerKK START" + " : " + str(time.process_time()))
                                                             if   secondaryConstraint['QCODE'] == CONTAINS: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__icontains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)
                                                             elif secondaryConstraint['QCODE'] == CS_CONTAINS: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__contains=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#ICONTAINS                                   
                                                             elif secondaryConstraint['QCODE'] == EXACT_MATCH: secondaryConstraintQuery = constraintQuery.filter(formrecordattributevalue__record_value__exact=secondaryTVAL, formrecordattributevalue__record_attribute_type__pk=rtypePK)#MATCHES EXACT                                    
@@ -6531,7 +6593,7 @@ class MyAdminSite(AdminSite):
                                                                 elif secondaryConstraint['QCODE'] == EXACT_MATCH: secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__form_name__exact=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#MATCHES EXACT                                    
                                                                 elif secondaryConstraint['QCODE'] == EXCLUDES: secondaryConstraintQuery = constraintQuery.exclude(ref_to_parent_form__record_reference__form_name__contains=secondaryTVAL, ref_to_parent_form__record_reference_type__pk=rtypePK)#EXCLUDES                                   
                                                                 elif secondaryConstraint['QCODE'] == IS_NULL: secondaryConstraintQuery = constraintQuery.filter(ref_to_parent_form__record_reference__isnull=True, ref_to_parent_form__record_reference_type__pk=rtypePK)#IS_NULL                                                
-                                                                logging.info("TimerKK END" + "-- : " + str(time.clock()))   
+                                                                logging.info("TimerKK END" + "-- : " + str(time.process_time()))   
                                                             elif deepRTYPE == 'FRRT':  
                                                                 rtypeTwoLabel = FormRecordReferenceType.objects.get(pk=deepPK).record_type
                                                                 if   secondaryConstraint['QCODE'] == CONTAINS: 
@@ -6585,11 +6647,15 @@ class MyAdminSite(AdminSite):
                                                     currentConstraintCount+=1    
                                                  
                                                 
-                                                logging.info("TimerG"+ " : " + str(time.clock()))
+                                                logging.info("TimerG"+ " : " + str(time.process_time()))
                                         currentConstraintCount+=1
+                                else:
+                                    logging.info("No primary Constraints set OR our search terms were left blank")
+                                    progressDataMessage['key_error'] = "No primary Constraints set OR our search terms were left blank"
                                 #Increment our progressData stats counter for the term
                                 #We've been modifying it in the constraints--so let's round it down before incrementing it a full step
                                 termCounter +=  1
+ 
                             progressDataMessage['message'] = "Loading Queried Forms & Sending generated stats now..."
                             progressDataMessage['current_query'] = ""
                             progressDataMessage['current_term'] = ""
@@ -6659,7 +6725,10 @@ class MyAdminSite(AdminSite):
                             progressData.jsonString=json.dumps(progressDataMessage)
                             progressData.save()                        
                             #CACHE -- This cache's the query before looping through it
+                            logger.info("BEFORE CACHING QUERY/EVALUATING")
+                            logger.info(masterQuery.query)
                             if masterQuery:
+                                logger.info("AFTER CACHEING QUERY/EVALUATING")
                                 formCounter = 0 
                                 for aForm in masterQuery:
                                     progressDataMessage['message'] = "Running through forms and converting to a usable format for navigation"
@@ -6687,10 +6756,10 @@ class MyAdminSite(AdminSite):
                                                 newFRAV.save()
                                                 rowList.append((rtype[0],'frav',newFRAV.record_value, newFRAV.pk))
                                         else:
-                                            logger.info( aForm.ref_to_parent_form.all().count())
-                                            logger.info( aForm.pk)
-                                            for frrt in aForm.ref_to_parent_form.all():
-                                                logger.info( "" + str(frrt.pk))
+                                            #logger.info( aForm.ref_to_parent_form.all().count())
+                                            #logger.info( aForm.pk)
+                                            #for frrt in aForm.ref_to_parent_form.all():
+                                            #    logger.info( "" + str(frrt.pk))
                                             formRVAL = aForm.ref_to_parent_form.all().filter(record_reference_type__pk=rtype[2])
                                             if formRVAL.exists():
                                                 formRVAL = formRVAL[0]
@@ -6724,7 +6793,7 @@ class MyAdminSite(AdminSite):
                                     if aForm.form_type.type == 1:
                                         thumbnailURI = aForm.get_thumbnail_type()
                                     else:
-                                        logger.info("LOOKING FOR A FRRT")
+                                        #logger.info("LOOKING FOR A FRRT")
                                         #let's find the first media type in the order but offer a default to "NO PREVIEW" if not found
                                         thumbnailURI = staticfiles_storage.url("/site-images/no-thumb-missing.png")
                                         for record in rowList:            
@@ -6735,26 +6804,26 @@ class MyAdminSite(AdminSite):
                                                 if currentRTYPE.record_reference_type.form_type_reference != None:
                                                     #If its a reference to a media type
                                                     if currentRTYPE.record_reference_type.form_type_reference.type == 1:
-                                                        logger.info( "WE GOT A MATCH")
+                                                        #logger.info( "WE GOT A MATCH")
                                                         #Because a form record reference value is a ManyToMany relationship, we just grab the first one in the list
                                                         #TODO this may need to be edited later--because you can't order the selections. I may add another ForeignKey called
                                                         #"Thumbnail Reference" which links to a single relation to a form of a media type--this would also
                                                         #probably solve the complexity of looping through to grab it as it stands right now
                                                         #****WE also have to check for NULL references
                                                         if currentRTYPE.record_reference.all().count() > 0:
-                                                            thumbnailURI = currentRTYPE.record_reference.all()[0].get_thumbnail_type()
+                                                            thumbnailURI = currentRTYPE.record_reference.all()[0].get_ref_thumbnail()
                                                         break
                                         #Finally--if there aren't any relevant media types in our frrts, let's do a last second check for ANY frrts that are media types
                                         #--that AREN'T in our RTYPE list
                                         if thumbnailURI == staticfiles_storage.url("/site-images/no-thumb-missing.png"):
-                                            logger.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    We're TRYING TO GET A THUMBNAIL")
+                                            #logger.info("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%    We're TRYING TO GET A THUMBNAIL")
                                             currentRVAL = aForm.ref_to_parent_form.filter(record_reference_type__form_type_reference__type=1)
-                                            logger.info(currentRVAL)
+                                            #logger.info(currentRVAL)
                                             if currentRVAL.exists():
                                                 #Just get the first one out of the list
                                                 if len(currentRVAL[0].record_reference.all()) > 0:
-                                                    logger.info(currentRVAL[0].record_reference.all()[0].form_name)
-                                                    thumbnailURI = currentRVAL[0].record_reference.all()[0].get_thumbnail_type()
+                                                    #logger.info(currentRVAL[0].record_reference.all()[0].form_name)
+                                                    thumbnailURI = currentRVAL[0].record_reference.all()[0].get_ref_thumbnail()
                                                     
                                     formList.append([thumbnailURI,str(aForm.pk), aForm, rowList])   
                                     formCounter += 1
@@ -6889,7 +6958,7 @@ class MyAdminSite(AdminSite):
             if request.method == 'POST':         
                 currentForm = Form.objects.get(pk=request.POST['form_pk'])
                 #$$$ SECURITY $$$ Make sure form is in the same project space as the user or refuse the request for the list
-                if currentForm.project.pk == request.user.permissions.project.pk:
+                if currentForm.project.pk == request.user.permissions.project.pk or (currentForm.is_public and currentForm.flagged_for_deletion == False):
                     jsonData = {}
                     rtype_list = []
                     jsonData['rtype_list'] = rtype_list
@@ -6903,7 +6972,9 @@ class MyAdminSite(AdminSite):
                     frrv_list = currentForm.ref_to_parent_form.all().filter(flagged_for_deletion=False)
                     
                     #Let's try and grab our backward referencing forms now.
+                    back_frrv_list = None
                     back_frrv_list = currentForm.ref_to_value_form.all().filter(flagged_for_deletion=False)
+                    if back_frrv_list.count() > 100: back_frrv_list = None
                     
                     
                     #If Statement forces evaluation of the query set before the loop
@@ -6922,7 +6993,9 @@ class MyAdminSite(AdminSite):
                             
                     #If Statement forces evaluation of the query set before the loop
                     if frrv_list:
-                        logger.info(frrv_list)
+
+                        
+                        
                         for FRRV in frrv_list:
                             currentRTYPE = {}
                             rvalList = []
@@ -6966,26 +7039,28 @@ class MyAdminSite(AdminSite):
                     #If Statement forces evaluation of the query set before the loop
                     if back_frrv_list:
                         logger.info(back_frrv_list)
+                        flattened_list = back_frrv_list.values('form_parent__pk','form_parent__form_name','form_parent__form_type__pk','form_parent__pk','form_parent__form_type__form_type_name',)
                         formTypeList = {}
-                        for FRRV in back_frrv_list:
+                        for FRRV in flattened_list:
+                            logger.info(FRRV)
                             #Create Our RVAL
                             newRVAL = {}
-                            newRVAL['form_pk'] = FRRV.form_parent.pk
-                            newRVAL['form_name'] = FRRV.form_parent.form_name
-                            newRVAL['thumbnail'] = FRRV.form_parent.get_ref_thumbnail()
-                            newRVAL['url'] =  reverse('maqlu_admin:edit_form',kwargs={'project_pk': request.user.permissions.project.pk, 'form_type_pk':FRRV.form_parent.form_type.pk, 'form_pk': FRRV.form_parent.pk})
+                            newRVAL['form_pk'] = FRRV['form_parent__pk']
+                            newRVAL['form_name'] = FRRV['form_parent__form_name']
+                            newRVAL['thumbnail'] = staticfiles_storage.url("/site-images/no-thumb-file.png") 
+                            newRVAL['url'] =  reverse('maqlu_admin:edit_form',kwargs={'project_pk': request.user.permissions.project.pk, 'form_type_pk':FRRV['form_parent__form_type__pk'], 'form_pk': FRRV['form_parent__pk']})
                             #create Our Back FRRT RTYPE dictionary entry
                             #We only need to create it once--if it already exists, then just add the rval to its existing list 
-                            if FRRV.form_parent.form_type.pk in formTypeList:
-                                formTypeList[FRRV.form_parent.form_type.pk]['rval'].append(newRVAL)
+                            if FRRV['form_parent__form_type__pk'] in formTypeList:
+                                formTypeList[FRRV['form_parent__form_type__pk']]['rval'].append(newRVAL)
                             else:
                                 formRef = {}
                                 formRef['rtype'] = "BACK_FRRT"
-                                formRef['formtype_name'] = FRRV.form_parent.form_type.form_type_name
-                                formRef['formtype_pk'] = FRRV.form_parent.form_type.pk
+                                formRef['formtype_name'] = FRRV['form_parent__form_type__form_type_name']
+                                formRef['formtype_pk'] = FRRV['form_parent__pk']
                                 formRef['rval'] = []
                                 formRef['rval'].append(newRVAL)
-                                formTypeList[FRRV.form_parent.form_type.pk] = formRef
+                                formTypeList[FRRV['form_parent__form_type__pk']] = formRef
                         #Now add it to the format in our rtype_list    
                         for key in formTypeList:
                             rtype_list.append(formTypeList[key])                    
@@ -7022,17 +7097,32 @@ class MyAdminSite(AdminSite):
             #$$$ SECURITY $$$ Make sure we only take POST requests
             if request.method == 'POST':   
                 logger.info( request.POST)
-                currentFormType = FormType.objects.get(pk=request.POST['formtype_pk'])                       
+                currentFormType = FormType.objects.get(pk=request.POST['formtype_pk'])   
+                if 'is_dropdown' in request.POST:
+                    print(request.POST['is_dropdown'])
                 #$$$ SECURITY $$$ Make sure form is in the same project space as the user or refuse the request for the list
                 if currentFormType.project.pk == request.user.permissions.project.pk:
                     jsonData = {}
                     form_list = []
                     jsonData['form_list'] = form_list
                     
+                       
+                    
                     #*** RECYCLING BIN *** Make sure Forms are filtered by their deletion flags
                     for aForm in currentFormType.form_set.all().filter(flagged_for_deletion=False):
                         currentForm = {}
-                        currentForm['form_label'] = aForm.form_name
+                        #In case we are the template engine asking for a dropdown list--we want to make sure we look for the other provided record type for the form
+                        #to append to the dropdown label
+                        if 'is_dropdown' in request.POST:
+                            logger.info("TRYING TO ADD APPENDED DESCRIPTOR TO DROP DOWN")
+                            logger.info(request.POST['is_dropdown'])
+                            logger.info(aForm.form_type.controlled_field_descriptor)
+                            logger.info(aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=aForm.form_type.controlled_field_descriptor, flagged_for_deletion=False).first().record_value)
+                        
+                        if 'is_dropdown' in request.POST:
+                            currentForm['form_label'] = aForm.form_name + ' - ' + aForm.formrecordattributevalue_set.all().filter(record_attribute_type__pk=aForm.form_type.controlled_field_descriptor, flagged_for_deletion=False).first().record_value
+                        else:
+                            currentForm['form_label'] = aForm.form_name
                         currentForm['form_pk'] = aForm.pk
                         form_list.append(currentForm)
                     #convert python dict to a json string and send it back as a response
@@ -8788,115 +8878,115 @@ class MyAdminSite(AdminSite):
         #
         #   --FOR TEMPLATES:   use this method   {% url 'maqlu_admin:view-name' arg1=v1 arg2=v2 %}
         
-        from django.conf.urls import url
+        from django.urls import re_path
         urls = super(MyAdminSite, self).get_urls()
         my_urls = [
             #Base Admin Site
-            url(r'^$', admin.site.admin_view(self.index), name='index'),
+            re_path(r'^$', admin.site.admin_view(self.index), name='index'),
             
             #All Admin API Endpoints 
 
             # MASTER ADMIN Endpoints
-            url(r'^create_project/$', admin.site.admin_view(self.create_project), name='create_project'),
-            url(r'^delete_project/$', admin.site.admin_view(self.delete_project), name='delete_project'),
-            url(r'^reset_user_password/$', admin.site.admin_view(self.reset_user_password), name='reset_user_password'),
-            url(r'^create_project_admin/$', admin.site.admin_view(self.create_project_admin), name='create_project_admin'),
-            url(r'^delete_user/$', admin.site.admin_view(self.delete_user), name='delete_user'),
-            url(r'^edit_security_message/$', admin.site.admin_view(self.edit_security_message), name='edit_security_message'),
-            url(r'^create_edit_blogpost/$', admin.site.admin_view(self.create_edit_blogpost), name='create_edit_blogpost'),
-            url(r'^get_admin_blog_post/$', admin.site.admin_view(self.get_admin_blog_post), name='get_admin_blog_post'),
-            url(r'^delete_admin_post/$', admin.site.admin_view(self.delete_admin_post), name='delete_admin_post'),
-            url(r'^master_admin_project_redirect/(?P<project_pk>[0-9]+)/$', admin.site.admin_view(self.master_admin_project_redirect), name='master_admin_project_redirect'),
+            re_path(r'^create_project/$', admin.site.admin_view(self.create_project), name='create_project'),
+            re_path(r'^delete_project/$', admin.site.admin_view(self.delete_project), name='delete_project'),
+            re_path(r'^reset_user_password/$', admin.site.admin_view(self.reset_user_password), name='reset_user_password'),
+            re_path(r'^create_project_admin/$', admin.site.admin_view(self.create_project_admin), name='create_project_admin'),
+            re_path(r'^delete_user/$', admin.site.admin_view(self.delete_user), name='delete_user'),
+            re_path(r'^edit_security_message/$', admin.site.admin_view(self.edit_security_message), name='edit_security_message'),
+            re_path(r'^create_edit_blogpost/$', admin.site.admin_view(self.create_edit_blogpost), name='create_edit_blogpost'),
+            re_path(r'^get_admin_blog_post/$', admin.site.admin_view(self.get_admin_blog_post), name='get_admin_blog_post'),
+            re_path(r'^delete_admin_post/$', admin.site.admin_view(self.delete_admin_post), name='delete_admin_post'),
+            re_path(r'^master_admin_project_redirect/(?P<project_pk>[0-9]+)/$', admin.site.admin_view(self.master_admin_project_redirect), name='master_admin_project_redirect'),
             
             # All Endpoints that return model objects
-            url(r'^get_user_list/$', admin.site.admin_view(self.get_user_list), name='get_user_list'),
-            url(r'^get_previous_next_forms/$', admin.site.admin_view(self.get_previous_next_forms), name='get_previous_next_forms'),
-            url(r'^get_projects/$', admin.site.admin_view(self.get_projects), name='get_projects'),
-            url(r'^get_formtypes/$', admin.site.admin_view(self.get_formtypes), name='get_formtypes'),
-            url(r'^get_rtypes/$', admin.site.admin_view(self.get_rtypes), name='get_rtypes'),
-            url(r'^get_deep_rtypes/$', admin.site.admin_view(self.get_deep_rtypes), name='get_deep_rtypes'),
-            url(r'^get_formtype_form_list/$', admin.site.admin_view(self.get_formtype_form_list), name='get_formtype_form_list'),
-            url(r'^get_geospatial_formtypes/$', admin.site.admin_view(self.get_geospatial_formtypes), name='get_geospatial_formtypes'),
-            url(r'^get_form_rtypes/$', admin.site.admin_view(self.get_form_rtypes), name='get_form_rtypes'),
-            url(r'^get_formtype_geospatial_layers/$', admin.site.admin_view(self.get_formtype_geospatial_layers), name='get_formtype_geospatial_layers'),
-            url(r'^get_form_search_list/$', admin.site.admin_view(self.get_form_search_list), name='get_form_search_list'),
-            url(r'^get_all_unique_rtype_rvals/$', admin.site.admin_view(self.get_all_unique_rtype_rvals), name='get_all_unique_rtype_rvals'),                
-            url(r'^get_geo_category_matches/$', admin.site.admin_view(self.get_geo_category_matches), name='get_geo_category_matches'),
-            url(r'^get_geo_quantity_frat_counter_auto/$', admin.site.admin_view(self.get_geo_quantity_frat_counter_auto), name='get_geo_quantity_frat_counter_auto'),
-            url(r'^get_geo_numeric_rtypes/$', admin.site.admin_view(self.get_geo_numeric_rtypes), name='get_geo_numeric_rtypes'),
-            url(r'^get_geo_graduated_applied_classes/$', admin.site.admin_view(self.get_geo_graduated_applied_classes), name='get_geo_graduated_applied_classes'),
-            url(r'^get_geo_rules_classes/$', admin.site.admin_view(self.get_geo_rules_classes), name='get_geo_rules_classes'),
+            re_path(r'^get_user_list/$', admin.site.admin_view(self.get_user_list), name='get_user_list'),
+            re_path(r'^get_previous_next_forms/$', admin.site.admin_view(self.get_previous_next_forms), name='get_previous_next_forms'),
+            re_path(r'^get_projects/$', admin.site.admin_view(self.get_projects), name='get_projects'),
+            re_path(r'^get_formtypes/$', admin.site.admin_view(self.get_formtypes), name='get_formtypes'),
+            re_path(r'^get_rtypes/$', admin.site.admin_view(self.get_rtypes), name='get_rtypes'),
+            re_path(r'^get_deep_rtypes/$', admin.site.admin_view(self.get_deep_rtypes), name='get_deep_rtypes'),
+            re_path(r'^get_formtype_form_list/$', admin.site.admin_view(self.get_formtype_form_list), name='get_formtype_form_list'),
+            re_path(r'^get_geospatial_formtypes/$', admin.site.admin_view(self.get_geospatial_formtypes), name='get_geospatial_formtypes'),
+            re_path(r'^get_form_rtypes/$', admin.site.admin_view(self.get_form_rtypes), name='get_form_rtypes'),
+            re_path(r'^get_formtype_geospatial_layers/$', admin.site.admin_view(self.get_formtype_geospatial_layers), name='get_formtype_geospatial_layers'),
+            re_path(r'^get_form_search_list/$', admin.site.admin_view(self.get_form_search_list), name='get_form_search_list'),
+            re_path(r'^get_all_unique_rtype_rvals/$', admin.site.admin_view(self.get_all_unique_rtype_rvals), name='get_all_unique_rtype_rvals'),                
+            re_path(r'^get_geo_category_matches/$', admin.site.admin_view(self.get_geo_category_matches), name='get_geo_category_matches'),
+            re_path(r'^get_geo_quantity_frat_counter_auto/$', admin.site.admin_view(self.get_geo_quantity_frat_counter_auto), name='get_geo_quantity_frat_counter_auto'),
+            re_path(r'^get_geo_numeric_rtypes/$', admin.site.admin_view(self.get_geo_numeric_rtypes), name='get_geo_numeric_rtypes'),
+            re_path(r'^get_geo_graduated_applied_classes/$', admin.site.admin_view(self.get_geo_graduated_applied_classes), name='get_geo_graduated_applied_classes'),
+            re_path(r'^get_geo_rules_classes/$', admin.site.admin_view(self.get_geo_rules_classes), name='get_geo_rules_classes'),
             # All Endpoints that run tools non-database-modification tools
             
-            url(r'^run_master_query_engine/$', admin.site.admin_view(self.run_master_query_engine), name='run_master_query_engine'),
+            re_path(r'^run_master_query_engine/$', admin.site.admin_view(self.run_master_query_engine), name='run_master_query_engine'),
 
             # Endpoints for Editing Model objects
-            url(r'^save_user_query/$', admin.site.admin_view(self.save_user_query), name='save_user_query'),            
-            url(r'^save_project_changes/$', admin.site.admin_view(self.save_project_changes), name='save_project_changes'),
-            url(r'^save_form_type_changes/$', admin.site.admin_view(self.save_form_type_changes), name='save_form_type_changes'),
-            url(r'^save_form_changes/$', admin.site.admin_view(self.save_form_changes), name='save_form_changes'),            
-            url(r'^modify_project_user/$', admin.site.admin_view(self.modify_project_user), name='modify_project_user'),
-            url(r'^bulk_edit_formtype/$', admin.site.admin_view(self.bulk_edit_formtype), name='bulk_edit_formtype'),
-            url(r'^edit_menugroup/$', admin.site.admin_view(self.edit_menugroup), name='edit_menugroup'),
+            re_path(r'^save_user_query/$', admin.site.admin_view(self.save_user_query), name='save_user_query'),            
+            re_path(r'^save_project_changes/$', admin.site.admin_view(self.save_project_changes), name='save_project_changes'),
+            re_path(r'^save_form_type_changes/$', admin.site.admin_view(self.save_form_type_changes), name='save_form_type_changes'),
+            re_path(r'^save_form_changes/$', admin.site.admin_view(self.save_form_changes), name='save_form_changes'),            
+            re_path(r'^modify_project_user/$', admin.site.admin_view(self.modify_project_user), name='modify_project_user'),
+            re_path(r'^bulk_edit_formtype/$', admin.site.admin_view(self.bulk_edit_formtype), name='bulk_edit_formtype'),
+            re_path(r'^edit_menugroup/$', admin.site.admin_view(self.edit_menugroup), name='edit_menugroup'),
             
             # Endpoints for Creating new model objects 
-            url(r'^create_new_form/$', admin.site.admin_view(self.create_new_form), name='create_new_form'),
-            url(r'^create_new_form_type/$', admin.site.admin_view(self.create_new_form_type), name='create_new_form_type'),
-            url(r'^create_new_form_type_template/$', admin.site.admin_view(self.create_new_form_type_template), name='create_new_form_type_template'),
-            url(r'^create_new_webpage/$', admin.site.admin_view(self.create_new_webpage), name='create_new_webpage'),
+            re_path(r'^create_new_form/$', admin.site.admin_view(self.create_new_form), name='create_new_form'),
+            re_path(r'^create_new_form_type/$', admin.site.admin_view(self.create_new_form_type), name='create_new_form_type'),
+            re_path(r'^create_new_form_type_template/$', admin.site.admin_view(self.create_new_form_type_template), name='create_new_form_type_template'),
+            re_path(r'^create_new_webpage/$', admin.site.admin_view(self.create_new_webpage), name='create_new_webpage'),
             
             # Endpoints for random tools
-            url(r'^navigate_query_pagination/$', admin.site.admin_view(self.navigate_query_pagination), name='navigate_query_pagination'),
-            url(r'^navigate_master_query_pagination/$', admin.site.admin_view(self.navigate_master_query_pagination), name='navigate_master_query_pagination'),
-            url(r'^check_progress/$', admin.site.admin_view(self.check_progress), name='check_progress'),
-            url(r'^check_progress_query/$', admin.site.admin_view(self.check_progress_query), name='check_progress_query'),
-            url(r'^username_taken/$', admin.site.admin_view(self.username_taken), name='username_taken'),
-            url(r'^debug_tool/$', admin.site.admin_view(self.debug_tool), name='debug_tool'),
-            url(r'^debug_toolA/$', admin.site.admin_view(self.debug_toolA), name='debug_toolA'),
+            re_path(r'^navigate_query_pagination/$', admin.site.admin_view(self.navigate_query_pagination), name='navigate_query_pagination'),
+            re_path(r'^navigate_master_query_pagination/$', admin.site.admin_view(self.navigate_master_query_pagination), name='navigate_master_query_pagination'),
+            re_path(r'^check_progress/$', admin.site.admin_view(self.check_progress), name='check_progress'),
+            re_path(r'^check_progress_query/$', admin.site.admin_view(self.check_progress_query), name='check_progress_query'),
+            re_path(r'^username_taken/$', admin.site.admin_view(self.username_taken), name='username_taken'),
+            re_path(r'^debug_tool/$', admin.site.admin_view(self.debug_tool), name='debug_tool'),
+            re_path(r'^debug_toolA/$', admin.site.admin_view(self.debug_toolA), name='debug_toolA'),
             
             # Endpoints for the Recycling Bin
-            url(r'^delete_user_profile_query/$', admin.site.admin_view(self.delete_user_profile_query), name='delete_user_profile_query'),
-            url(r'^delete_form_type/$', admin.site.admin_view(self.delete_form_type), name='delete_form_type'),
-            url(r'^delete_form/$', admin.site.admin_view(self.delete_form), name='delete_form'),
-            url(r'^delete_frat/$', admin.site.admin_view(self.delete_frat), name='delete_frat'),
-            url(r'^delete_frrt/$', admin.site.admin_view(self.delete_frrt), name='delete_frrt'),
-            url(r'^delete_form_type_group/$', admin.site.admin_view(self.delete_form_type_group), name='delete_form_type_group'),
-            url(r'^restore_form_type/$', admin.site.admin_view(self.restore_form_type), name='restore_form_type'),
-            url(r'^restore_form/$', admin.site.admin_view(self.restore_form), name='restore_form'),
-            url(r'^restore_frat/$', admin.site.admin_view(self.restore_frat), name='restore_frat'),
-            url(r'^restore_frrt/$', admin.site.admin_view(self.restore_frrt), name='restore_frrt'),
-            url(r'^recycle_form_type/$', admin.site.admin_view(self.recycle_form_type), name='recycle_form_type'),
-            url(r'^recycle_form/$', admin.site.admin_view(self.recycle_form), name='recycle_form'),
-            url(r'^recycle_frat/$', admin.site.admin_view(self.recycle_frat), name='recycle_frat'),
-            url(r'^recycle_frrt/$', admin.site.admin_view(self.recycle_frrt), name='recycle_frrt'),
-            url(r'^recycle_webpage/$', admin.site.admin_view(self.recycle_webpage), name='recycle_webpage'),
-            url(r'^load_recycling_bin/$', admin.site.admin_view(self.load_recycling_bin), name='load_recycling_bin'),
+            re_path(r'^delete_user_profile_query/$', admin.site.admin_view(self.delete_user_profile_query), name='delete_user_profile_query'),
+            re_path(r'^delete_form_type/$', admin.site.admin_view(self.delete_form_type), name='delete_form_type'),
+            re_path(r'^delete_form/$', admin.site.admin_view(self.delete_form), name='delete_form'),
+            re_path(r'^delete_frat/$', admin.site.admin_view(self.delete_frat), name='delete_frat'),
+            re_path(r'^delete_frrt/$', admin.site.admin_view(self.delete_frrt), name='delete_frrt'),
+            re_path(r'^delete_form_type_group/$', admin.site.admin_view(self.delete_form_type_group), name='delete_form_type_group'),
+            re_path(r'^restore_form_type/$', admin.site.admin_view(self.restore_form_type), name='restore_form_type'),
+            re_path(r'^restore_form/$', admin.site.admin_view(self.restore_form), name='restore_form'),
+            re_path(r'^restore_frat/$', admin.site.admin_view(self.restore_frat), name='restore_frat'),
+            re_path(r'^restore_frrt/$', admin.site.admin_view(self.restore_frrt), name='restore_frrt'),
+            re_path(r'^recycle_form_type/$', admin.site.admin_view(self.recycle_form_type), name='recycle_form_type'),
+            re_path(r'^recycle_form/$', admin.site.admin_view(self.recycle_form), name='recycle_form'),
+            re_path(r'^recycle_frat/$', admin.site.admin_view(self.recycle_frat), name='recycle_frat'),
+            re_path(r'^recycle_frrt/$', admin.site.admin_view(self.recycle_frrt), name='recycle_frrt'),
+            re_path(r'^recycle_webpage/$', admin.site.admin_view(self.recycle_webpage), name='recycle_webpage'),
+            re_path(r'^load_recycling_bin/$', admin.site.admin_view(self.load_recycling_bin), name='load_recycling_bin'),
 
             #Endpoints for Importing and Exporting data into TARA
-            url(r'^run_form_type_form_importer/$', admin.site.admin_view(self.run_form_type_form_importer), name='run_form_type_form_importer'),
-            url(r'^run_form_type_importer/$', admin.site.admin_view(self.run_form_type_importer), name='run_form_type_importer'),
-            url(r'^run_new_rtype_importer/$', admin.site.admin_view(self.run_new_rtype_importer), name='run_new_rtype_importer'),
-            url(r'^run_geojson_importer/$', admin.site.admin_view(self.run_geojson_importer), name='run_geojson_importer'),            
-            url(r'^export_formtype/$', admin.site.admin_view(self.export_formtype), name='export_formtype'),
-            url(r'^export_project/$', admin.site.admin_view(self.export_project), name='export_project'),
+            re_path(r'^run_form_type_form_importer/$', admin.site.admin_view(self.run_form_type_form_importer), name='run_form_type_form_importer'),
+            re_path(r'^run_form_type_importer/$', admin.site.admin_view(self.run_form_type_importer), name='run_form_type_importer'),
+            re_path(r'^run_new_rtype_importer/$', admin.site.admin_view(self.run_new_rtype_importer), name='run_new_rtype_importer'),
+            re_path(r'^run_geojson_importer/$', admin.site.admin_view(self.run_geojson_importer), name='run_geojson_importer'),            
+            re_path(r'^export_formtype/$', admin.site.admin_view(self.export_formtype), name='export_formtype'),
+            re_path(r'^export_project/$', admin.site.admin_view(self.export_project), name='export_project'),
 
             
             #All Admin Template Views
-            url(r'^project/(?P<project_pk>[0-9]+)/$', self.admin_view(self.project_home), name='project_home'),
-            url(r'^project/(?P<project_pk>[0-9]+)/recycling_bin/$', self.admin_view(self.recycling_bin), name='recycling_bin'),
-            url(r'^project/(?P<project_pk>[0-9]+)/formtype_importer/$', admin.site.admin_view(self.form_type_importer), name='formtype_importer'),
-            url(r'^project/(?P<project_pk>[0-9]+)/geojson_importer/$', admin.site.admin_view(self.geojson_importer), name='geojson_importer'),
-            url(r'^project/(?P<project_pk>[0-9]+)/geospatial_engine/$', admin.site.admin_view(self.geospatial_engine), name='geospatial_engine'),
-            url(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/rtype_importer/$', admin.site.admin_view(self.rtype_importer), name='rtype_importer'),
-            url(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/form_importer/$', admin.site.admin_view(self.formtype_form_importer), name='formtype_form_importer'),
-            url(r'^project/(?P<project_pk>[0-9]+)/formtype_editor/(?P<form_type_pk>[0-9]+)/$', admin.site.admin_view(self.edit_form_type), name='edit_form_type'),
-            url(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/$', admin.site.admin_view(self.view_form_type), name='view_form_type'),
-            url(r'^project/(?P<project_pk>[0-9]+)/formtype_query_engine/(?P<form_type_pk>[0-9]+)/$', admin.site.admin_view(self.query_form_type), name='query_form_type'),
-            url(r'^project/(?P<project_pk>[0-9]+)/master_query_engine/$', admin.site.admin_view(self.master_query_engine), name='master_query_engine'),
-            url(r'^project/(?P<project_pk>[0-9]+)/formtype_generator/$', admin.site.admin_view(self.new_form_type), name='new_form_type'),
-            url(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/formtype_template_generator/$', admin.site.admin_view(self.edit_form_type_template), name='edit_form_type_template'),
-            url(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/form_generator/$', admin.site.admin_view(self.new_form), name='new_form'),
-            url(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/form_editor/(?P<form_pk>[0-9]+)/$', admin.site.admin_view(self.edit_form), name='edit_form')
+            re_path(r'^project/(?P<project_pk>[0-9]+)/$', self.admin_view(self.project_home), name='project_home'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/recycling_bin/$', self.admin_view(self.recycling_bin), name='recycling_bin'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/formtype_importer/$', admin.site.admin_view(self.form_type_importer), name='formtype_importer'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/geojson_importer/$', admin.site.admin_view(self.geojson_importer), name='geojson_importer'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/geospatial_engine/$', admin.site.admin_view(self.geospatial_engine), name='geospatial_engine'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/rtype_importer/$', admin.site.admin_view(self.rtype_importer), name='rtype_importer'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/form_importer/$', admin.site.admin_view(self.formtype_form_importer), name='formtype_form_importer'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/formtype_editor/(?P<form_type_pk>[0-9]+)/$', admin.site.admin_view(self.edit_form_type), name='edit_form_type'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/$', admin.site.admin_view(self.view_form_type), name='view_form_type'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/formtype_query_engine/(?P<form_type_pk>[0-9]+)/$', admin.site.admin_view(self.query_form_type), name='query_form_type'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/master_query_engine/$', admin.site.admin_view(self.master_query_engine), name='master_query_engine'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/formtype_generator/$', admin.site.admin_view(self.new_form_type), name='new_form_type'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/formtype_template_generator/$', admin.site.admin_view(self.edit_form_type_template), name='edit_form_type_template'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/form_generator/$', admin.site.admin_view(self.new_form), name='new_form'),
+            re_path(r'^project/(?P<project_pk>[0-9]+)/formtype/(?P<form_type_pk>[0-9]+)/form_editor/(?P<form_pk>[0-9]+)/$', admin.site.admin_view(self.edit_form), name='edit_form')
             
         ]
         
@@ -8921,69 +9011,9 @@ class MyAdminSite(AdminSite):
             
         
     def debug_tool(self, request, **kwargs):
-        response = HttpResponse(content_type='text/csv')
-        response['Content-Disposition'] = 'attachment; filename="' + 'test' + '.csv"'
-        
-
-        writer = csv.writer(response)
-        titles = []
-        titles.append('__Title__')
-
-        rows = []
-        for result in Subject.objects.all():
-            row = []
-            row_dict = {}
-            
-            # store title and url
-            row_dict[0] = result.title
-            
-            # controlled properties
-
-            cps = result.subjectcontrolproperty_set.all()
-                  
-            for each_prop in cps:
-
-                prop_name = each_prop.control_property.property.strip()
-                prop_value = each_prop.control_property_value.title.strip()
-                if not (prop_name in titles):
-                    column_index = len(titles)                        
-                    titles.append(prop_name)
-                else:
-                    column_index = titles.index(prop_name)
-                    if column_index in row_dict:
-                        prop_value = row_dict[column_index] + '; ' + prop_value
-                row_dict[column_index] = "\"" + prop_value +"\""
-            
-            # free-form properties
-
-            ps = result.subjectproperty_set.all()
-                 
-            for each_prop in ps:
-
-                prop_name = each_prop.property.property.strip()
-                prop_value = each_prop.property_value.strip()
-                if not (prop_name in titles):
-                    column_index = len(titles)                        
-                    titles.append(prop_name)
-                else:
-                    column_index = titles.index(prop_name)
-                    if column_index in row_dict:
-                        prop_value = row_dict[column_index] + '; ' + prop_value
-                row_dict[column_index] = "\"" + prop_value +"\""                 
-                        
-            # store row in list
-            for i in range(len(titles)):
-                if i in row_dict:
-                    row.append(row_dict[i])
-                else:
-                    row.append('')
-            rows.append(row)
-
-        # write out the rows, starting with header
-        writer.writerow(titles)
-        for each_row in rows:
-            writer.writerow([unicode(s).encode("utf-8") for s in each_row])
-        return response
+        #I got rid of this older debug tool tied to older uronline style models but keep its endpoint for easier use int he future
+        print("Nothing Happens Here")
+		
 
 
 

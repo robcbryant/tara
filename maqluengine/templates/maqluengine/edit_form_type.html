@@ -1,6 +1,6 @@
  
 {% extends "admin/base.html" %}
-{% load staticfiles %}
+{% load static %}
 
 {% load enki_tags %}
 {% block title %}Maqlu Engine{% endblock %}
@@ -169,6 +169,10 @@
                                <div class="switch-id">
                                     <span class="glyphicon glyphicon-retweet" title="Switch with Form ID"></span>
                                     <input class="switch-id-checkbox" type="checkbox" name="frat__{{formrecordattributetype.pk}}__switch-id">
+                                </div>
+							   <div class="controlfieldesc-id">
+                                    <span class="glyphicon glyphicon-comment" title="Set as appended description to a control field. (will not be used otherwise)"></span>
+                                    <input class="switch-id-checkbox" type="checkbox" name="frat__{{formrecordattributetype.pk}}__controlfieldesc-id" {%if formtype.controlled_field_descriptor == formrecordattributetype.pk  %}checked{%endif%}>
                                 </div>
                             </div>
                             {%endif%}
@@ -365,6 +369,7 @@
     -->
     {% if user_access >= access_level %}   
     <script src="{% static 'js/maqlu-csrf-header.js'  %}"></script>
+    <script src="{% static 'js/enki-form-navigation-search.js'  %}"></script>
     <script>          
     //GLOBAL FUNCTIONS//
     function getAPIEndpoints(){

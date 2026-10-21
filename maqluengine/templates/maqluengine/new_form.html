@@ -1,6 +1,6 @@
 
 {% extends "admin/base.html" %}
-{% load staticfiles %}
+{% load static %}
 
 {% load enki_tags %}
 {% block title %}Maqlu Engine{% endblock %}
@@ -35,8 +35,8 @@
                                 <div id="geospatial" style="min-height:400px;">
                                     <!--geospatial stuff goes here-->
                                     <div id="gis-help-text-box" class="col-md-12"></div>
-                                    <div style="display:none;"><strong>GeoJSON Data</strong></div>
-                                    <div style="display:none;"><textarea id="id_geojson_string" name ="form_geojson_string"></textarea></div>
+                                    <div style=";"><strong>GeoJSON Data</strong></div>
+                                    <div style=""><textarea id="id_geojson_string" name ="form_geojson_string"></textarea></div>
                                 </div>
                             </div>
                                                       
@@ -219,7 +219,7 @@
     var CURRENT_FORM_PK = '{{form.pk}}';
     var CURRENT_FORMTYPE_PK = '{{formtype.pk}}'; 
     var CURRENT_PROJECT_PK = '{{project.pk}}';
-    var INITIALIZATION_CODE = 0;
+    var INITIALIZATION_CODE = 1;
     var API_URLS = getAPIEndpoints();
     
     var DEFAULT_GEOJSON = '{{project.geojson_string}}';

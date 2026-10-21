@@ -56,7 +56,7 @@ def getUniqueSessionToken(temp):
     return random.randint(1, 999999)
 
 def isLengthGreaterThan(string,max_length):
-    print >>sys.stderr, str(len(string)) + "  is length vs : " + max_length
+    print (str(len(string)) + "  is length vs : " + max_length, file=sys.stderr)
     if len(string) > int(max_length):
         return 1
     else:
@@ -67,7 +67,7 @@ def get_number_of_cols_needed_to_finish(totalLoopCount, remainingInterations):
     return range(rangeLimit)
 
 def print_httpd_log(message):
-    print >>sys.stderr, message
+    print (message, file=sys.stderr)
     return ""
     
 def get_toolbar_title(tool_bar_code):
